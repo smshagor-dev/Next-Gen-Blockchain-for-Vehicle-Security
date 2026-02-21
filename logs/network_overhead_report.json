@@ -1,0 +1,35 @@
+{
+  "generated_at": "2026-02-21T14:15:35.063132+00:00",
+  "rows": [
+    {
+      "sample": "small",
+      "plain_json_bytes": 76,
+      "protocol_no_mac_bytes": 199,
+      "protocol_hmac_bytes": 274,
+      "encrypted_hmac_bytes": 455,
+      "overhead_protocol_no_mac_pct": 161.84,
+      "overhead_protocol_hmac_pct": 260.53,
+      "overhead_encrypted_hmac_pct": 498.68
+    },
+    {
+      "sample": "medium",
+      "plain_json_bytes": 452,
+      "protocol_no_mac_bytes": 604,
+      "protocol_hmac_bytes": 679,
+      "encrypted_hmac_bytes": 955,
+      "overhead_protocol_no_mac_pct": 33.63,
+      "overhead_protocol_hmac_pct": 50.22,
+      "overhead_encrypted_hmac_pct": 111.28
+    },
+    {
+      "sample": "large",
+      "plain_json_bytes": 3530,
+      "protocol_no_mac_bytes": 3765,
+      "protocol_hmac_bytes": 3840,
+      "encrypted_hmac_bytes": 5059,
+      "overhead_protocol_no_mac_pct": 6.66,
+      "overhead_protocol_hmac_pct": 8.78,
+      "overhead_encrypted_hmac_pct": 43.31
+    }
+  ]
+}

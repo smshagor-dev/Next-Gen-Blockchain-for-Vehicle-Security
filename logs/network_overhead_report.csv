@@ -1,0 +1,4 @@
+sample,plain_json_bytes,protocol_no_mac_bytes,protocol_hmac_bytes,encrypted_hmac_bytes,overhead_protocol_no_mac_pct,overhead_protocol_hmac_pct,overhead_encrypted_hmac_pct
+small,76,199,274,455,161.84,260.53,498.68
+medium,452,604,679,955,33.63,50.22,111.28
+large,3530,3765,3840,5059,6.66,8.78,43.31
