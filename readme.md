@@ -30,34 +30,64 @@ SmartCar research platform with blockchain audit trail, PoA consensus, ZKP-based
 - `perf_metrics.py`, `zkp_latency_report.py`, `network_overhead_analysis.py`, `logs/`
 - ZKP latency metrics, network overhead reports/charts, runtime logs
 
-## Root Structure (Current)
+## Folder Structure (Current)
 
 ```text
-Smart Car/
-|- main.py
-|- dashboard.py
-|- blockchain.py
-|- sync_protocol.py
-|- v2x_protocol.py
-|- zkp_privacy.py
-|- did_identity.py
-|- smart_contracts.py
-|- edge_layer.py
-|- anomaly_detector.py
-|- env_config.py
-|- hardware_bridge.py
-|- pi_sensor_node.py
-|- SmartCarSensorNode.ino
-|- camera_emergency_brake.cpp
-|- multi_car_majority_demo.py
-|- attacker_fake_zkp.py
-|- network_overhead_analysis.py
-|- perf_metrics.py
-|- zkp_latency_report.py
-|- .env
-|- logs/
-|- image source/
+Smart Car - Blockchain for Vehicle Security/
+|-- main.py
+|-- dashboard.py
+|-- blockchain.py
+|-- blockchain.cpp
+|-- blockchain.h
+|-- sync_protocol.py
+|-- v2x_protocol.py
+|-- zkp_privacy.py
+|-- did_identity.py
+|-- smart_contracts.py
+|-- edge_layer.py
+|-- anomaly_detector.py
+|-- federated_learning.py
+|-- fl_trainer_node.py
+|-- vehicle_sensors.py
+|-- hardware_bridge.py
+|-- pi_sensor_node.py
+|-- decentralized_fl_demo.py
+|-- network_overhead_analysis.py
+|-- multi_car_majority_demo.py
+|-- v2x_demo_nodes.py
+|-- attacker_fake_zkp.py
+|-- perf_metrics.py
+|-- zkp_latency_report.py
+|-- pqc_kyber_handshake_test.py
+|-- SmartCarSensorNode.ino
+|-- camera_emergency_brake.cpp
+|-- CMakeLists.txt
+|-- requirements.txt
+|-- .env
+|-- readme.md
+|-- logs/
+|-- build/
+|-- image_source/
+|   |-- System-Architechture.png
+|   |-- privacy-security-flow.png
+|   |-- commonication-blockchain-synctrization.png
+|   |-- federaated-learning-flow.png
+|   |-- Zero-Knowladge-proofs.png
+|   |-- Large-language-model.png
+|   |-- project_theam.jpg
+|   `-- road_scene.svg
+`-- __pycache__/
 ```
+
+## Image Preview (`image_source/`)
+
+![Project Theme](image_source/project_theam.jpg)
+![System Architecture](image_source/System-Architechture.png)
+![Privacy Security Flow](image_source/privacy-security-flow.png)
+![Blockchain Communication Sync](image_source/commonication-blockchain-synctrization.png)
+![Federated Learning Flow](image_source/federaated-learning-flow.png)
+![Zero Knowledge Proofs](image_source/Zero-Knowladge-proofs.png)
+![Large Language Model](image_source/Large-language-model.png)
 
 ## Production-Oriented ZKP Parameters
 
@@ -305,76 +335,552 @@ Config in `.env`:
 - `SMARTCAR_OWNER_RECOVERY_KEY=...`
 - `SMARTCAR_OWNER_ALLOW_CHAIN_RESET=1`
 
-## Math Calculation
+## Function-wise Math Calculation + Mermaid
 
-### 1) Block Hash
+### `blockchain.py`
+
+#### `dual_hash(data)`
 
 ```text
-block_hash = SHA3-256(index || timestamp || vehicle_id || telemetry_hash_sha3 || event_hash_sha3 || previous_hash)
+sha2 = SHA2-256(data)
+sha3 = SHA3-256(data)
+combined = SHA2-256(data + sha3)
 ```
 
-### 2) Dual Hash
-
-```text
-sha2 = SHA2-256(block_hash)
-sha3 = SHA3-256(block_hash)
-dual_hash_combined = sha2 + ":" + sha3
+```mermaid
+flowchart TD
+    A[data] --> B[sha2_256]
+    A --> C[sha3_256]
+    A --> D[concat data+sha3]
+    D --> E[sha2_256 chained]
 ```
 
-### 3) PoA Block Signature (HMAC)
+#### `compute_block_hash(...)`
 
 ```text
-poa_payload = block_hash + "|" + validator_id + "|" + authority_round
-poa_signature = HMAC-SHA256(validator_key, poa_payload)
+raw = index || timestamp || vehicle_id || telemetry_hash_sha3 || event_hash_sha3 || previous_hash
+block_hash = SHA3-256(raw)
 ```
 
-### 4) ZKP Commitment (Lightweight)
-
-```text
-C = (G^value mod P) * (H^blind mod P) mod P
+```mermaid
+flowchart TD
+    A[index/timestamp/vehicle/telemetry/event/prev] --> B[concatenate]
+    B --> C[SHA3-256]
+    C --> D[block_hash]
 ```
 
-Knowledge proof challenge:
+#### `poa_sign_block(...)`
 
 ```text
-ch = H(commitment || t || context) mod (P-1)
+payload = block_hash || "|" || validator_id || "|" || authority_round
+poa_signature = HMAC-SHA256(validator_key, payload)
 ```
 
-Speed-limit relation check:
-
-```text
-speed + diff = limit
-commit_speed * commit_diff ?= G^limit * H^(r_speed + r_diff) (mod P)
+```mermaid
+flowchart TD
+    A[block_hash + validator + round] --> B[payload string]
+    B --> C[HMAC-SHA256]
+    C --> D[poa_signature]
 ```
 
-### 5) Camera Distance Estimation
-
-Used in dashboard object detection:
+#### `Block.compute_hashes(...)`
 
 ```text
-distance_m = (real_object_height_m * focal_length_px) / bbox_height_px
+telemetry_hash_sha2 = SHA2-256(telemetry_string)
+telemetry_hash_sha3 = SHA3-256(telemetry_string)
+event_hash_sha2 = SHA2-256(event_data)
+event_hash_sha3 = SHA3-256(event_data)
+dual_hash_combined = SHA2-256(block_hash) || ":" || SHA3-256(block_hash)
+biometric_hash_sha3 = SHA3-256(heart_rate|drowsiness|unwell_flag)
 ```
 
-Current implementation constant form:
-
-```text
-distance_m = (1.70 * 850.0) / bbox_height_px
+```mermaid
+flowchart TD
+    A[telemetry,event] --> B[SHA2/SHA3 hashes]
+    B --> C[compute_block_hash]
+    C --> D[dual hash]
+    A --> E[biometric raw string]
+    E --> F[SHA3 biometric hash]
 ```
 
-### 6) Speedometer Needle Angle
-
-For max speed `Vmax` and current speed `v`:
+#### `SmartCarCrypto.encrypt(plaintext)`
 
 ```text
-angle_deg = start_deg - (v / Vmax) * sweep_deg
+key = PBKDF2-HMAC-SHA256(password, salt, 100000, 64 bytes)
+ciphertext = plaintext XOR keystream
+mac = HMAC-SHA256(mac_key, nonce || ciphertext)
+package = base64(nonce || mac || ciphertext)
 ```
 
-Current UI values:
+```mermaid
+flowchart TD
+    A[plaintext] --> B[keystream generate]
+    B --> C[XOR encrypt]
+    C --> D[HMAC nonce+ciphertext]
+    D --> E[base64 package]
+```
+
+#### `SmartCarCrypto.decrypt(encrypted_b64)`
 
 ```text
-start_deg = 162
-sweep_deg = 144
-Vmax = 220 km/h
+expected_mac = HMAC-SHA256(mac_key, nonce || ciphertext)
+if mac != expected_mac => reject
+plaintext = ciphertext XOR keystream
+```
+
+```mermaid
+flowchart TD
+    A[package] --> B[decode nonce/mac/ciphertext]
+    B --> C[recompute HMAC]
+    C --> D{match?}
+    D -- no --> E[reject]
+    D -- yes --> F[XOR decrypt]
+```
+
+### `zkp_privacy.py`
+
+#### `commit(value, blind)`
+
+```text
+C = (G^(value mod Q) * H^r) mod P
+```
+
+```mermaid
+flowchart TD
+    A[value,r] --> B[pow G^value, H^r]
+    B --> C[multiply mod P]
+    C --> D[commitment C]
+```
+
+#### `prove_knowledge(...)`
+
+```text
+t  = (G^k1 * H^k2) mod P
+ch = H(commitment|t|context) mod Q
+s1 = (k1 + ch*value) mod Q
+s2 = (k2 + ch*blind) mod Q
+```
+
+```mermaid
+flowchart TD
+    A[k1,k2] --> B[t]
+    B --> C[ch]
+    C --> D[s1,s2]
+    D --> E[proof]
+```
+
+#### `verify_knowledge(...)`
+
+```text
+lhs = (G^s1 * H^s2) mod P
+rhs = (t * commitment^ch) mod P
+valid = (lhs == rhs)
+```
+
+```mermaid
+flowchart TD
+    A[proof + commitment] --> B[ch]
+    B --> C[lhs]
+    B --> D[rhs]
+    C --> E{lhs==rhs}
+    D --> E
+```
+
+#### `create_speed_limit_proof(...)`
+
+```text
+speed = round(speed_kmh), speed >= 0
+diff = limit - speed
+relation_blind = (r_speed + r_diff) mod Q
+```
+
+```mermaid
+flowchart TD
+    A[speed,limit] --> B[diff=limit-speed]
+    B --> C[commit speed]
+    B --> D[commit diff]
+    C --> E[proof_speed]
+    D --> F[proof_diff]
+    C --> G[relation_blind]
+    D --> G
+```
+
+#### `verify_speed_limit_proof(...)`
+
+```text
+lhs = (commit_speed * commit_diff) mod P
+rhs = (G^limit * H^relation_blind) mod P
+valid = proof_speed_ok AND proof_diff_ok AND (lhs == rhs)
+```
+
+```mermaid
+flowchart TD
+    A[proof object] --> B[verify speed proof]
+    A --> C[verify diff proof]
+    A --> D[relation check lhs==rhs]
+    B --> E{all true?}
+    C --> E
+    D --> E
+```
+
+### `anomaly_detector.py`
+
+#### `_mean_std(key)`
+
+```text
+mean = sum(vals)/n
+var  = sum((v-mean)^2)/(n-1)
+std  = sqrt(var)
+```
+
+```mermaid
+flowchart TD
+    A[history values] --> B[mean]
+    B --> C[variance]
+    C --> D[std]
+```
+
+#### `detect_telemetry(telemetry)`
+
+```text
+z = |(x-mean)/std|
+zsum = z_speed + z_accel + z_temp + z_rpm
+score += zsum/4 + rule_based_penalties
+is_anomaly = (score >= threshold) OR (reason_count >= 2)
+```
+
+```mermaid
+flowchart TD
+    A[input telemetry] --> B[hard-rule penalties]
+    A --> C[z-score features]
+    B --> D[score]
+    C --> D
+    D --> E{score>=thr or reasons>=2}
+```
+
+### `edge_layer.py`
+
+#### `_avg(vals)`
+
+```text
+avg = sum(vals)/len(vals)
+```
+
+```mermaid
+flowchart TD
+    A[list] --> B[sum]
+    A --> C[count]
+    B --> D[divide]
+    C --> D
+```
+
+#### `_flush(event_hint)`
+
+```text
+speed      = avg(speed_vals)
+obstacle   = min(obs_vals)
+brake      = max(brake_vals)
+drowsiness = max(drowsy_vals)
+```
+
+```mermaid
+flowchart TD
+    A[buffer telemetry] --> B[extract vectors]
+    B --> C[avg metrics]
+    B --> D[min metrics]
+    B --> E[max metrics]
+    C --> F[summary telemetry/meta]
+    D --> F
+    E --> F
+```
+
+### `vehicle_sensors.py`
+
+#### `GPSSimulator.update(speed_kmh, heading_change)`
+
+```text
+speed_ms = speed_kmh / 3.6
+d = speed_ms * dt / 111111
+lat += d * cos(heading_rad)
+lon += d * sin(heading_rad)
+```
+
+```mermaid
+flowchart TD
+    A[speed,heading] --> B[km/h to m/s]
+    B --> C[distance in degrees]
+    C --> D[update lat with cos]
+    C --> E[update lon with sin]
+```
+
+#### `EngineSimulator.update(throttle, dt)`
+
+```text
+target_rpm = 800 + (throttle/100)*6200
+rpm += (target_rpm - rpm)*0.1
+fuel -= (0.00001 + throttle*0.000005)*dt
+oil_pressure = 3.5 + (rpm/6000)*1.5 + noise
+```
+
+```mermaid
+flowchart TD
+    A[throttle,dt] --> B[target rpm]
+    B --> C[rpm smoothing]
+    A --> D[fuel decrement]
+    C --> E[oil pressure]
+```
+
+#### `EmergencyBrakeController._on_obstacle_detected(obstacle)`
+
+```text
+if distance < 30m: brake_pressure = 100
+else brake_pressure = (1 - distance/100)*100
+```
+
+```mermaid
+flowchart TD
+    A[obstacle distance] --> B{distance<100?}
+    B -- no --> C[no emergency brake]
+    B -- yes --> D{distance<30?}
+    D -- yes --> E[pressure=100]
+    D -- no --> F[pressure=(1-d/100)*100]
+```
+
+### `dashboard.py`
+
+#### `_estimate_distance(box_h)`
+
+```text
+distance_m = (1.70 * 850.0) / box_h
+```
+
+```mermaid
+flowchart TD
+    A[box height] --> B[distance formula]
+    B --> C[estimated meters]
+```
+
+#### `_draw_speedometer()`
+
+```text
+angle_deg = 162 - (speed/220)*144
+needle_x = cx + (r-30)*cos(angle)
+needle_y = cy - (r-30)*sin(angle)
+```
+
+```mermaid
+flowchart TD
+    A[current speed] --> B[clamp 0..220]
+    B --> C[compute angle]
+    C --> D[cos/sin]
+    D --> E[needle position]
+```
+
+### `federated_learning.py`
+
+#### `_sigmoid(x)`
+
+```text
+sigmoid(x) = 1 / (1 + exp(-clip(x,-40,40)))
+```
+
+```mermaid
+flowchart TD
+    A[x] --> B[clip]
+    B --> C[exp]
+    C --> D[sigmoid]
+```
+
+#### `FederatedObstacleLearner._extract_features(telemetry)`
+
+```text
+speed_norm = clip(speed/180, 0, 1)
+accel_norm = clip(|accel|/12, 0, 1)
+brake_norm = clip(brake/100, 0, 1)
+temp_norm  = clip((temp-60)/60, 0, 1)
+near_obstacle = 1 if distance<=35 else 0
+hr_risk = 1 if hr<=45 or hr>=140 else 0
+```
+
+```mermaid
+flowchart TD
+    A[telemetry] --> B[normalize speed/accel/brake/temp]
+    A --> C[threshold features]
+    B --> D[feature vector]
+    C --> D
+```
+
+#### `FederatedObstacleLearner._train_batch(x,y,epochs)`
+
+```text
+logits = Xw
+pred = sigmoid(logits)
+grad = X^T(pred - y)/n
+w = w - lr*grad
+loss = -mean(y*log(pred)+(1-y)*log(1-pred))
+```
+
+```mermaid
+flowchart TD
+    A[X,y,w] --> B[forward pass]
+    B --> C[gradient]
+    C --> D[weight update]
+    D --> E[loss compute]
+```
+
+#### `FederatedObstacleLearner._clip_delta(delta, clip_norm)`
+
+```text
+n = ||delta||2
+if n > c: delta = delta * (c/n)
+```
+
+```mermaid
+flowchart TD
+    A[delta] --> B[norm]
+    B --> C{n>clip?}
+    C -- yes --> D[scale c/n]
+    C -- no --> E[keep delta]
+```
+
+#### `FederatedTrainer._mad_filter(vals,k)`
+
+```text
+med = median(vals)
+mad = median(|vals - med|) + 1e-9
+z = |vals - med| / mad
+keep = z <= k
+```
+
+```mermaid
+flowchart TD
+    A[norm values] --> B[median]
+    B --> C[MAD]
+    C --> D[robust z]
+    D --> E[keep mask]
+```
+
+#### `FederatedTrainer._robust_weighted_trimmed_mean(...)`
+
+```text
+sort each feature column
+trim lowest/highest ratio
+output_j = sum(col_j * weight_j)/sum(weight_j)
+```
+
+```mermaid
+flowchart TD
+    A[deltas + sample weights] --> B[sort per dimension]
+    B --> C[trim tails]
+    C --> D[weighted mean]
+    D --> E[aggregated delta]
+```
+
+### `v2x_protocol.py`
+
+#### `DynamicCryptoAgilityLayer._agility_score(recommended_mode)`
+
+```text
+avg_rtt = mean(rtt_history)
+mps = msg_count / window_sec
+latency_component = min(1, avg_rtt/latency_hi_ms)
+traffic_component = min(1, mps/traffic_hi_mps)
+score = wL*latency_component + wT*traffic_component
+```
+
+```mermaid
+flowchart TD
+    A[rtt history] --> B[latency component]
+    C[msg timestamps] --> D[traffic component]
+    B --> E[weighted sum score]
+    D --> E
+```
+
+#### `DynamicCryptoAgilityLayer.maybe_switch_mode(...)`
+
+```text
+if mode=DILITHIUM and score>=up_thr -> target=SHA3
+if mode=SHA3 and score<=down_thr -> target=DILITHIUM
+switch only after confirm_count and switch_interval_sec
+```
+
+```mermaid
+flowchart TD
+    A[current mode + score] --> B[target mode decision]
+    B --> C[pending confirmation count]
+    C --> D{count ok and interval ok?}
+    D -- yes --> E[switch]
+    D -- no --> F[keep]
+```
+
+#### `V2XHub._recommend_crypto_mode()`
+
+```text
+score = 0.5*traffic_ratio + 0.3*client_load_ratio + 0.2*latency_ratio
+mode = SHA3 if score>=0.66 else DILITHIUM
+```
+
+```mermaid
+flowchart TD
+    A[messages/sec] --> B[traffic ratio]
+    C[clients] --> D[load ratio]
+    E[latency hint] --> F[latency ratio]
+    B --> G[weighted score]
+    D --> G
+    F --> G
+    G --> H[mode choose]
+```
+
+### `network_overhead_analysis.py`
+
+#### `analyze()`
+
+```text
+overhead_pct = ((protocol_bytes - plain_bytes) / plain_bytes) * 100
+```
+
+Applied for:
+- `protocol_no_mac_bytes`
+- `protocol_hmac_bytes`
+- `encrypted_hmac_bytes`
+
+```mermaid
+flowchart TD
+    A[plain payload bytes] --> B[protocol bytes]
+    B --> C[subtract]
+    A --> D[divide]
+    C --> D
+    D --> E[*100 overhead%]
+```
+
+### `did_identity.py`
+
+#### `_msg_bits(message)`
+
+```text
+digest = SHA3-256(message)
+bits[i] = (byte >> shift) & 1
+```
+
+```mermaid
+flowchart TD
+    A[message] --> B[SHA3 digest bytes]
+    B --> C[bit extraction loop]
+    C --> D[256 bits]
+```
+
+#### `verify_did_proof(challenge, proof, did_document)`
+
+```text
+challenge_hash == SHA3-256(challenge)
+for each i: SHA3(signature[i]) == public_pairs[i][bit_i]
+```
+
+```mermaid
+flowchart TD
+    A[challenge/proof/doc] --> B[hash challenge check]
+    B --> C[bitwise Lamport verify loop]
+    C --> D{all matched?}
 ```
 
 ## Docstring Update

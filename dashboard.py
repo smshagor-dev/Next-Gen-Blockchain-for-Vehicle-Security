@@ -84,7 +84,7 @@ class RoadSvgRenderer:
         """Render static road SVG elements and car marker."""
         self.canvas.delete("all")
         if not os.path.exists(self.svg_path):
-            self.canvas.create_text(20, 20, text="Missing: image source/road_scene.svg", fill="#fca5a5", anchor="nw")
+            self.canvas.create_text(20, 20, text="Missing: image_source/road_scene.svg", fill="#fca5a5", anchor="nw")
             return
         root = ET.parse(self.svg_path).getroot()
         vb = root.attrib.get("viewBox", "")
@@ -321,7 +321,7 @@ class SmartCarDashboard(tk.Tk):
         p_road = self._panel(center_left, "ROAD SCENE")
         self.road_canvas = tk.Canvas(p_road, width=640, height=210, bg="#101820", highlightthickness=0)
         self.road_canvas.pack(fill="x")
-        self.road_svg = RoadSvgRenderer(self.road_canvas, os.path.join(os.getcwd(), "image source", "road_scene.svg"))
+        self.road_svg = RoadSvgRenderer(self.road_canvas, os.path.join(os.getcwd(), "image_source", "road_scene.svg"))
         self.road_svg.render()
 
         p_chain_feed = self._panel(center_left, "BLOCKCHAIN LEDGER FEED")
