@@ -7,12 +7,6 @@
 - Role: `Project Architect & Lead Developer`
 - Description: A smart-car security platform where blockchain integrity, ZKP privacy, DID trust, V2X security, anomaly defense, edge processing, federated learning, forensic logging, and hardware control are integrated into one end-to-end architecture.
 
-### Reviewer Snapshot
-- Problem solved: Trusted, privacy-preserving, and attack-resilient vehicle data sharing for connected/autonomous mobility.
-- Technical strengths: Dual-hash blockchain, post-quantum-friendly identity/signature paths, adaptive V2X cryptography, encrypted forensic evidence, robust FL aggregation.
-- Practical strengths: Hardware bridge support (Pi/Arduino), real-time telemetry flow, measurable latency/overhead instrumentation, safe-mode dispatch.
-- Readiness: Research-proven architecture with clear extension path toward production hardening.
-
 ## Project Overview
 This is a modern security framework designed to protect smart and autonomous vehicle data against present-day cyber threats and future quantum-era risks. The platform uses Zero-Knowledge Proofs to preserve privacy, decentralized identity for trust without a central authority, and federated learning to improve AI behavior without exposing raw personal data.
 
