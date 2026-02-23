@@ -14,7 +14,7 @@ import math
 import time
 import threading
 from dataclasses import dataclass
-from typing import Optional, Callable
+from typing import Optional, Callable, Dict
 import logging
 
 logger = logging.getLogger('SmartCarSensors')
@@ -57,6 +57,13 @@ class BrakeData:
     abs_active: bool
     traction_control: bool
     emergency_brake: bool
+
+
+@dataclass
+class BiometricData:
+    heart_rate_bpm: float
+    drowsiness_score: float
+    unwell: bool
 
 # ============================================================
 # Obstacle Sensor (LIDAR/Radar Simulation)
@@ -326,6 +333,33 @@ class VehicleSensorSuite:
         self.brake = EmergencyBrakeController(self.obstacle)
         self._speed = 0.0
         self._throttle = 0.0
+        self._biometric_provider: Optional[Callable[[], Dict]] = None
+        self._last_biometric = BiometricData(heart_rate_bpm=72.0, drowsiness_score=0.0, unwell=False)
+
+    def set_biometric_provider(self, provider: Callable[[], Dict]):
+        """
+        Register real biometric provider.
+        provider() should return dict with:
+          heart_rate_bpm, drowsiness_score, unwell
+        """
+        self._biometric_provider = provider
+
+    def _read_biometric(self) -> BiometricData:
+        if not self._biometric_provider:
+            return self._last_biometric
+        try:
+            raw = self._biometric_provider() or {}
+            hr = float(raw.get("heart_rate_bpm", self._last_biometric.heart_rate_bpm))
+            drowsy = float(raw.get("drowsiness_score", self._last_biometric.drowsiness_score))
+            unwell = bool(raw.get("unwell", False))
+            self._last_biometric = BiometricData(
+                heart_rate_bpm=max(20.0, min(240.0, hr)),
+                drowsiness_score=max(0.0, min(1.0, drowsy)),
+                unwell=unwell,
+            )
+        except Exception:
+            pass
+        return self._last_biometric
 
     def update(self, speed: float = None, throttle: float = None, heading_change: float = 0):
         if speed is not None:
@@ -340,6 +374,7 @@ class VehicleSensorSuite:
         gps = self.gps.get()
         engine = self.engine.get()
         brake_status = self.brake.get_status()
+        bio = self._read_biometric()
         return {
             'obstacle': {
                 'distance': obstacle.distance if obstacle else 999.0,
@@ -361,6 +396,11 @@ class VehicleSensorSuite:
                 'pressure': brake_status.pressure,
                 'emergency': brake_status.emergency_brake,
                 'abs': brake_status.abs_active,
+            },
+            'biometric': {
+                'heart_rate_bpm': bio.heart_rate_bpm,
+                'drowsiness_score': bio.drowsiness_score,
+                'unwell': bio.unwell,
             }
         }
 

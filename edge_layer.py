@@ -8,16 +8,34 @@ Aggregates raw telemetry locally and emits compact summaries for blockchain writ
 """
 
 import time
-from typing import Dict, List, Optional, Tuple
+from collections import deque
+from typing import Dict, List, Optional, Tuple, Deque, Any
 
 
 class EdgeTelemetryLayer:
-    def __init__(self, enabled: bool = True, window_size: int = 5, flush_interval_sec: float = 2.0):
+    def __init__(
+        self,
+        enabled: bool = True,
+        window_size: int = 5,
+        flush_interval_sec: float = 2.0,
+        forensic_queue_size: int = 2400,
+        forensic_window_sec: int = 600,
+    ):
         self.enabled = enabled
         self.window_size = max(1, int(window_size))
         self.flush_interval_sec = max(0.1, float(flush_interval_sec))
         self._buffer: List[Tuple[dict, str]] = []
         self._last_flush_ts = time.time()
+        self.forensic_window_sec = max(60, int(forensic_window_sec))
+        self._forensic_queue: Deque[Dict[str, Any]] = deque(maxlen=max(100, int(forensic_queue_size)))
+
+    def record_forensic_sample(self, telemetry: dict, event_hint: str = ""):
+        self._forensic_queue.append({
+            "timestamp": telemetry.get("timestamp", ""),
+            "event": event_hint or "TELEMETRY:UPDATE",
+            "telemetry": dict(telemetry),
+            "ingest_ts": time.time(),
+        })
 
     def _avg(self, vals: List[float]) -> float:
         if not vals:
@@ -45,6 +63,9 @@ class EdgeTelemetryLayer:
         rpm_vals = [float(t.get("rpm", 0.0)) for t in telemetry_list]
         odo_vals = [float(t.get("odometer", 0.0)) for t in telemetry_list]
         ebrake_vals = [bool(t.get("emergency_brake_active", False)) for t in telemetry_list]
+        hr_vals = [float(t.get("driver_heart_rate_bpm", 0.0)) for t in telemetry_list]
+        drowsy_vals = [float(t.get("driver_drowsiness_score", 0.0)) for t in telemetry_list]
+        unwell_vals = [bool(t.get("driver_unwell", False)) for t in telemetry_list]
 
         summary_telemetry = {
             "speed": self._avg(speed_vals),
@@ -61,6 +82,9 @@ class EdgeTelemetryLayer:
             "throttle_position": self._avg(thr_vals),
             "rpm": self._avg(rpm_vals),
             "odometer": odo_vals[-1] if odo_vals else 0.0,
+            "driver_heart_rate_bpm": self._avg(hr_vals) if hr_vals else 0.0,
+            "driver_drowsiness_score": max(drowsy_vals) if drowsy_vals else 0.0,
+            "driver_unwell": any(unwell_vals),
             "timestamp": telemetry_list[-1].get("timestamp", ""),
         }
 
@@ -72,6 +96,8 @@ class EdgeTelemetryLayer:
             "engine_temp_avg": summary_telemetry["engine_temp"],
             "engine_temp_max": max(temp_vals) if temp_vals else 0.0,
             "obstacle_min": summary_telemetry["obstacle_distance"],
+            "heart_rate_avg": summary_telemetry["driver_heart_rate_bpm"],
+            "drowsiness_max": summary_telemetry["driver_drowsiness_score"],
             "event_count": len(events),
         }
 
@@ -91,6 +117,9 @@ class EdgeTelemetryLayer:
         }
 
     def ingest(self, telemetry: dict, event_hint: str = "") -> Optional[Dict]:
+        now = time.time()
+        self.record_forensic_sample(telemetry, event_hint)
+
         if not self.enabled:
             return {
                 "telemetry": telemetry,
@@ -99,7 +128,6 @@ class EdgeTelemetryLayer:
             }
 
         self._buffer.append((dict(telemetry), event_hint))
-        now = time.time()
         if len(self._buffer) >= self.window_size:
             return self._flush(event_hint)
         if now - self._last_flush_ts >= self.flush_interval_sec:
@@ -108,4 +136,34 @@ class EdgeTelemetryLayer:
 
     def force_flush(self, event_hint: str = "EDGE:FORCE_FLUSH") -> Optional[Dict]:
         return self._flush(event_hint=event_hint)
+
+    def build_forensic_block(self, trigger_event: str, reason: str = "IMPACT") -> Optional[Dict]:
+        """
+        Build a special FORENSIC_BLOCK payload from recent raw edge queue.
+        Intended to be pushed to chain immediately after critical impact/hack events.
+        """
+        if not self._forensic_queue:
+            return None
+
+        now = time.time()
+        cutoff = now - self.forensic_window_sec
+        records = [r for r in self._forensic_queue if float(r.get("ingest_ts", 0.0)) >= cutoff]
+        if not records:
+            return None
+
+        last_tel = dict(records[-1].get("telemetry", {}))
+        forensic_event = f"FORENSIC_BLOCK:{reason}:{trigger_event}"
+        forensic_meta = {
+            "forensic_block": True,
+            "forensic_reason": reason,
+            "trigger_event": trigger_event,
+            "window_sec": self.forensic_window_sec,
+            "record_count": len(records),
+            "records": records,
+        }
+        return {
+            "telemetry": last_tel,
+            "event": forensic_event,
+            "meta": forensic_meta,
+        }
 

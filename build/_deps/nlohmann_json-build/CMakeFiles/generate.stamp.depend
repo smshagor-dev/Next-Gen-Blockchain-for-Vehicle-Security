@@ -1,0 +1,10 @@
+# CMake generation dependency list for this directory.
+C:/ST/STM32CubeCLT_1.20.0/CMake/share/cmake-3.28/Modules/CMakePackageConfigHelpers.cmake
+C:/ST/STM32CubeCLT_1.20.0/CMake/share/cmake-3.28/Modules/ExternalProject.cmake
+C:/ST/STM32CubeCLT_1.20.0/CMake/share/cmake-3.28/Modules/ExternalProject/shared_internal_commands.cmake
+C:/ST/STM32CubeCLT_1.20.0/CMake/share/cmake-3.28/Modules/GNUInstallDirs.cmake
+C:/ST/STM32CubeCLT_1.20.0/CMake/share/cmake-3.28/Modules/WriteBasicConfigVersionFile.cmake
+C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-src/CMakeLists.txt
+C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-src/cmake/config.cmake.in
+C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-src/cmake/nlohmann_jsonConfigVersion.cmake.in
+C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-src/cmake/pkg-config.pc.in

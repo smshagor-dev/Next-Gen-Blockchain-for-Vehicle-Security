@@ -1,0 +1,152 @@
+^C:\USERS\SHAGOR\ONEDRIVE\DESKTOP\FINAL PROJECT\SMART CAR - BLOCKCHAIN FOR VEHICLE SECURITY\BUILD\_DEPS\NLOHMANN_JSON-SUBBUILD\CMAKEFILES\53F3AA472674B36CF16205898629C4BF\NLOHMANN_JSON-POPULATE-MKDIR.RULE
+setlocal
+C:\ST\STM32CubeCLT_1.20.0\CMake\bin\cmake.exe -Dcfgdir=/Debug -P "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/nlohmann_json-populate-prefix/tmp/nlohmann_json-populate-mkdirs.cmake"
+if %errorlevel% neq 0 goto :cmEnd
+C:\ST\STM32CubeCLT_1.20.0\CMake\bin\cmake.exe -E touch "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/nlohmann_json-populate-prefix/src/nlohmann_json-populate-stamp/Debug/nlohmann_json-populate-mkdir"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\SHAGOR\ONEDRIVE\DESKTOP\FINAL PROJECT\SMART CAR - BLOCKCHAIN FOR VEHICLE SECURITY\BUILD\_DEPS\NLOHMANN_JSON-SUBBUILD\CMAKEFILES\53F3AA472674B36CF16205898629C4BF\NLOHMANN_JSON-POPULATE-DOWNLOAD.RULE
+setlocal
+cd "C:\Users\Shagor\OneDrive\Desktop\Final Project\Smart Car - Blockchain for Vehicle Security\build\_deps"
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+C:\ST\STM32CubeCLT_1.20.0\CMake\bin\cmake.exe -P "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/nlohmann_json-populate-prefix/src/nlohmann_json-populate-stamp/download-nlohmann_json-populate.cmake"
+if %errorlevel% neq 0 goto :cmEnd
+C:\ST\STM32CubeCLT_1.20.0\CMake\bin\cmake.exe -P "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/nlohmann_json-populate-prefix/src/nlohmann_json-populate-stamp/verify-nlohmann_json-populate.cmake"
+if %errorlevel% neq 0 goto :cmEnd
+C:\ST\STM32CubeCLT_1.20.0\CMake\bin\cmake.exe -P "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/nlohmann_json-populate-prefix/src/nlohmann_json-populate-stamp/extract-nlohmann_json-populate.cmake"
+if %errorlevel% neq 0 goto :cmEnd
+C:\ST\STM32CubeCLT_1.20.0\CMake\bin\cmake.exe -E touch "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/nlohmann_json-populate-prefix/src/nlohmann_json-populate-stamp/Debug/nlohmann_json-populate-download"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\SHAGOR\ONEDRIVE\DESKTOP\FINAL PROJECT\SMART CAR - BLOCKCHAIN FOR VEHICLE SECURITY\BUILD\_DEPS\NLOHMANN_JSON-SUBBUILD\CMAKEFILES\53F3AA472674B36CF16205898629C4BF\NLOHMANN_JSON-POPULATE-UPDATE.RULE
+setlocal
+C:\ST\STM32CubeCLT_1.20.0\CMake\bin\cmake.exe -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+C:\ST\STM32CubeCLT_1.20.0\CMake\bin\cmake.exe -E touch "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/nlohmann_json-populate-prefix/src/nlohmann_json-populate-stamp/Debug/nlohmann_json-populate-update"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\SHAGOR\ONEDRIVE\DESKTOP\FINAL PROJECT\SMART CAR - BLOCKCHAIN FOR VEHICLE SECURITY\BUILD\_DEPS\NLOHMANN_JSON-SUBBUILD\CMAKEFILES\53F3AA472674B36CF16205898629C4BF\NLOHMANN_JSON-POPULATE-PATCH.RULE
+setlocal
+C:\ST\STM32CubeCLT_1.20.0\CMake\bin\cmake.exe -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+C:\ST\STM32CubeCLT_1.20.0\CMake\bin\cmake.exe -E touch "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/nlohmann_json-populate-prefix/src/nlohmann_json-populate-stamp/Debug/nlohmann_json-populate-patch"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\SHAGOR\ONEDRIVE\DESKTOP\FINAL PROJECT\SMART CAR - BLOCKCHAIN FOR VEHICLE SECURITY\BUILD\_DEPS\NLOHMANN_JSON-SUBBUILD\CMAKEFILES\53F3AA472674B36CF16205898629C4BF\NLOHMANN_JSON-POPULATE-CONFIGURE.RULE
+setlocal
+cd "C:\Users\Shagor\OneDrive\Desktop\Final Project\Smart Car - Blockchain for Vehicle Security\build\_deps\nlohmann_json-build"
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+C:\ST\STM32CubeCLT_1.20.0\CMake\bin\cmake.exe -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+C:\ST\STM32CubeCLT_1.20.0\CMake\bin\cmake.exe -E touch "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/nlohmann_json-populate-prefix/src/nlohmann_json-populate-stamp/Debug/nlohmann_json-populate-configure"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\SHAGOR\ONEDRIVE\DESKTOP\FINAL PROJECT\SMART CAR - BLOCKCHAIN FOR VEHICLE SECURITY\BUILD\_DEPS\NLOHMANN_JSON-SUBBUILD\CMAKEFILES\53F3AA472674B36CF16205898629C4BF\NLOHMANN_JSON-POPULATE-BUILD.RULE
+setlocal
+cd "C:\Users\Shagor\OneDrive\Desktop\Final Project\Smart Car - Blockchain for Vehicle Security\build\_deps\nlohmann_json-build"
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+C:\ST\STM32CubeCLT_1.20.0\CMake\bin\cmake.exe -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+C:\ST\STM32CubeCLT_1.20.0\CMake\bin\cmake.exe -E touch "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/nlohmann_json-populate-prefix/src/nlohmann_json-populate-stamp/Debug/nlohmann_json-populate-build"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\SHAGOR\ONEDRIVE\DESKTOP\FINAL PROJECT\SMART CAR - BLOCKCHAIN FOR VEHICLE SECURITY\BUILD\_DEPS\NLOHMANN_JSON-SUBBUILD\CMAKEFILES\53F3AA472674B36CF16205898629C4BF\NLOHMANN_JSON-POPULATE-INSTALL.RULE
+setlocal
+cd "C:\Users\Shagor\OneDrive\Desktop\Final Project\Smart Car - Blockchain for Vehicle Security\build\_deps\nlohmann_json-build"
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+C:\ST\STM32CubeCLT_1.20.0\CMake\bin\cmake.exe -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+C:\ST\STM32CubeCLT_1.20.0\CMake\bin\cmake.exe -E touch "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/nlohmann_json-populate-prefix/src/nlohmann_json-populate-stamp/Debug/nlohmann_json-populate-install"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\SHAGOR\ONEDRIVE\DESKTOP\FINAL PROJECT\SMART CAR - BLOCKCHAIN FOR VEHICLE SECURITY\BUILD\_DEPS\NLOHMANN_JSON-SUBBUILD\CMAKEFILES\53F3AA472674B36CF16205898629C4BF\NLOHMANN_JSON-POPULATE-TEST.RULE
+setlocal
+cd "C:\Users\Shagor\OneDrive\Desktop\Final Project\Smart Car - Blockchain for Vehicle Security\build\_deps\nlohmann_json-build"
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+C:\ST\STM32CubeCLT_1.20.0\CMake\bin\cmake.exe -E echo_append
+if %errorlevel% neq 0 goto :cmEnd
+C:\ST\STM32CubeCLT_1.20.0\CMake\bin\cmake.exe -E touch "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/nlohmann_json-populate-prefix/src/nlohmann_json-populate-stamp/Debug/nlohmann_json-populate-test"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\SHAGOR\ONEDRIVE\DESKTOP\FINAL PROJECT\SMART CAR - BLOCKCHAIN FOR VEHICLE SECURITY\BUILD\_DEPS\NLOHMANN_JSON-SUBBUILD\CMAKEFILES\8B44A0521300559EC03DD44F5FE05C32\NLOHMANN_JSON-POPULATE-COMPLETE.RULE
+setlocal
+C:\ST\STM32CubeCLT_1.20.0\CMake\bin\cmake.exe -E make_directory "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/CMakeFiles/Debug"
+if %errorlevel% neq 0 goto :cmEnd
+C:\ST\STM32CubeCLT_1.20.0\CMake\bin\cmake.exe -E touch "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/CMakeFiles/Debug/nlohmann_json-populate-complete"
+if %errorlevel% neq 0 goto :cmEnd
+C:\ST\STM32CubeCLT_1.20.0\CMake\bin\cmake.exe -E touch "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/nlohmann_json-populate-prefix/src/nlohmann_json-populate-stamp/Debug/nlohmann_json-populate-done"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\SHAGOR\ONEDRIVE\DESKTOP\FINAL PROJECT\SMART CAR - BLOCKCHAIN FOR VEHICLE SECURITY\BUILD\_DEPS\NLOHMANN_JSON-SUBBUILD\CMAKEFILES\1AC2C3F4193EE3CD985E491CB02AB061\NLOHMANN_JSON-POPULATE.RULE
+setlocal
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\SHAGOR\ONEDRIVE\DESKTOP\FINAL PROJECT\SMART CAR - BLOCKCHAIN FOR VEHICLE SECURITY\BUILD\_DEPS\NLOHMANN_JSON-SUBBUILD\CMAKELISTS.TXT
+setlocal
+C:\ST\STM32CubeCLT_1.20.0\CMake\bin\cmake.exe "-SC:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild" "-BC:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild" --check-stamp-file "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/CMakeFiles/generate.stamp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

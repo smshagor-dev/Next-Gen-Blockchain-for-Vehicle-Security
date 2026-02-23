@@ -94,8 +94,12 @@ class DynamicSmartContractEngine:
         self.insurance_enabled = get_bool("INSURANCE_AUTO_SHARE_ENABLED", True)
         self.toll_enabled = get_bool("TOLL_AUTO_PAYMENT_ENABLED", True)
         self.maintenance_enabled = get_bool("MAINTENANCE_CONTRACT_ENABLED", True)
+        self.biometric_safety_enabled = get_bool("BIOMETRIC_SAFETY_CONTRACT_ENABLED", True)
         self.toll_fee = get_float("TOLL_DEFAULT_FEE", 75.0)
         self.maintenance_temp_threshold = get_float("MAINTENANCE_TEMP_THRESHOLD", 100.0)
+        self.biometric_hr_low = get_float("BIOMETRIC_HEART_RATE_LOW_BPM", 45.0)
+        self.biometric_hr_high = get_float("BIOMETRIC_HEART_RATE_HIGH_BPM", 140.0)
+        self.biometric_drowsy_threshold = get_float("BIOMETRIC_DROWSINESS_THRESHOLD", 0.80)
 
     def _insurance_rule(self, event_data: str) -> bool:
         ev = event_data.upper()
@@ -107,6 +111,14 @@ class DynamicSmartContractEngine:
 
     def _maintenance_rule(self, telemetry: Dict) -> bool:
         return float(telemetry.get("engine_temp", 0.0)) >= self.maintenance_temp_threshold
+
+    def _biometric_safety_rule(self, telemetry: Dict) -> bool:
+        hr = float(telemetry.get("driver_heart_rate_bpm", 0.0))
+        drowsy = float(telemetry.get("driver_drowsiness_score", 0.0))
+        driver_unwell = bool(telemetry.get("driver_unwell", False))
+        hr_risk = (hr > 0.0) and (hr <= self.biometric_hr_low or hr >= self.biometric_hr_high)
+        drowsy_risk = drowsy >= self.biometric_drowsy_threshold
+        return hr_risk or drowsy_risk or driver_unwell
 
     def evaluate_and_invoke(self, *, vehicle_id: str, did: str, event_data: str, telemetry: Dict, block_hash: str) -> List[Dict]:
         if not self.enabled:
@@ -141,6 +153,18 @@ class DynamicSmartContractEngine:
             payload["maintenance_reason"] = "engine_temp_high"
             result = self.fabric_connector.invoke("submitMaintenanceAlert", payload)
             result["contract_key"] = "maintenance_alert"
+            receipts.append(result)
+
+        if self.biometric_safety_enabled and self._biometric_safety_rule(telemetry):
+            payload = dict(base_payload)
+            payload["biometric_reason"] = {
+                "driver_heart_rate_bpm": telemetry.get("driver_heart_rate_bpm"),
+                "driver_drowsiness_score": telemetry.get("driver_drowsiness_score"),
+                "driver_unwell": telemetry.get("driver_unwell"),
+            }
+            result = self.fabric_connector.invoke("activateBiometricSafeMode", payload)
+            result["contract_key"] = "biometric_safety_mode"
+            result["action"] = "SAFE_MODE_ACTIVATE"
             receipts.append(result)
 
         return receipts

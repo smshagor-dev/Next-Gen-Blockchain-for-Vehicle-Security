@@ -1,0 +1,10 @@
+^C:\USERS\SHAGOR\ONEDRIVE\DESKTOP\FINAL PROJECT\SMART CAR - BLOCKCHAIN FOR VEHICLE SECURITY\BUILD\CMAKEFILES\A4B7D0E74BF96002384B72E14E4C085B\GENERATE.STAMP.RULE
+setlocal
+C:\ST\STM32CubeCLT_1.20.0\CMake\bin\cmake.exe "-SC:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security" "-BC:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build" --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/SmartCarBlockchain.sln"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

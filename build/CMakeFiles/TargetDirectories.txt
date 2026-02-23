@@ -1,0 +1,4 @@
+C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/CMakeFiles/smartcar_blockchain.dir
+C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/CMakeFiles/ALL_BUILD.dir
+C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/CMakeFiles/ZERO_CHECK.dir
+C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-build/CMakeFiles/ALL_BUILD.dir

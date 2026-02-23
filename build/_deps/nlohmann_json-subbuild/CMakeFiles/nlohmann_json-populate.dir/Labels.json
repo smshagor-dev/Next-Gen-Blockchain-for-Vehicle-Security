@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/CMakeFiles/nlohmann_json-populate"
+		},
+		{
+			"file" : "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/CMakeFiles/1ac2c3f4193ee3cd985e491cb02ab061/nlohmann_json-populate.rule"
+		},
+		{
+			"file" : "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/CMakeFiles/8b44a0521300559ec03dd44f5fe05c32/nlohmann_json-populate-complete.rule"
+		},
+		{
+			"file" : "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/CMakeFiles/53f3aa472674b36cf16205898629c4bf/nlohmann_json-populate-build.rule"
+		},
+		{
+			"file" : "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/CMakeFiles/53f3aa472674b36cf16205898629c4bf/nlohmann_json-populate-configure.rule"
+		},
+		{
+			"file" : "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/CMakeFiles/53f3aa472674b36cf16205898629c4bf/nlohmann_json-populate-download.rule"
+		},
+		{
+			"file" : "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/CMakeFiles/53f3aa472674b36cf16205898629c4bf/nlohmann_json-populate-install.rule"
+		},
+		{
+			"file" : "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/CMakeFiles/53f3aa472674b36cf16205898629c4bf/nlohmann_json-populate-mkdir.rule"
+		},
+		{
+			"file" : "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/CMakeFiles/53f3aa472674b36cf16205898629c4bf/nlohmann_json-populate-patch.rule"
+		},
+		{
+			"file" : "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/CMakeFiles/53f3aa472674b36cf16205898629c4bf/nlohmann_json-populate-test.rule"
+		},
+		{
+			"file" : "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/CMakeFiles/53f3aa472674b36cf16205898629c4bf/nlohmann_json-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"nlohmann_json-populate"
+		],
+		"name" : "nlohmann_json-populate"
+	}
+}

@@ -1,0 +1,10 @@
+^C:\USERS\SHAGOR\ONEDRIVE\DESKTOP\FINAL PROJECT\SMART CAR - BLOCKCHAIN FOR VEHICLE SECURITY\BUILD\_DEPS\NLOHMANN_JSON-SUBBUILD\CMAKEFILES\1AC2C3F4193EE3CD985E491CB02AB061\GENERATE.STAMP.RULE
+setlocal
+C:\ST\STM32CubeCLT_1.20.0\CMake\bin\cmake.exe "-SC:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild" "-BC:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild" --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file "C:/Users/Shagor/OneDrive/Desktop/Final Project/Smart Car - Blockchain for Vehicle Security/build/_deps/nlohmann_json-subbuild/nlohmann_json-populate.sln"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

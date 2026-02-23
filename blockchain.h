@@ -31,6 +31,14 @@ struct Block {
     std::string previous_hash;
     std::string block_hash;
     std::string dual_hash;
+    std::string pqc_digest;
+    std::string pqc_signature;
+    std::string pqc_signature_public_key;
+    std::string pqc_kem_ciphertext;
+    std::string pqc_kem_public_key;
+    std::string pqc_kem_shared_secret_hash;
+    std::string pqc_binding_hash;
+    std::string pqc_algorithm;
     TelemetryData telemetry;
     std::string event_data;
     bool is_valid;

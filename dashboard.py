@@ -158,6 +158,9 @@ class SmartCarDashboard(tk.Tk):
         self.odometer = 0.0
         self.gps_lat = 23.8103
         self.gps_lon = 90.4125
+        self.driver_heart_rate_bpm = 76.0
+        self.driver_drowsiness_score = 0.08
+        self.driver_unwell = False
 
         self._frame_counter = 0
         self._last_detection_count = 0
@@ -171,10 +174,24 @@ class SmartCarDashboard(tk.Tk):
         self._last_stop_ok = True
         self._last_lock_ok = True
         self._last_ui_error_log_ts = 0.0
+        self._last_chain_verify_ts = 0.0
+        self._last_chain_verify_ok = True
+        self._last_status_text = ""
 
         self.anomaly_history = deque([0.02] * 120, maxlen=120)
         self._latest_anomaly = 0.02
         self.v2x_nodes = []
+        self._last_camera_frame = None
+        self._last_frame_render_tick = -1
+
+        # UI cadence controls to keep dashboard smooth on lower-end hardware.
+        self.ui_tick_ms = get_int("SMARTCAR_UI_TICK_MS", 100)
+        self.canvas_refresh_every = max(1, get_int("SMARTCAR_UI_CANVAS_REFRESH_EVERY", 2))
+        self.text_refresh_every = max(1, get_int("SMARTCAR_UI_TEXT_REFRESH_EVERY", 1))
+        self.log_refresh_every = max(1, get_int("SMARTCAR_UI_LOG_REFRESH_EVERY", 2))
+        self.camera_refresh_every = max(1, get_int("SMARTCAR_UI_CAMERA_REFRESH_EVERY", 1))
+        self.camera_detect_every = max(1, get_int("SMARTCAR_UI_CAMERA_DETECT_EVERY", 3))
+        self.chain_verify_interval_sec = float(get_env("SMARTCAR_UI_CHAIN_VERIFY_INTERVAL_SEC", "1.0"))
 
         self._setup_fonts()
         self._build_ui()
@@ -456,15 +473,20 @@ class SmartCarDashboard(tk.Tk):
 
         detections = []
         self._frame_counter += 1
-        if self._frame_counter % 2 == 0:
-            boxes, weights = self.hog.detectMultiScale(frame, winStride=(8, 8), padding=(8, 8), scale=1.05)
+        if self._frame_counter % self.camera_detect_every == 0:
+            boxes, weights = self.hog.detectMultiScale(frame, winStride=(12, 12), padding=(8, 8), scale=1.05)
             for i, (x, y, w, h) in enumerate(boxes):
                 dist_m = self._estimate_distance(h)
                 conf = float(weights[i]) if i < len(weights) else 0.5
                 detections.append((x, y, w, h, dist_m, conf))
 
-        self._last_detection_count = len(detections)
-        self._last_obstacle_distance = min([d[4] for d in detections], default=999.0)
+        if detections:
+            self._last_detection_count = len(detections)
+            self._last_obstacle_distance = min([d[4] for d in detections], default=999.0)
+        elif self._frame_counter % self.camera_detect_every == 0:
+            # Refresh stale detection state at detection cadence.
+            self._last_detection_count = 0
+            self._last_obstacle_distance = 999.0
 
         for x, y, w, h, dist_m, _ in detections:
             danger = dist_m < self.emergency_distance_m
@@ -488,15 +510,29 @@ class SmartCarDashboard(tk.Tk):
             self.speed_kmh += (target - self.speed_kmh) * 0.12
             if self.blockchain.emergency_brake_active:
                 self.speed_kmh = max(0.0, self.speed_kmh - 2.7)
+            if getattr(self.blockchain, "safe_mode_active", False):
+                self.throttle = min(self.throttle, 18.0)
+                self.speed_kmh = max(0.0, self.speed_kmh - 4.2)
             self.rpm = 900 + self.speed_kmh * 36
             self.engine_temp = min(105.0, self.engine_temp + 0.02 + self.speed_kmh * 0.0008)
             self.fuel_level = max(0.0, self.fuel_level - (0.0009 + self.throttle * 0.00003))
             self.odometer += self.speed_kmh / 3600.0 * 0.08
             self.gps_lat += self.speed_kmh * 0.0000008
             self.gps_lon += self.speed_kmh * 0.0000004
+            self.driver_drowsiness_score = min(1.0, self.driver_drowsiness_score + random.uniform(-0.01, 0.03))
+            hr_base = 72.0 + self.speed_kmh * 0.15 + self.throttle * 0.08
+            self.driver_heart_rate_bpm = max(42.0, min(165.0, hr_base + random.uniform(-6.0, 6.0)))
         else:
             self.speed_kmh *= 0.95
             self.rpm = max(0.0, self.rpm * 0.9)
+            self.driver_drowsiness_score = max(0.05, self.driver_drowsiness_score - 0.02)
+            self.driver_heart_rate_bpm = max(58.0, self.driver_heart_rate_bpm - random.uniform(0.5, 1.5))
+
+        self.driver_unwell = (
+            self.driver_drowsiness_score >= 0.93
+            or self.driver_heart_rate_bpm <= 45
+            or self.driver_heart_rate_bpm >= 145
+        )
 
         risk = 0.01 + (0.55 if self.blockchain.emergency_brake_active else 0.0)
         risk += min(0.25, self._last_detection_count * 0.06)
@@ -542,6 +578,9 @@ class SmartCarDashboard(tk.Tk):
             throttle_position=self.throttle,
             rpm=self.rpm,
             odometer=self.odometer,
+            driver_heart_rate_bpm=self.driver_heart_rate_bpm,
+            driver_drowsiness_score=self.driver_drowsiness_score,
+            driver_unwell=self.driver_unwell,
             timestamp=now_iso(),
         )
         self.blockchain.push_telemetry(tel, "LIVE_SEC_MONITOR")
@@ -746,7 +785,10 @@ class SmartCarDashboard(tk.Tk):
         self.lbl_clock.config(text=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         self.lbl_speed_big.config(text=f"{self.speed_kmh:0.0f}")
 
-        if self.blockchain.emergency_brake_active:
+        if getattr(self.blockchain, "safe_mode_active", False):
+            self.lbl_speed_state.config(text="SAFE MODE", fg=C["orange"])
+            self.lbl_shield.config(text="ZKP Privacy Shield: ACTIVE - BIOMETRIC SAFETY", fg=C["orange"])
+        elif self.blockchain.emergency_brake_active:
             self.lbl_speed_state.config(text="EMERGENCY BRAKE", fg=C["red"])
             self.lbl_shield.config(text="ZKP Privacy Shield: ACTIVE - DEFENSE MODE", fg=C["orange"])
         elif self.blockchain.engine_started:
@@ -756,19 +798,29 @@ class SmartCarDashboard(tk.Tk):
             self.lbl_speed_state.config(text="STANDBY", fg=C["dim"])
             self.lbl_shield.config(text="ZKP Privacy Shield: ACTIVE", fg=C["green"])
 
-        chain_ok = self.blockchain.verify_chain()
+        now = time.time()
+        if now - self._last_chain_verify_ts >= self.chain_verify_interval_sec:
+            self._last_chain_verify_ok = self.blockchain.verify_chain()
+            self._last_chain_verify_ts = now
+        chain_ok = self._last_chain_verify_ok
         self.lbl_did.config(text="DID Proof Verified" if chain_ok else "DID Proof Warning", fg=C["cyan"] if chain_ok else C["red"])
 
-        self.lbl_status.config(text=(
+        status_text = (
             f"Vehicle ID   : {self.VEHICLE_ID[-12:]}\n"
             f"Unlocked     : {self.blockchain.car_unlocked}\n"
             f"Engine       : {self.blockchain.engine_started}\n"
             f"Emergency    : {self.blockchain.emergency_brake_active}\n"
+            f"Safe Mode    : {getattr(self.blockchain, 'safe_mode_active', False)}\n"
             f"Detections   : {self._last_detection_count}\n"
             f"Obstacle     : {self._last_obstacle_distance:6.1f} m\n"
+            f"Heart Rate   : {self.driver_heart_rate_bpm:6.1f} bpm\n"
+            f"Drowsiness   : {self.driver_drowsiness_score:0.2f}\n"
             f"Chain Length : {len(self.blockchain.chain)}\n"
             f"Anomaly      : {self._latest_anomaly:0.2f}"
-        ))
+        )
+        if status_text != self._last_status_text:
+            self.lbl_status.config(text=status_text)
+            self._last_status_text = status_text
         lock_text = "OPEN" if self.blockchain.car_unlocked else "LOCKED"
         lock_color = C["orange"] if self.blockchain.car_unlocked else C["green"]
         auth_text = "AUTHENTIC" if self._last_auth_ok else "WAITING"
@@ -779,8 +831,6 @@ class SmartCarDashboard(tk.Tk):
         self.lbl_auth_state.config(text=auth_text, fg=auth_color)
         self.lbl_engine_cmd.config(text=engine_text, fg=engine_color)
 
-        latest = self.blockchain.chain[-1] if self.blockchain.chain else None
-        latest_hash = latest.block_hash[:18] + ".." if latest and latest.block_hash else "-"
         self.lbl_card_rpm.config(text=f"{self.rpm:6.0f}")
         self.lbl_card_temp.config(text=f"{self.engine_temp:4.1f} C")
         self.lbl_card_fuel.config(text=f"{self.fuel_level:4.1f} %")
@@ -798,13 +848,22 @@ class SmartCarDashboard(tk.Tk):
     def _update_ui(self):
         """Main UI update loop."""
         try:
-            frame = self._process_frame()
+            frame = None
+            if self._tick % self.camera_refresh_every == 0:
+                frame = self._process_frame()
+                if frame is not None:
+                    self._last_camera_frame = frame
             self._update_model()
             self._push_telemetry()
-            self._show_frame(frame)
-            self._render_text_panels()
-            self._render_canvases()
-            self._sync_logs()
+            if self._last_camera_frame is not None and self._tick != self._last_frame_render_tick:
+                self._show_frame(self._last_camera_frame)
+                self._last_frame_render_tick = self._tick
+            if self._tick % self.text_refresh_every == 0:
+                self._render_text_panels()
+            if self._tick % self.canvas_refresh_every == 0:
+                self._render_canvases()
+            if self._tick % self.log_refresh_every == 0:
+                self._sync_logs()
             self._tick += 1
         except Exception as e:
             now = time.time()
@@ -812,7 +871,7 @@ class SmartCarDashboard(tk.Tk):
             if now - self._last_ui_error_log_ts > 2.0:
                 logger.exception("UI update loop error: %s", e)
                 self._last_ui_error_log_ts = now
-        self.after(80, self._update_ui)
+        self.after(self.ui_tick_ms, self._update_ui)
 
     def on_closing(self):
         """Save chain and release resources."""

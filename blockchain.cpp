@@ -17,7 +17,47 @@
 #include <cstdint>
 #include <algorithm>
 #include <stdexcept>
+#include <memory>
 #include <nlohmann/json.hpp>
+
+#if defined(__has_include)
+#if __has_include(<oqs/oqs.h>)
+#include <oqs/oqs.h>
+#define SMARTCAR_OQS_AVAILABLE 1
+#else
+#define SMARTCAR_OQS_AVAILABLE 0
+#endif
+#if __has_include(<oqs_cpp.hpp>)
+#include <oqs_cpp.hpp>
+#define SMARTCAR_OQSCPP_AVAILABLE 1
+#elif __has_include(<liboqs-cpp/oqs_cpp.hpp>)
+#include <liboqs-cpp/oqs_cpp.hpp>
+#define SMARTCAR_OQSCPP_AVAILABLE 1
+#else
+#define SMARTCAR_OQSCPP_AVAILABLE 0
+#endif
+#else
+#define SMARTCAR_OQS_AVAILABLE 0
+#define SMARTCAR_OQSCPP_AVAILABLE 0
+#endif
+
+#if SMARTCAR_OQS_AVAILABLE
+#if defined(OQS_SIG_alg_ml_dsa_44)
+#define SMARTCAR_OQS_SIG_ALG OQS_SIG_alg_ml_dsa_44
+#elif defined(OQS_SIG_alg_dilithium_2)
+#define SMARTCAR_OQS_SIG_ALG OQS_SIG_alg_dilithium_2
+#else
+#define SMARTCAR_OQS_SIG_ALG OQS_SIG_alg_dilithium_2
+#endif
+
+#if defined(OQS_KEM_alg_ml_kem_512)
+#define SMARTCAR_OQS_KEM_ALG OQS_KEM_alg_ml_kem_512
+#elif defined(OQS_KEM_alg_kyber_512)
+#define SMARTCAR_OQS_KEM_ALG OQS_KEM_alg_kyber_512
+#else
+#define SMARTCAR_OQS_KEM_ALG OQS_KEM_alg_kyber_512
+#endif
+#endif
 
 using json = nlohmann::json;
 
@@ -193,6 +233,299 @@ const uint64_t SHA3_256::RC[24] = {
 };
 const int SHA3_256::ROT[24] = {1,62,28,27,36,44,6,55,20,3,10,43,25,39,41,45,15,21,8,18,2,61,56,14};
 
+// ========== Optional PQC Hybrid Layer (Dilithium + Kyber) ==========
+static std::string bytesToHex(const uint8_t* data, size_t len) {
+    std::ostringstream ss;
+    for(size_t i = 0; i < len; ++i) {
+        ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(data[i]);
+    }
+    return ss.str();
+}
+
+static std::vector<uint8_t> hexToBytes(const std::string& hex) {
+    std::vector<uint8_t> out;
+    if(hex.size() % 2 != 0) return out;
+    out.reserve(hex.size() / 2);
+    for(size_t i = 0; i < hex.size(); i += 2) {
+        const auto byte = static_cast<uint8_t>(std::stoul(hex.substr(i, 2), nullptr, 16));
+        out.push_back(byte);
+    }
+    return out;
+}
+
+class PQCHybridEngine {
+private:
+    bool enabled = false;
+    bool real_pqc = false;
+    bool using_cpp_wrapper = false;
+    std::string algorithm;
+    std::string fallback_secret;
+
+#if SMARTCAR_OQSCPP_AVAILABLE
+    std::string sig_alg_cpp = "ML-DSA-44";
+    std::string kem_alg_cpp = "ML-KEM-512";
+    std::unique_ptr<oqs::Signature> sig_signer_cpp;
+    std::vector<uint8_t> sig_pub_cpp;
+    std::unique_ptr<oqs::KeyEncapsulation> kem_receiver_cpp;
+    std::vector<uint8_t> kem_pub_cpp;
+#endif
+
+#if SMARTCAR_OQS_AVAILABLE
+    OQS_SIG* sig = nullptr;
+    OQS_KEM* kem = nullptr;
+    std::vector<uint8_t> sig_pubkey;
+    std::vector<uint8_t> sig_seckey;
+    std::vector<uint8_t> kem_pubkey;
+    std::vector<uint8_t> kem_seckey;
+#endif
+
+public:
+    explicit PQCHybridEngine(const std::string& seed_secret) {
+        fallback_secret = seed_secret;
+#if SMARTCAR_OQSCPP_AVAILABLE
+        const std::vector<std::string> sig_algs = {"ML-DSA-44", "Dilithium2"};
+        const std::vector<std::string> kem_algs = {"ML-KEM-512", "Kyber512"};
+        for(const auto& sig_name : sig_algs) {
+            for(const auto& kem_name : kem_algs) {
+                try {
+                    auto sig_try = std::make_unique<oqs::Signature>(sig_name);
+                    auto sig_pub_try = sig_try->generate_keypair();
+                    auto kem_try = std::make_unique<oqs::KeyEncapsulation>(kem_name);
+                    auto kem_pub_try = kem_try->generate_keypair();
+                    sig_alg_cpp = sig_name;
+                    kem_alg_cpp = kem_name;
+                    sig_signer_cpp = std::move(sig_try);
+                    sig_pub_cpp = std::move(sig_pub_try);
+                    kem_receiver_cpp = std::move(kem_try);
+                    kem_pub_cpp = std::move(kem_pub_try);
+                    enabled = true;
+                    real_pqc = true;
+                    using_cpp_wrapper = true;
+                    algorithm = sig_alg_cpp + "+" + kem_alg_cpp + "(cpp)";
+                    return;
+                } catch(...) {
+                    sig_signer_cpp.reset();
+                    kem_receiver_cpp.reset();
+                    sig_pub_cpp.clear();
+                    kem_pub_cpp.clear();
+                }
+            }
+        }
+#endif
+
+#if SMARTCAR_OQS_AVAILABLE
+        sig = OQS_SIG_new(SMARTCAR_OQS_SIG_ALG);
+        kem = OQS_KEM_new(SMARTCAR_OQS_KEM_ALG);
+        if(sig != nullptr && kem != nullptr) {
+            sig_pubkey.resize(sig->length_public_key);
+            sig_seckey.resize(sig->length_secret_key);
+            kem_pubkey.resize(kem->length_public_key);
+            kem_seckey.resize(kem->length_secret_key);
+            if(OQS_SIG_keypair(sig, sig_pubkey.data(), sig_seckey.data()) == OQS_SUCCESS &&
+               OQS_KEM_keypair(kem, kem_pubkey.data(), kem_seckey.data()) == OQS_SUCCESS) {
+                enabled = true;
+                real_pqc = true;
+                using_cpp_wrapper = false;
+                algorithm = "Dilithium2+Kyber512(c)";
+                return;
+            }
+        }
+        if(sig != nullptr) { OQS_SIG_free(sig); sig = nullptr; }
+        if(kem != nullptr) { OQS_KEM_free(kem); kem = nullptr; }
+#endif
+        enabled = true;
+        real_pqc = false;
+        using_cpp_wrapper = false;
+        algorithm = "Dilithium2+Kyber512-SIMULATED";
+    }
+
+    ~PQCHybridEngine() {
+#if SMARTCAR_OQS_AVAILABLE
+        if(sig != nullptr) {
+            OQS_SIG_free(sig);
+            sig = nullptr;
+        }
+        if(kem != nullptr) {
+            OQS_KEM_free(kem);
+            kem = nullptr;
+        }
+#endif
+    }
+
+    bool isEnabled() const { return enabled; }
+    bool isRealPQC() const { return real_pqc; }
+    const std::string& getAlgorithm() const { return algorithm; }
+
+    bool buildArtifact(
+        const std::string& message,
+        std::string& signature_hex,
+        std::string& sig_public_hex,
+        std::string& kem_ciphertext_hex,
+        std::string& kem_public_hex,
+        std::string& kem_shared_secret_hash,
+        std::string& binding_hash
+    ) const {
+        if(!enabled) return false;
+
+#if SMARTCAR_OQSCPP_AVAILABLE
+        if(real_pqc && using_cpp_wrapper && sig_signer_cpp && kem_receiver_cpp) {
+            try {
+                std::vector<uint8_t> msg_bytes(message.begin(), message.end());
+                auto sig_bytes = sig_signer_cpp->sign(msg_bytes);
+                signature_hex = bytesToHex(sig_bytes.data(), sig_bytes.size());
+                sig_public_hex = bytesToHex(sig_pub_cpp.data(), sig_pub_cpp.size());
+
+                oqs::KeyEncapsulation kem_sender(kem_alg_cpp);
+                auto enc = kem_sender.encap_secret(kem_pub_cpp);
+                auto shared_recv = kem_receiver_cpp->decap_secret(enc.first);
+                if(enc.second != shared_recv) return false;
+
+                kem_ciphertext_hex = bytesToHex(enc.first.data(), enc.first.size());
+                kem_public_hex = bytesToHex(kem_pub_cpp.data(), kem_pub_cpp.size());
+                kem_shared_secret_hash = SHA3_256::hash(bytesToHex(shared_recv.data(), shared_recv.size()));
+                binding_hash = SHA3_256::hash(signature_hex + "|" + kem_ciphertext_hex + "|" + kem_shared_secret_hash);
+                return true;
+            } catch(...) {
+                return false;
+            }
+        }
+#endif
+
+#if SMARTCAR_OQS_AVAILABLE
+        if(real_pqc && sig != nullptr && kem != nullptr) {
+            std::vector<uint8_t> msg_bytes(message.begin(), message.end());
+            std::vector<uint8_t> signature(sig->length_signature);
+            size_t sig_len = 0;
+            if(OQS_SIG_sign(sig,
+                            signature.data(),
+                            &sig_len,
+                            msg_bytes.data(),
+                            msg_bytes.size(),
+                            sig_seckey.data()) != OQS_SUCCESS) {
+                return false;
+            }
+
+            std::vector<uint8_t> ciphertext(kem->length_ciphertext);
+            std::vector<uint8_t> ss_sender(kem->length_shared_secret);
+            if(OQS_KEM_encaps(kem, ciphertext.data(), ss_sender.data(), kem_pubkey.data()) != OQS_SUCCESS) {
+                return false;
+            }
+            std::vector<uint8_t> ss_recv(kem->length_shared_secret);
+            if(OQS_KEM_decaps(kem, ss_recv.data(), ciphertext.data(), kem_seckey.data()) != OQS_SUCCESS) {
+                return false;
+            }
+            if(ss_sender != ss_recv) return false;
+
+            signature_hex = bytesToHex(signature.data(), sig_len);
+            sig_public_hex = bytesToHex(sig_pubkey.data(), sig_pubkey.size());
+            kem_ciphertext_hex = bytesToHex(ciphertext.data(), ciphertext.size());
+            kem_public_hex = bytesToHex(kem_pubkey.data(), kem_pubkey.size());
+            kem_shared_secret_hash = SHA3_256::hash(bytesToHex(ss_recv.data(), ss_recv.size()));
+            binding_hash = SHA3_256::hash(signature_hex + "|" + kem_ciphertext_hex + "|" + kem_shared_secret_hash);
+            return true;
+        }
+#endif
+
+        signature_hex = SHA3_256::hash("SIM_PQC_SIG|" + fallback_secret + "|" + message);
+        sig_public_hex = SHA3_256::hash("SIM_PQC_SIG_PUB|" + fallback_secret);
+        kem_ciphertext_hex = SHA3_256::hash("SIM_PQC_KEM_CT|" + fallback_secret + "|" + message);
+        kem_public_hex = SHA3_256::hash("SIM_PQC_KEM_PUB|" + fallback_secret);
+        kem_shared_secret_hash = SHA3_256::hash("SIM_PQC_KEM_SS|" + fallback_secret + "|" + message);
+        binding_hash = SHA3_256::hash(signature_hex + "|" + kem_ciphertext_hex + "|" + kem_shared_secret_hash);
+        return true;
+    }
+
+    bool verifyArtifact(
+        const std::string& message,
+        const std::string& signature_hex,
+        const std::string& sig_public_hex,
+        const std::string& kem_ciphertext_hex,
+        const std::string& kem_public_hex,
+        const std::string& kem_shared_secret_hash,
+        const std::string& binding_hash
+    ) const {
+        if(!enabled || signature_hex.empty() || sig_public_hex.empty()) return false;
+
+#if SMARTCAR_OQS_AVAILABLE
+        if(real_pqc && !using_cpp_wrapper && sig != nullptr && kem != nullptr) {
+            std::vector<uint8_t> sig_bytes;
+            std::vector<uint8_t> pub_bytes;
+            std::vector<uint8_t> kem_ct;
+            std::vector<uint8_t> kem_pub;
+            try {
+                sig_bytes = hexToBytes(signature_hex);
+                pub_bytes = hexToBytes(sig_public_hex);
+                kem_ct = hexToBytes(kem_ciphertext_hex);
+                kem_pub = hexToBytes(kem_public_hex);
+            } catch(...) {
+                return false;
+            }
+            if(sig_bytes.empty() || pub_bytes.empty() || kem_ct.empty() || kem_pub.empty()) return false;
+            if(pub_bytes != sig_pubkey) return false;
+            if(kem_pub != kem_pubkey) return false;
+            const std::vector<uint8_t> msg_bytes(message.begin(), message.end());
+            if(OQS_SIG_verify(
+                       sig,
+                       msg_bytes.data(),
+                       msg_bytes.size(),
+                       sig_bytes.data(),
+                       sig_bytes.size(),
+                       pub_bytes.data()
+                   ) != OQS_SUCCESS) {
+                return false;
+            }
+            std::vector<uint8_t> ss_recv(kem->length_shared_secret);
+            if(OQS_KEM_decaps(kem, ss_recv.data(), kem_ct.data(), kem_seckey.data()) != OQS_SUCCESS) {
+                return false;
+            }
+            const std::string expected_ss_hash = SHA3_256::hash(bytesToHex(ss_recv.data(), ss_recv.size()));
+            if(expected_ss_hash != kem_shared_secret_hash) return false;
+            const std::string expected_binding =
+                SHA3_256::hash(signature_hex + "|" + kem_ciphertext_hex + "|" + kem_shared_secret_hash);
+            return expected_binding == binding_hash;
+        }
+#endif
+
+#if SMARTCAR_OQSCPP_AVAILABLE
+        if(real_pqc && using_cpp_wrapper && kem_receiver_cpp) {
+            try {
+                std::vector<uint8_t> msg_bytes(message.begin(), message.end());
+                auto sig_bytes = hexToBytes(signature_hex);
+                auto pub_bytes = hexToBytes(sig_public_hex);
+                auto kem_ct = hexToBytes(kem_ciphertext_hex);
+                auto kem_pub = hexToBytes(kem_public_hex);
+                if(pub_bytes.empty() || sig_bytes.empty() || kem_ct.empty() || kem_pub.empty()) return false;
+                if(pub_bytes != sig_pub_cpp) return false;
+                if(kem_pub != kem_pub_cpp) return false;
+                oqs::Signature verifier(sig_alg_cpp);
+                if(!verifier.verify(msg_bytes, sig_bytes, pub_bytes)) return false;
+                auto shared = kem_receiver_cpp->decap_secret(kem_ct);
+                const std::string expected_ss_hash = SHA3_256::hash(bytesToHex(shared.data(), shared.size()));
+                if(expected_ss_hash != kem_shared_secret_hash) return false;
+                const std::string expected_binding =
+                    SHA3_256::hash(signature_hex + "|" + kem_ciphertext_hex + "|" + kem_shared_secret_hash);
+                return expected_binding == binding_hash;
+            } catch(...) {
+                return false;
+            }
+        }
+#endif
+
+        const std::string expected_sig = SHA3_256::hash("SIM_PQC_SIG|" + fallback_secret + "|" + message);
+        const std::string expected_pub = SHA3_256::hash("SIM_PQC_SIG_PUB|" + fallback_secret);
+        const std::string expected_ct = SHA3_256::hash("SIM_PQC_KEM_CT|" + fallback_secret + "|" + message);
+        const std::string expected_kem_pub = SHA3_256::hash("SIM_PQC_KEM_PUB|" + fallback_secret);
+        const std::string expected_ss = SHA3_256::hash("SIM_PQC_KEM_SS|" + fallback_secret + "|" + message);
+        const std::string expected_binding = SHA3_256::hash(expected_sig + "|" + expected_ct + "|" + expected_ss);
+        return signature_hex == expected_sig &&
+               sig_public_hex == expected_pub &&
+               kem_ciphertext_hex == expected_ct &&
+               kem_public_hex == expected_kem_pub &&
+               kem_shared_secret_hash == expected_ss &&
+               binding_hash == expected_binding;
+    }
+};
+
 // ========== Block Structure ==========
 struct TelemetryData {
     double speed;
@@ -218,6 +551,14 @@ struct Block {
     std::string previous_hash;
     std::string block_hash;    // sha3_256(index+ts+vid+tel_sha3+evt_sha3+prev)
     std::string dual_hash;     // sha2+sha3 combined for extra security
+    std::string pqc_digest;    // hybrid digest anchored for PQC signature
+    std::string pqc_signature;
+    std::string pqc_signature_public_key;
+    std::string pqc_kem_ciphertext;
+    std::string pqc_kem_public_key;
+    std::string pqc_kem_shared_secret_hash;
+    std::string pqc_binding_hash;
+    std::string pqc_algorithm;
     TelemetryData telemetry;
     std::string event_data;
     bool is_valid;
@@ -272,6 +613,7 @@ private:
     std::string authorized_hash;  // SHA3-256 of auth token
     bool car_unlocked = false;
     bool engine_started = false;
+    PQCHybridEngine pqc_engine;
 
     std::string getCurrentTimestamp() {
         auto now = std::chrono::system_clock::now();
@@ -290,7 +632,35 @@ private:
     std::string computeDualHash(const Block& b) {
         std::string sha2_part = SHA256::hash(b.block_hash);
         std::string sha3_part = SHA3_256::hash(b.block_hash);
+        // PQC-aware dual hash anchor input (classic part remains deterministic).
         return sha2_part + ":" + sha3_part;
+    }
+
+    std::string computePQCDigest(const Block& b) {
+        // Hybrid anchor: dual hash + signature/KEM artifacts + context.
+        std::string payload = b.dual_hash + "|" + b.block_hash + "|" + b.previous_hash + "|" + b.timestamp +
+                              "|" + b.pqc_binding_hash + "|" + b.pqc_kem_shared_secret_hash;
+        return SHA3_256::hash(payload);
+    }
+
+    void applyPQCToBlock(Block& b) {
+        const std::string message = b.dual_hash + "|" + b.block_hash + "|" + b.previous_hash + "|" + b.timestamp;
+        std::string sig_hex, sig_pub_hex, kem_ct_hex, kem_pub_hex, kem_ss_hash, binding_hash;
+        if(!pqc_engine.buildArtifact(
+            message, sig_hex, sig_pub_hex, kem_ct_hex, kem_pub_hex, kem_ss_hash, binding_hash
+        )) {
+            throw std::runtime_error("PQC artifact generation failed");
+        }
+        b.pqc_signature = sig_hex;
+        b.pqc_signature_public_key = sig_pub_hex;
+        b.pqc_kem_ciphertext = kem_ct_hex;
+        b.pqc_kem_public_key = kem_pub_hex;
+        b.pqc_kem_shared_secret_hash = kem_ss_hash;
+        b.pqc_binding_hash = binding_hash;
+        // Bind PQC proof to dual hash so classical and PQ layers stay linked.
+        b.dual_hash = b.dual_hash + ":pqc:" + b.pqc_binding_hash;
+        b.pqc_algorithm = pqc_engine.getAlgorithm();
+        b.pqc_digest = computePQCDigest(b);
     }
 
     std::string serializeTelemetry(const TelemetryData& t) {
@@ -305,11 +675,14 @@ private:
     }
 
 public:
-    SmartCarBlockchain(const std::string& vid, const std::string& enc_key, const std::string& auth_token) {
+    SmartCarBlockchain(const std::string& vid, const std::string& enc_key, const std::string& auth_token)
+        : pqc_engine(enc_key) {
         vehicle_id = vid;
         encryption_key = enc_key;
         authorized_hash = SHA3_256::hash(auth_token);
         createGenesisBlock();
+        std::cout << "[PQC] Layer initialized. Algorithm=" << pqc_engine.getAlgorithm()
+                  << " Mode=" << (pqc_engine.isRealPQC() ? "liboqs" : "simulated") << std::endl;
     }
 
     void createGenesisBlock() {
@@ -329,6 +702,7 @@ public:
         genesis.previous_hash = std::string(64, '0');
         genesis.block_hash = computeBlockHash(genesis);
         genesis.dual_hash = computeDualHash(genesis);
+        applyPQCToBlock(genesis);
         genesis.is_valid = true;
         genesis.emergency_brake_triggered = false;
         chain.push_back(genesis);
@@ -411,6 +785,7 @@ public:
         b.previous_hash = chain.back().block_hash;
         b.block_hash = computeBlockHash(b);
         b.dual_hash = computeDualHash(b);
+        applyPQCToBlock(b);
         b.is_valid = true;
         chain.push_back(b);
         return b;
@@ -434,6 +809,25 @@ public:
             // Verify telemetry integrity
             std::string tel_str = serializeTelemetry(curr.telemetry);
             if(curr.telemetry_hash_sha3 != SHA3_256::hash(tel_str)) return false;
+            if(curr.telemetry_hash_sha2 != SHA256::hash(tel_str)) return false;
+            // Verify dual hash classic component is intact.
+            const std::string dual_classic = computeDualHash(curr);
+            const std::string expected_dual = dual_classic + ":pqc:" + curr.pqc_binding_hash;
+            if(curr.dual_hash != expected_dual) return false;
+            // Verify hybrid PQC digest + signature
+            if(curr.pqc_digest != computePQCDigest(curr)) return false;
+            if(curr.pqc_algorithm.empty()) return false;
+            const std::string pqc_message =
+                dual_classic + "|" + curr.block_hash + "|" + curr.previous_hash + "|" + curr.timestamp;
+            if(!pqc_engine.verifyArtifact(
+                pqc_message,
+                curr.pqc_signature,
+                curr.pqc_signature_public_key,
+                curr.pqc_kem_ciphertext,
+                curr.pqc_kem_public_key,
+                curr.pqc_kem_shared_secret_hash,
+                curr.pqc_binding_hash
+            )) return false;
         }
         return true;
     }
@@ -457,6 +851,14 @@ public:
             block["previous_hash"] = b.previous_hash;
             block["block_hash"] = b.block_hash;
             block["dual_hash"] = SimpleEncrypt::encrypt(b.dual_hash, encryption_key);
+            block["pqc_digest"] = b.pqc_digest;
+            block["pqc_signature"] = b.pqc_signature;
+            block["pqc_signature_public_key"] = b.pqc_signature_public_key;
+            block["pqc_kem_ciphertext"] = b.pqc_kem_ciphertext;
+            block["pqc_kem_public_key"] = b.pqc_kem_public_key;
+            block["pqc_kem_shared_secret_hash"] = b.pqc_kem_shared_secret_hash;
+            block["pqc_binding_hash"] = b.pqc_binding_hash;
+            block["pqc_algorithm"] = b.pqc_algorithm;
             block["event_data"] = b.event_data;
             block["telemetry"]["speed"] = b.telemetry.speed;
             block["telemetry"]["acceleration"] = b.telemetry.acceleration;
@@ -483,6 +885,8 @@ public:
         std::cout << "Chain Length: " << chain.size() << " blocks" << std::endl;
         std::cout << "Car Locked : " << (car_unlocked ? "NO (UNLOCKED)" : "YES (LOCKED)") << std::endl;
         std::cout << "Engine     : " << (engine_started ? "RUNNING" : "OFF") << std::endl;
+        std::cout << "PQC Mode   : " << pqc_engine.getAlgorithm()
+                  << " (" << (pqc_engine.isRealPQC() ? "liboqs" : "simulated") << ")" << std::endl;
         std::cout << "Chain Valid: " << (verifyChain() ? "YES" : "NO - TAMPERED!") << std::endl;
         std::cout << "Latest Hash: " << chain.back().block_hash.substr(0,32) << "..." << std::endl;
         std::cout << "==================================\n" << std::endl;
@@ -498,7 +902,7 @@ public:
 int main(int argc, char* argv[]) {
     std::cout << "=====================================" << std::endl;
     std::cout << " SmartCar Blockchain Security System" << std::endl;
-    std::cout << " SHA2 + SHA3 Dual Hash Chain" << std::endl;
+    std::cout << " SHA2 + SHA3 + PQC Hybrid Integrity" << std::endl;
     std::cout << "=====================================" << std::endl;
 
     std::string vehicle_id = (argc>1) ? argv[1] : "SMARTCAR_VIN_2024_XYZ789";

@@ -49,6 +49,9 @@ class LightweightAnomalyDetector:
         temp = float(telemetry.get("engine_temp", 0.0))
         rpm = float(telemetry.get("rpm", 0.0))
         obstacle = float(telemetry.get("obstacle_distance", 999.0))
+        heart_rate = float(telemetry.get("driver_heart_rate_bpm", 0.0))
+        drowsiness = float(telemetry.get("driver_drowsiness_score", 0.0))
+        driver_unwell = bool(telemetry.get("driver_unwell", False))
 
         # Hard constraints (domain heuristics)
         if speed > 220:
@@ -63,6 +66,15 @@ class LightweightAnomalyDetector:
         if abs(accel) > 12:
             reasons.append("acceleration_spike")
             score += 1.2
+        if heart_rate > 0 and (heart_rate < 45 or heart_rate > 140):
+            reasons.append("driver_heart_rate_abnormal")
+            score += 1.4
+        if drowsiness >= 0.80:
+            reasons.append("driver_drowsiness_high")
+            score += 1.4
+        if driver_unwell:
+            reasons.append("driver_unwell_signal")
+            score += 1.6
 
         if self.last_speed is not None and abs(speed - self.last_speed) > 45:
             reasons.append("speed_jump")
@@ -76,6 +88,8 @@ class LightweightAnomalyDetector:
             "engine_temp": temp,
             "rpm": rpm,
             "obstacle_distance": obstacle,
+            "driver_heart_rate_bpm": heart_rate,
+            "driver_drowsiness_score": drowsiness,
         }
         if len(self.history) >= 8:
             zsum = 0.0

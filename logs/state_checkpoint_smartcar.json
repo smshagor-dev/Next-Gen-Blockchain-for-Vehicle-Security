@@ -1,0 +1,23 @@
+{
+  "format": "SMARTCAR_STATE_CHECKPOINT_V1",
+  "vehicle_id": "SMARTCAR_VIN_2024_BD_XYZ789",
+  "created_at": "2026-02-23T09:41:57.230107+00:00",
+  "reason": "GENESIS_BOOTSTRAP",
+  "chain_length": 1,
+  "latest_block_index": 0,
+  "latest_block_hash": "190adee1e7ef3b203d8d735d4dc65c94f401cf94a1bcc36ff3213207f89d517d",
+  "latest_timestamp": "2026-02-23T09:41:57.229718+00:00",
+  "active_blocks": 1,
+  "archived_compacted_blocks": 0,
+  "archive_shards_count": 0,
+  "archive_roots": [],
+  "authority_order": [
+    "authority_node_1"
+  ],
+  "validator_id": "authority_node_1",
+  "did": "did:smartcar:70a7a446a9fd734b6462c07d96c93cc5876ae60b381aae8dc84cddd7845b08fb",
+  "fl_round_id": 0,
+  "consensus": "POA_POP",
+  "checkpoint_hash_sha3": "3f86c5014af7cb502d68b9795e6b6d62cead7c7fe12a6ae4ef912301578025ae",
+  "checkpoint_signature": "d9df3c342c56852b611e4a4d405f6daf592acf2845dc87238aa9088ce3aba2e1"
+}
