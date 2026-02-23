@@ -173,8 +173,11 @@ This is a modern security framework designed to protect smart and autonomous veh
 - `perf_metrics.py`, `zkp_latency_report.py`, `network_overhead_analysis.py`, `logs/`
 - ZKP latency logs, overhead reports, runtime forensic artifacts.
 
-## 3. Folder Structure
+## Structure
+
 ![Project Theme](image_source/project_theam.jpg)
+
+## 3. Folder Structure
 
 ```text
 Smart Car - Blockchain for Vehicle Security/
