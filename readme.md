@@ -1,11 +1,152 @@
 # OmniGuard V2X: A Privacy-Preserving Blockchain Framework for Smart Vehicle Security
 
-## 1. Project Name, Developer, Author, Role, Description
+## 1. Project Identity
 - Project Name: `OmniGuard V2X`
 - Developer: `Md Shahanur Islam Shagor`
 - Author: `Md Shahanur Islam Shagor`
 - Role: `Project Architect & Lead Developer`
--  Smart-car security research platform where blockchain, ZKP privacy, DID identity, V2X communication, anomaly defense, edge processing, federated learning, forensic logging, and hardware control are integrated into one end-to-end system.
+- Description: A smart-car security platform where blockchain integrity, ZKP privacy, DID trust, V2X security, anomaly defense, edge processing, federated learning, forensic logging, and hardware control are integrated into one end-to-end architecture.
+
+### Reviewer Snapshot
+- Problem solved: Trusted, privacy-preserving, and attack-resilient vehicle data sharing for connected/autonomous mobility.
+- Technical strengths: Dual-hash blockchain, post-quantum-friendly identity/signature paths, adaptive V2X cryptography, encrypted forensic evidence, robust FL aggregation.
+- Practical strengths: Hardware bridge support (Pi/Arduino), real-time telemetry flow, measurable latency/overhead instrumentation, safe-mode dispatch.
+- Readiness: Research-proven architecture with clear extension path toward production hardening.
+
+## Project Overview
+This is a modern security framework designed to protect smart and autonomous vehicle data against present-day cyber threats and future quantum-era risks. The platform uses Zero-Knowledge Proofs to preserve privacy, decentralized identity for trust without a central authority, and federated learning to improve AI behavior without exposing raw personal data.
+
+1. Decentralized Identity (DID). File: `did_identity.py`. Core functions/classes: `DIDIdentity.generate`, `DIDIdentity.sign_challenge`, `verify_did_proof`. It creates a vehicle-specific decentralized digital passport and verifies identity through Lamport one-time hash signatures, providing strong post-quantum-friendly identity assurance.
+2. Zero-Knowledge Privacy (ZKP). File: `zkp_privacy.py`. Core functions: `create_speed_limit_proof`, `verify_speed_limit_proof`, `create_location_ownership_proof`, `verify_location_ownership_proof`. It proves compliance (like speed-limit adherence) without revealing exact sensitive values such as true speed or exact location.
+3. Dual-Hash Blockchain Integrity. Files: `blockchain.py`, `blockchain.cpp`. Core functions: `dual_hash`, `compute_block_hash`. It secures each block with SHA2 and SHA3 paths so integrity remains resilient even if one hash family weakens in the future.
+4. Federated Learning and AI Security. Files: `federated_learning.py`, `fl_trainer_node.py`. Core functions/classes: `FederatedObstacleLearner.maybe_create_local_update`, `FederatedTrainer.aggregate_updates`, `_mad_filter`, `_robust_weighted_trimmed_mean`. Vehicles train locally, share only protected model deltas, and reject poisoned updates through robust outlier filtering.
+5. Encrypted Forensic Blackbox. Files: `edge_layer.py`, `blockchain.py`. Core functions/classes: `EdgeTelemetryLayer.record_forensic_sample`, `EdgeTelemetryLayer.build_forensic_block`, `ForensicBlackboxLogger.create_locked_package`. On impact or attack signals, the system preserves a rolling raw timeline as encrypted forensic evidence for authorized investigators.
+6. Real-Time Anomaly Detection. File: `anomaly_detector.py`. Core functions/classes: `LightweightAnomalyDetector.detect_telemetry`, `LightweightAnomalyDetector.detect_security_event`, `_mean_std`. It continuously scores abnormal behavior (sensor spikes, auth anomalies, integrity threats) with lightweight statistics suitable for edge hardware.
+7. Smart Contract Automation. File: `smart_contracts.py`. Core functions/classes: `DynamicSmartContractEngine.evaluate_and_invoke`, `_insurance_rule`, `_toll_rule`, `_maintenance_rule`, `_biometric_safety_rule`. It auto-executes policy workflows (insurance/toll/safety actions) from trusted blockchain event context.
+8. V2X Sync and Secure Communication. Files: `sync_protocol.py`, `v2x_protocol.py`. Core functions/classes: `create_message`, `verify_message`, `SmartCarBlockchain.verify_and_sync`, `DynamicCryptoAgilityLayer.maybe_switch_mode`. It defends message authenticity and integrity using signed/authenticated envelopes, session secrets, and adaptive crypto mode selection under changing latency and traffic.
+9. Hardware-to-Blockchain Bridge. Files: `hardware_bridge.py`, `pi_sensor_node.py`. Core functions/classes: `run_pi_mode`, `run_arduino_mode`, `PiTelemetryNode.run`, `to_telemetry`. It ingests real telemetry from Raspberry Pi/Arduino and pushes it into the secure blockchain pipeline in real time.
+10. Biometric and Driver Health Safety. Files: `pi_sensor_node.py`, `vehicle_sensors.py`, `blockchain.py`. Core functions/classes: `HeartRateSensorSerial.read_bpm`, `DrowsinessEyeClosureDetector.read_score`, `VehicleSensorSuite._read_biometric`, `SmartCarBlockchain._activate_safe_mode`. It monitors heart rate and drowsiness and can trigger automatic protective driving controls when risk thresholds are crossed.
+11. Advanced Consensus and Majority Validation. File: `multi_car_majority_demo.py` (and vote APIs in `sync_protocol.py`). Core functions: `verify_candidate_locally`, `make_candidate_block`, `SyncClient.submit_vote`, `SyncClient.request_vote_tally`. It demonstrates distributed validation so one malicious node cannot easily force false chain events.
+12. Latency and Performance Measurement. Files: `perf_metrics.py`, `zkp_latency_report.py`, `network_overhead_analysis.py`. Core functions: `log_zkp_latency`, `main`, `analyze`. It records cryptographic and network timing overhead to show the system remains practical for near real-time vehicular operation.
+13. Secure Configuration and Secret Hygiene. File: `env_config.py` plus `.env`. Core functions: `load_project_env_once`, `get_env`, `get_bool`, `get_int`, `get_float`. Sensitive keys and policy toggles are externally managed, reducing hardcoded secret exposure and improving operational security maturity.
+
+## Detailed Functional Explanation (What, Why, How, Value, Stability, Future, Importance)
+### 1. DID Identity (`did_identity.py`)
+- What was done: Implemented decentralized identity and Lamport hash-signature flow using `DIDIdentity.generate`, `DIDIdentity.sign_challenge`, and `verify_did_proof`.
+- Why: A centralized identity server is a single point of failure for fleet trust.
+- How it works: The vehicle publishes a DID document, signs challenge bits with one-time hash keys, and peers verify signature-hash pairs.
+- Practical value: Reduces identity spoofing and strengthens V2X trust bootstrap.
+- Stability now: high (lightweight, deterministic verification, and minimal external dependencies).
+- Future direction: key rotation registry, DID revocation list, multi-proof identity bundle.
+- Importance: critical; secure inter-vehicle trust cannot start without strong identity verification.
+
+### 2. ZKP Privacy (`zkp_privacy.py`)
+- What was done: Implemented `commit`, `prove_knowledge`, `verify_knowledge`, `create_speed_limit_proof`, and `verify_speed_limit_proof`.
+- Why: Exposing raw speed/location increases privacy and surveillance risk.
+- How it works: Commitment plus knowledge proofs allow compliance verification without revealing secret values.
+- Practical value: Enables regulation compliance while preserving user privacy.
+- Stability now: medium-high (practical and robust, but not a formally verified production range-proof system yet).
+- Future direction: Bulletproofs/zkSNARK integration, formally verified proof circuits.
+- Importance: high; this is a core privacy-by-design capability.
+
+### 3. Dual-Hash Chain Integrity (`blockchain.py`, `blockchain.cpp`)
+- What was done: Implemented SHA2+SHA3 hybrid integrity with `dual_hash` and `compute_block_hash`.
+- Why: Relying on only one hash family increases long-term cryptographic risk.
+- How it works: block payload canonical hash chaining + dual digest verification.
+- Practical value: Improves tamper detection and forensic confidence.
+- Stability now: high (simple deterministic cryptographic primitive usage).
+- Future direction: domain-separated hash contexts, hardware-accelerated hashing.
+- Importance: critical; this is the foundation of ledger trust.
+
+### 4. Federated Learning Security (`federated_learning.py`, `fl_trainer_node.py`)
+- What was done: local training + delta sharing + `_mad_filter` outlier defense + clipped updates.
+- Why: The system needs collective model improvement without sharing raw private driving data.
+- How it works: Each car computes local updates, the trainer performs robust aggregation, and extreme/poisoned deltas are rejected.
+- Practical value: Improves fleet-wide AI safety without exposing personal data.
+- Stability now: medium (works well; model simplicity logistic baseline).
+- Future direction: secure aggregation, personalized FL, stronger poisoning defenses.
+- Importance: high; a key enabler for privacy-preserving intelligence scaling.
+
+### 5. Encrypted Forensic Blackbox (`edge_layer.py`, `blockchain.py`)
+- What was done: Built trigger-based forensic capture with `record_forensic_sample`, `build_forensic_block`, and `create_locked_package`.
+- Why: Incident investigation requires trusted immutable evidence timelines.
+- How it works: A rolling raw buffer is maintained; on trigger, an encrypted forensic bundle is locked into a chain event.
+- Practical value: insurance, legal investigation, root-cause analysis.
+- Stability now: high for logging path; crypto strength config-dependent.
+- Future direction: hardware secure enclave key wrapping, chain-of-custody metadata standardization.
+- Importance: very high for real-world accountability and incident response.
+
+### 6. Real-Time Anomaly Detection (`anomaly_detector.py`)
+- What was done: `detect_telemetry`, `detect_security_event`, z-score baseline + heuristic fusion.
+- Why: Without early anomaly detection, prevention and response are delayed.
+- How it works: Rolling mean/std baselines and rule penalties are combined into a detection score.
+- Practical value: enables fast detection of sensor spoofing, authentication abuse, and integrity anomalies.
+- Stability now: medium-high (lightweight and fast, but threshold tuning environment-specific).
+- Future direction: adaptive thresholds, online drift handling, hybrid ML anomaly scoring.
+- Importance: high; proactive defense layer.
+
+### 7. Smart Contract Automation (`smart_contracts.py`)
+- What was done: implemented event-driven policy execution using `evaluate_and_invoke` and rule functions.
+- Why: Manual response is slow and error-prone.
+- How it works: Policy rules evaluate telemetry/event context and invoke contract connectors.
+- Practical value: insurance/toll/maintenance workflow automation.
+- Stability now: medium-high (internal abstraction is stable; external endpoint reliability still matters).
+- Future direction: audited contract ABI layer, retry-safe idempotent transaction manager.
+- Importance: medium-high; operations efficiency and trust automation.
+
+### 8. Secure Sync and V2X (`sync_protocol.py`, `v2x_protocol.py`)
+- What was done: authenticated message envelopes, robust socket handling, dynamic crypto agility.
+- Why: MITM/tamper/replay risk high in vehicular networks.
+- How it works: signed or HMAC-protected messages, handshake-derived session secret, latency-aware mode switching.
+- Practical value: safe low-latency vehicle-to-vehicle/infrastructure communication.
+- Stability now: medium-high (fallback logic is strong; heterogeneous networks still require tuning).
+- Future direction: full PQ signatures everywhere, formal replay protection windowing.
+- Importance: critical for connected vehicle safety.
+
+### 9. Hardware Bridge (`hardware_bridge.py`, `pi_sensor_node.py`)
+- What was done: `run_pi_mode`, `run_arduino_mode`, telemetry translation and control dispatch.
+- Why: Real deployment requires direct hardware integration beyond simulation.
+- How it works: Sensor streams are ingested, normalized, and pushed into the chain pipeline; safe-mode signals are dispatched to actuators.
+- Practical value: Improves field deployability and lab-to-road transition.
+- Stability now: medium (hardware link quality and driver stack dependent).
+- Future direction: CAN-native ingestion, watchdog recovery, offline queueing.
+- Importance: high for practical deployment credibility.
+
+### 10. Biometric Safety (`pi_sensor_node.py`, `vehicle_sensors.py`, `blockchain.py`)
+- What was done: heart-rate/drowsiness intake + safe-mode activation integration.
+- Why: driver physiological risk often causes accidents before system-level failure appears.
+- How it works: Threshold crossings generate risk events; chain and contract logic trigger protective responses.
+- Practical value: human-centric safety and emergency intervention.
+- Stability now: medium (sensor quality dependent, but control path robust).
+- Future direction: multi-sensor fusion (ECG + eye + steering behavior), false-positive suppression.
+- Importance: high in safety-critical contexts.
+
+### 11. Majority Consensus Demo (`multi_car_majority_demo.py`, `sync_protocol.py`)
+- What was done: local candidate verification + distributed vote/tally interfaces.
+- Why: Reduces risk of forged events and single-node authority abuse.
+- How it works: Peer nodes independently verify candidate blocks and majority outcomes determine acceptance.
+- Practical value: trust decentralization and anti-Sybil hardening (demo scope).
+- Stability now: medium (demo-grade orchestration, core logic clear).
+- Future direction: production BFT voting and weighted trust scoring.
+- Importance: medium-high for decentralized resilience.
+
+### 12. Performance and Latency Metrics (`perf_metrics.py`, `zkp_latency_report.py`, `network_overhead_analysis.py`)
+- What was done: zkp latency logging, overhead profiling and reports.
+- Why: Security features must prove timing feasibility for real-time operation.
+- How it works: Operation-level latency is logged and payload overhead is measured and compared.
+- Practical value: optimization decisions, publication/report quality evidence.
+- Stability now: high (simple instrumentation pipeline).
+- Future direction: end-to-end distributed tracing, percentile SLA dashboard.
+- Importance: high for research validity and production readiness.
+
+### 13. Secure Configuration (`env_config.py`, `.env`)
+- What was done: centralized env parsing and typed getters (`get_bool`, `get_int`, `get_float`).
+- Why: Hardcoded secrets and constants reduce both security and maintainability.
+- How it works: Project-root discovery loads config once; modules read typed values with safe runtime defaults.
+- Practical value: safer deployment, easy tuning, reproducible environment behavior.
+- Stability now: high (minimal logic, broad module coverage).
+- Future direction: secret manager integration, config schema validation and signature checks.
+- Importance: critical baseline and foundation layer for secure system operation.
 
 ## 2. Project Layers
 1. Presentation Layer
@@ -73,7 +214,6 @@ Smart Car - Blockchain for Vehicle Security/
 ```
 
 ## 4. Production-Oriented ZKP Parameters
-![Zero Knowledge Proofs](image_source/Zero-Knowladge-proofs.png)
 
 Key parameters from `.env`:
 - `SMARTCAR_ZKP_PARAM_SET`
@@ -97,8 +237,7 @@ flowchart TD
     C --> D[Verify Proof]
 ```
 
-## 5. Network Error Handling Hardening 
-![Blockchain Communication](image_source/commonication-blockchain-synctrization.png)
+## 5. Network Error Handling Hardening
 
 Scope:
 - Timeout retry loops
@@ -121,8 +260,7 @@ flowchart TD
     D --> F[Retry Or Close]
 ```
 
-## 6. Quantum-Resistant V2V Handshake (Dynamic PQC) 
-![Blockchain Communication](image_source/commonication-blockchain-synctrization.png)
+## 6. Quantum-Resistant V2V Handshake (Dynamic PQC)
 
 Crypto agility and handshake:
 - PQC KEM preferred (`ML-KEM` or `Kyber`)
@@ -153,8 +291,7 @@ flowchart TD
     G --> H[Select SHA3 Or DILITHIUM]
 ```
 
-## 7. Local Storage Encryption (Blockchain File) 
-![System Architecture](image_source/System-Architechture.png)
+## 7. Local Storage Encryption (Blockchain File)
 
 Storage modes:
 - `AES-256-GCM` primary
@@ -179,8 +316,7 @@ flowchart TD
     D --> E[Read And Verify]
 ```
 
-## 8. Encrypted Blackbox Logging (Forensic Analysis) 
-![Privacy Security Flow](image_source/privacy-security-flow.png)
+## 8. Encrypted Blackbox Logging (Forensic Analysis)
 
 Flow:
 - Rolling window capture
@@ -208,8 +344,7 @@ flowchart TD
     C -->|No| F[Continue Buffering]
 ```
 
-## 9. Multi-Modal Biometric Auth via Blockchain 
-![Privacy Security Flow](image_source/privacy-security-flow.png)
+## 9. Multi-Modal Biometric Auth via Blockchain
 
 Fields:
 - `driver_heart_rate_bpm`
@@ -236,8 +371,7 @@ flowchart TD
     D -->|No| F[Normal Mode]
 ```
 
-## 10. Decentralized AI-Model Training (Federated Learning) 
-![Federated Learning Flow](image_source/federaated-learning-flow.png)
+## 10. Decentralized AI-Model Training (Federated Learning)
 
 Training shape:
 - Local logistic training on each vehicle
@@ -271,8 +405,7 @@ flowchart TD
     F --> G[Global Model Broadcast]
 ```
 
-## 11. Self-Healing Blockchain (Pruning + Sharding) 
-![System Architecture](image_source/System-Architechture.png)
+## 11. Self-Healing Blockchain (Pruning + Sharding)
 
 Core behavior:
 - Archive old blocks into shards
@@ -300,8 +433,7 @@ flowchart TD
     E --> F[Checkpoint Update]
 ```
 
-## 12. Platooning Security with Proof-of-Proximity (PoP) 
-![Road Scene](image_source/road_scene.svg)
+## 12. Platooning Security with Proof-of-Proximity (PoP)
 
 PoP rule:
 - Own distance must be in range
@@ -331,8 +463,7 @@ flowchart TD
     E -->|No| G[PoP Blocked]
 ```
 
-## 13. Owner Recovery Mode 
-![Project Theme](image_source/project_theam.jpg)
+## 13. Owner Recovery Mode
 
 Flow:
 - Validate recovery key hash
@@ -362,12 +493,10 @@ flowchart TD
     G -->|No| I[Reject]
 ```
 
-## 14. Math Calculation + Mermaid
+## 14. Function-wise Math and Mermaid
 
-## Function-wise Math Calculation + Mermaid
 
 ### `blockchain.py`
-Related image: `image_source/System-Architechture.png`, `image_source/commonication-blockchain-synctrization.png`
 
 #### `dual_hash(data)`
 
@@ -468,7 +597,6 @@ flowchart TD
 ```
 
 ### `zkp_privacy.py`
-Related image: `image_source/Zero-Knowladge-proofs.png`, `image_source/privacy-security-flow.png`
 
 #### `commit(value, blind)`
 
@@ -555,7 +683,6 @@ flowchart TD
 ```
 
 ### `anomaly_detector.py`
-Related image: `image_source/privacy-security-flow.png`
 
 #### `_mean_std(key)`
 
@@ -591,7 +718,6 @@ flowchart TD
 ```
 
 ### `edge_layer.py`
-Related image: `image_source/commonication-blockchain-synctrization.png`
 
 #### `_avg(vals)`
 
@@ -628,7 +754,6 @@ flowchart TD
 ```
 
 ### `vehicle_sensors.py`
-Related image: `image_source/road_scene.svg`
 
 #### `GPSSimulator.update(speed_kmh, heading_change)`
 
@@ -681,7 +806,6 @@ flowchart TD
 ```
 
 ### `dashboard.py`
-Related image: `image_source/road_scene.svg`, `image_source/project_theam.jpg`
 
 #### `_estimate_distance(box_h)`
 
@@ -730,7 +854,6 @@ flowchart TD
 ```
 
 ### `federated_learning.py`
-Related image: `image_source/federaated-learning-flow.png`
 
 #### `_sigmoid(x)`
 
@@ -831,7 +954,6 @@ flowchart TD
 ```
 
 ### `v2x_protocol.py`
-Related image: `image_source/commonication-blockchain-synctrization.png`
 
 #### `DynamicCryptoAgilityLayer._agility_score(recommended_mode)`
 
@@ -887,7 +1009,6 @@ flowchart TD
 ```
 
 ### `network_overhead_analysis.py`
-Related image: `image_source/commonication-blockchain-synctrization.png`
 
 #### `analyze()`
 
@@ -910,7 +1031,6 @@ flowchart TD
 ```
 
 ### `did_identity.py`
-Related image: `image_source/privacy-security-flow.png`
 
 #### `_msg_bits(message)`
 
@@ -940,8 +1060,6 @@ flowchart TD
     C --> D{All Matched}
 ```
 
-### Additional Missing Math (Added)
-Related image: `image_source/System-Architechture.png`
 
 #### `blockchain.py::LocalStorageCipher.encrypt_payload(payload)`
 
