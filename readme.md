@@ -32,7 +32,7 @@
 - `perf_metrics.py`, `zkp_latency_report.py`, `network_overhead_analysis.py`, `logs/`
 - ZKP latency logs, overhead reports, runtime forensic artifacts.
 
-## 3. Folder Structure + Project Theme Image
+## 3. Folder Structure
 ![Project Theme](image_source/project_theam.jpg)
 
 ```text
@@ -72,7 +72,7 @@ Smart Car - Blockchain for Vehicle Security/
 `-- build/
 ```
 
-## 4. Production-Oriented ZKP Parameters + Math + Mermaid + Image
+## 4. Production-Oriented ZKP Parameters
 ![Zero Knowledge Proofs](image_source/Zero-Knowladge-proofs.png)
 
 Key parameters from `.env`:
@@ -86,6 +86,9 @@ $$
 $$
 ch=H(commitment\parallel t\parallel context)\bmod Q
 $$
+Description:
+- First formula creates the Pedersen-style commitment used to hide sensitive value.
+- Second formula creates Fiat-Shamir challenge for non-interactive knowledge proof verification.
 
 ```mermaid
 flowchart TD
@@ -94,7 +97,7 @@ flowchart TD
     C --> D[Verify Proof]
 ```
 
-## 5. Network Error Handling Hardening + Math + Mermaid + Image
+## 5. Network Error Handling Hardening 
 ![Blockchain Communication](image_source/commonication-blockchain-synctrization.png)
 
 Scope:
@@ -104,8 +107,10 @@ Scope:
 
 Math (reliability metric used operationally):
 $$
-success\_rate=\frac{successful\_messages}{total\_messages}\times 100
+success_{rate}=\frac{successful_{messages}}{total_{messages}}\times 100
 $$
+Description:
+- Measures delivery reliability of sync/V2X pipeline under hardened retry and exception handling.
 
 ```mermaid
 flowchart TD
@@ -116,7 +121,7 @@ flowchart TD
     D --> F[Retry Or Close]
 ```
 
-## 6. Quantum-Resistant V2V Handshake (Dynamic PQC) + Math + Mermaid + Image
+## 6. Quantum-Resistant V2V Handshake (Dynamic PQC) 
 ![Blockchain Communication](image_source/commonication-blockchain-synctrization.png)
 
 Crypto agility and handshake:
@@ -126,12 +131,15 @@ Crypto agility and handshake:
 
 Math:
 $$
-score=w_L\cdot latency\_component+w_T\cdot traffic\_component
+score=w_L\cdot latency_{component}+w_T\cdot traffic_{component}
 $$
 $$
-latency\_component=\min\left(1,\frac{avg\_rtt}{latency\_high}\right),\quad
-traffic\_component=\min\left(1,\frac{mps}{traffic\_high}\right)
+latency_{component}=\min\left(1,\frac{avg_{rtt}}{latency_{high}}\right),\quad
+traffic_{component}=\min\left(1,\frac{mps}{traffic_{high}}\right)
 $$
+Description:
+- Converts current network condition into a bounded agility score.
+- Score drives dynamic crypto mode switch between `DILITHIUM` and `SHA3` with hysteresis.
 
 ```mermaid
 flowchart TD
@@ -145,7 +153,7 @@ flowchart TD
     G --> H[Select SHA3 Or DILITHIUM]
 ```
 
-## 7. Local Storage Encryption (Blockchain File) + Math + Mermaid + Image
+## 7. Local Storage Encryption (Blockchain File) 
 ![System Architecture](image_source/System-Architechture.png)
 
 Storage modes:
@@ -159,6 +167,9 @@ $$
 $$
 ciphertext=AES\text{-}256\text{-}GCM(K,nonce,plaintext,aad)
 $$
+Description:
+- Derives storage encryption key from passphrase.
+- Encrypts blockchain file payload with authenticated encryption to prevent tamper and leak.
 
 ```mermaid
 flowchart TD
@@ -168,7 +179,7 @@ flowchart TD
     D --> E[Read And Verify]
 ```
 
-## 8. Encrypted Blackbox Logging (Forensic Analysis) + Math + Mermaid + Image
+## 8. Encrypted Blackbox Logging (Forensic Analysis) 
 ![Privacy Security Flow](image_source/privacy-security-flow.png)
 
 Flow:
@@ -179,11 +190,14 @@ Flow:
 
 Math:
 $$
-window\_samples=sample\_hz\times window\_sec
+window_{samples}=sample_{hz}\times window_{sec}
 $$
 $$
-forensic\_trigger\_score=impact\_flag+hack\_flag+emergency\_flag
+forensic_{trigger\_score}=impact_{flag}+hack_{flag}+emergency_{flag}
 $$
+Description:
+- First formula sets how many raw records stay in rolling forensic window.
+- Second formula represents trigger logic for generating locked forensic package block.
 
 ```mermaid
 flowchart TD
@@ -194,7 +208,7 @@ flowchart TD
     C -->|No| F[Continue Buffering]
 ```
 
-## 9. Multi-Modal Biometric Auth via Blockchain + Math + Mermaid + Image
+## 9. Multi-Modal Biometric Auth via Blockchain 
 ![Privacy Security Flow](image_source/privacy-security-flow.png)
 
 Fields:
@@ -204,11 +218,14 @@ Fields:
 
 Math:
 $$
-biometric\_hash=SHA3\text{-}256(hr\parallel drowsiness\parallel unwell\_flag)
+biometric_{hash}=SHA3\text{-}256(hr\parallel drowsiness\parallel unwell_{flag})
 $$
 $$
-risk\_flag=(hr\le hr\_low)\lor(hr\ge hr\_high)\lor(drowsiness\ge threshold)\lor unwell
+risk_{flag}=(hr\le hr_{low})\lor(hr\ge hr_{high})\lor(drowsiness\ge threshold)\lor unwell
 $$
+Description:
+- Hash formula creates immutable biometric digest included in each block.
+- Risk formula decides whether safe-mode contract action should be triggered.
 
 ```mermaid
 flowchart TD
@@ -219,7 +236,7 @@ flowchart TD
     D -->|No| F[Normal Mode]
 ```
 
-## 10. Decentralized AI-Model Training (Federated Learning) + Math + Mermaid + Image
+## 10. Decentralized AI-Model Training (Federated Learning) 
 ![Federated Learning Flow](image_source/federaated-learning-flow.png)
 
 Training shape:
@@ -241,6 +258,10 @@ $$
 \Delta\cdot\frac{c}{\|\Delta\|_2}, & \|\Delta\|_2>c
 \end{cases}
 $$
+Description:
+- First formula is logistic prediction used by local obstacle-risk model.
+- Second formula is SGD update rule for local training.
+- Third formula is norm clipping to defend against poisoned/extreme client updates.
 
 ```mermaid
 flowchart TD
@@ -252,7 +273,7 @@ flowchart TD
     F --> G[Global Model Broadcast]
 ```
 
-## 11. Self-Healing Blockchain (Pruning + Sharding) + Math + Mermaid + Image
+## 11. Self-Healing Blockchain (Pruning + Sharding) 
 ![System Architecture](image_source/System-Architechture.png)
 
 Core behavior:
@@ -263,11 +284,14 @@ Core behavior:
 
 Math:
 $$
-leaf_i=SHA3\text{-}256(index\parallel block\_hash\parallel telemetry\_hash\parallel event\_hash\parallel previous\_hash)
+leaf_i=SHA3\text{-}256(index\parallel block_{hash}\parallel telemetry_{hash}\parallel event_{hash}\parallel previous_{hash})
 $$
 $$
 root=Merkle(leaf_1,leaf_2,\dots,leaf_n)
 $$
+Description:
+- Leaf hash encodes each archived block into tamper-evident shard element.
+- Merkle root anchors entire shard compactly on-chain for later proof verification.
 
 ```mermaid
 flowchart TD
@@ -278,7 +302,7 @@ flowchart TD
     E --> F[Checkpoint Update]
 ```
 
-## 12. Platooning Security with Proof-of-Proximity (PoP) + Math + Mermaid + Image
+## 12. Platooning Security with Proof-of-Proximity (PoP) 
 ![Road Scene](image_source/road_scene.svg)
 
 PoP rule:
@@ -288,14 +312,18 @@ PoP rule:
 
 Math:
 $$
-own\_valid=(d_{own}\in[d_{min},d_{max}])
+own_{valid}=(d_{own}\in[d_{min},d_{max}])
 $$
 $$
-participants=(1\text{ if own\_valid else }0)+N_{selected}
+participants=(1\text{ if }own_{valid}\text{ else }0)+N_{selected}
 $$
 $$
-approved=own\_valid\land(participants\ge required\_participants)
+approved=own_{valid}\land(participants\ge required_{participants})
 $$
+Description:
+- Own-valid checks physical range condition for platoon safety.
+- Participants counts own vehicle plus trusted nearby confirmations.
+- Approved defines final PoP consensus rule for block acceptance.
 
 ```mermaid
 flowchart TD
@@ -307,7 +335,7 @@ flowchart TD
     E -->|No| G[PoP Blocked]
 ```
 
-## 13. Owner Recovery Mode + Math + Mermaid + Image
+## 13. Owner Recovery Mode 
 ![Project Theme](image_source/project_theam.jpg)
 
 Flow:
@@ -317,11 +345,14 @@ Flow:
 
 Math:
 $$
-provided\_hash=SHA3\text{-}256(recovery\_key)
+provided_{hash}=SHA3\text{-}256(recovery_{key})
 $$
 $$
-valid\_key \iff provided\_hash=stored\_owner\_recovery\_hash
+valid_{key}\iff provided_{hash}=stored_{owner\_recovery\_hash}
 $$
+Description:
+- Recovery key is never compared in plaintext, only by hash equality.
+- Valid hash unlocks owner recovery flow and optional controlled chain reset path.
 
 ```mermaid
 flowchart TD
