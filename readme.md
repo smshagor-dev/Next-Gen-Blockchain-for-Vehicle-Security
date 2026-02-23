@@ -80,12 +80,12 @@ Key parameters from `.env`:
 - `SMARTCAR_ZKP_P`, `SMARTCAR_ZKP_G`, `SMARTCAR_ZKP_H`
 
 Math:
-$$
-C=(G^{value\bmod Q}\cdot H^r)\bmod P
-$$
-$$
-ch=H(commitment\parallel t\parallel context)\bmod Q
-$$
+```math
+\begin{aligned}
+C&=(G^{value\bmod Q}\cdot H^r)\bmod P\\
+ch&=H(commitment\parallel t\parallel context)\bmod Q
+\end{aligned}
+```
 Description:
 - First formula creates the Pedersen-style commitment used to hide sensitive value.
 - Second formula creates Fiat-Shamir challenge for non-interactive knowledge proof verification.
@@ -106,9 +106,9 @@ Scope:
 - Safe send and safe shutdown paths
 
 Math (reliability metric used operationally):
-$$
+```math
 success_{rate}=\frac{successful_{messages}}{total_{messages}}\times 100
-$$
+```
 Description:
 - Measures delivery reliability of sync/V2X pipeline under hardened retry and exception handling.
 
@@ -130,13 +130,13 @@ Crypto agility and handshake:
 - Dynamic `SHA3` vs `DILITHIUM` mode switching
 
 Math:
-$$
-score=w_L\cdot latency_{component}+w_T\cdot traffic_{component}
-$$
-$$
-latency_{component}=\min\left(1,\frac{avg_{rtt}}{latency_{high}}\right),\quad
-traffic_{component}=\min\left(1,\frac{mps}{traffic_{high}}\right)
-$$
+```math
+\begin{aligned}
+score&=w_L\cdot latency_{component}+w_T\cdot traffic_{component}\\
+latency_{component}&=\min\left(1,\frac{avg_{rtt}}{latency_{high}}\right)\\
+traffic_{component}&=\min\left(1,\frac{mps}{traffic_{high}}\right)
+\end{aligned}
+```
 Description:
 - Converts current network condition into a bounded agility score.
 - Score drives dynamic crypto mode switch between `DILITHIUM` and `SHA3` with hysteresis.
@@ -161,12 +161,12 @@ Storage modes:
 - PBKDF2 based authenticated envelope fallback
 
 Math:
-$$
-K=PBKDF2\text{-}HMAC\text{-}SHA256(passphrase,salt,iterations)
-$$
-$$
-ciphertext=AES\text{-}256\text{-}GCM(K,nonce,plaintext,aad)
-$$
+```math
+\begin{aligned}
+K&=PBKDF2\text{-}HMAC\text{-}SHA256(passphrase,salt,iterations)\\
+ciphertext&=AES\text{-}256\text{-}GCM(K,nonce,plaintext,aad)
+\end{aligned}
+```
 Description:
 - Derives storage encryption key from passphrase.
 - Encrypts blockchain file payload with authenticated encryption to prevent tamper and leak.
@@ -189,12 +189,12 @@ Flow:
 - Inject forensic block to chain
 
 Math:
-$$
-window_{samples}=sample_{hz}\times window_{sec}
-$$
-$$
-forensic_{trigger\_score}=impact_{flag}+hack_{flag}+emergency_{flag}
-$$
+```math
+\begin{aligned}
+window_{samples}&=sample_{hz}\times window_{sec}\\
+forensic_{trigger\_score}&=impact_{flag}+hack_{flag}+emergency_{flag}
+\end{aligned}
+```
 Description:
 - First formula sets how many raw records stay in rolling forensic window.
 - Second formula represents trigger logic for generating locked forensic package block.
@@ -217,12 +217,12 @@ Fields:
 - `driver_unwell`
 
 Math:
-$$
-biometric_{hash}=SHA3\text{-}256(hr\parallel drowsiness\parallel unwell_{flag})
-$$
-$$
-risk_{flag}=(hr\le hr_{low})\lor(hr\ge hr_{high})\lor(drowsiness\ge threshold)\lor unwell
-$$
+```math
+\begin{aligned}
+biometric_{hash}&=SHA3\text{-}256(hr\parallel drowsiness\parallel unwell_{flag})\\
+risk_{flag}&=(hr\le hr_{low})\lor(hr\ge hr_{high})\lor(drowsiness\ge threshold)\lor unwell
+\end{aligned}
+```
 Description:
 - Hash formula creates immutable biometric digest included in each block.
 - Risk formula decides whether safe-mode contract action should be triggered.
@@ -245,19 +245,17 @@ Training shape:
 - Robust aggregation + outlier defense + DP noise
 
 Math:
-$$
-\hat{y}=\sigma(Xw),\quad \sigma(x)=\frac{1}{1+e^{-x}}
-$$
-$$
-\nabla_w=\frac{X^T(\hat{y}-y)}{n},\quad w\leftarrow w-\eta\nabla_w
-$$
-$$
-\Delta'=
+```math
+\begin{aligned}
+\hat{y}&=\sigma(Xw),\quad \sigma(x)=\frac{1}{1+e^{-x}}\\
+\nabla_w&=\frac{X^T(\hat{y}-y)}{n},\quad w\leftarrow w-\eta\nabla_w\\
+\Delta'&=
 \begin{cases}
 \Delta, & \|\Delta\|_2\le c \\
 \Delta\cdot\frac{c}{\|\Delta\|_2}, & \|\Delta\|_2>c
 \end{cases}
-$$
+\end{aligned}
+```
 Description:
 - First formula is logistic prediction used by local obstacle-risk model.
 - Second formula is SGD update rule for local training.
@@ -283,12 +281,12 @@ Core behavior:
 - Checkpoint state snapshots
 
 Math:
-$$
-leaf_i=SHA3\text{-}256(index\parallel block_{hash}\parallel telemetry_{hash}\parallel event_{hash}\parallel previous_{hash})
-$$
-$$
-root=Merkle(leaf_1,leaf_2,\dots,leaf_n)
-$$
+```math
+\begin{aligned}
+leaf_i&=SHA3\text{-}256(index\parallel block_{hash}\parallel telemetry_{hash}\parallel event_{hash}\parallel previous_{hash})\\
+root&=Merkle(leaf_1,leaf_2,\dots,leaf_n)
+\end{aligned}
+```
 Description:
 - Leaf hash encodes each archived block into tamper-evident shard element.
 - Merkle root anchors entire shard compactly on-chain for later proof verification.
@@ -311,15 +309,13 @@ PoP rule:
 - Approval bound to proof hash in block metadata
 
 Math:
-$$
-own_{valid}=(d_{own}\in[d_{min},d_{max}])
-$$
-$$
-participants=(1\text{ if }own_{valid}\text{ else }0)+N_{selected}
-$$
-$$
-approved=own_{valid}\land(participants\ge required_{participants})
-$$
+```math
+\begin{aligned}
+own_{valid}&=(d_{own}\in[d_{min},d_{max}])\\
+participants&=(1\text{ if }own_{valid}\text{ else }0)+N_{selected}\\
+approved&=own_{valid}\land(participants\ge required_{participants})
+\end{aligned}
+```
 Description:
 - Own-valid checks physical range condition for platoon safety.
 - Participants counts own vehicle plus trusted nearby confirmations.
@@ -344,12 +340,12 @@ Flow:
 - If compromised and policy allows, force reset to genesis
 
 Math:
-$$
-provided_{hash}=SHA3\text{-}256(recovery_{key})
-$$
-$$
-valid_{key}\iff provided_{hash}=stored_{owner\_recovery\_hash}
-$$
+```math
+\begin{aligned}
+provided_{hash}&=SHA3\text{-}256(recovery_{key})\\
+valid_{key}&\iff provided_{hash}=stored_{owner\_recovery\_hash}
+\end{aligned}
+```
 Description:
 - Recovery key is never compared in plaintext, only by hash equality.
 - Valid hash unlocks owner recovery flow and optional controlled chain reset path.
