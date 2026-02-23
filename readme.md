@@ -1,36 +1,39 @@
 # OmniGuard V2X: A Privacy-Preserving Blockchain Framework for Smart Vehicle Security
-# Developer : Md Shahanur Islam Shagor
-# Role      : Project Architect & Lead Developer
 
-SmartCar research platform with blockchain audit trail, PoA consensus, ZKP-based privacy checks, V2X communication, DID, edge processing, anomaly detection, and hardware bridge support.
+## 1. Project Name, Developer, Author, Role, Description
+- Project Name: `OmniGuard V2X`
+- Developer: `Md Shahanur Islam Shagor`
+- Author: `Md Shahanur Islam Shagor`
+- Role: `Project Architect & Lead Developer`
+- Description: Smart-car security research platform where blockchain, ZKP privacy, DID identity, V2X communication, anomaly defense, edge processing, federated learning, forensic logging, and hardware control are integrated into one end-to-end system.
 
-## Project Layers
-
-1. `Presentation Layer`
+## 2. Project Layers
+1. Presentation Layer
 - `main.py`, `dashboard.py`
-- Live telemetry UI, camera/object detection view, road SVG, speedometer, chain/event panels
+- Live UI, camera detection, speed/radar/map, chain feed, control panel.
 
-2. `Application Layer`
+2. Application Layer
 - `blockchain.py`, `smart_contracts.py`, `edge_layer.py`, `anomaly_detector.py`, `did_identity.py`
-- Core security logic, smart-contract orchestration, edge summarization, anomaly scoring, DID verification
+- Chain logic, contracts, edge summarization, anomaly scoring, DID verification.
 
-3. `Network Layer`
-- `sync_protocol.py`, `v2x_protocol.py`, `multi_car_majority_demo.py`, `v2x_demo_nodes.py`
-- Multi-node sync, majority vote, V2V/V2I exchange, telemetry relay
+3. Network Layer
+- `sync_protocol.py`, `v2x_protocol.py`, `v2x_demo_nodes.py`, `multi_car_majority_demo.py`
+- Sync packets, V2V/V2I message flow, majority validation demos.
 
-4. `Privacy/Crypto Layer`
+4. Privacy and Crypto Layer
 - `zkp_privacy.py`
-- Commitment-based lightweight ZKP proofs for speed-limit and location-ownership validation
+- Commitment-based proofs for speed and location ownership privacy.
 
-5. `Hardware/Edge Integration Layer`
-- `hardware_bridge.py`, `pi_sensor_node.py`, `SmartCarSensorNode.ino`, `camera_emergency_brake.cpp`
-- Arduino/Raspberry Pi input bridge and C++ camera emergency braking pipeline
+5. Hardware and Edge Integration Layer
+- `hardware_bridge.py`, `pi_sensor_node.py`, `SmartCarSensorNode.ino`, `camera_emergency_brake.cpp`, `vehicle_sensors.py`
+- Sensor fusion, emergency braking path, ECU bridge.
 
-6. `Observability Layer`
+6. Observability and Analytics Layer
 - `perf_metrics.py`, `zkp_latency_report.py`, `network_overhead_analysis.py`, `logs/`
-- ZKP latency metrics, network overhead reports/charts, runtime logs
+- ZKP latency logs, overhead reports, runtime forensic artifacts.
 
-## Folder Structure (Current)
+## 3. Folder Structure + Project Theme Image
+![Project Theme](image_source/project_theam.jpg)
 
 ```text
 Smart Car - Blockchain for Vehicle Security/
@@ -39,301 +42,300 @@ Smart Car - Blockchain for Vehicle Security/
 |-- blockchain.py
 |-- blockchain.cpp
 |-- blockchain.h
-|-- sync_protocol.py
-|-- v2x_protocol.py
 |-- zkp_privacy.py
+|-- v2x_protocol.py
+|-- sync_protocol.py
 |-- did_identity.py
 |-- smart_contracts.py
 |-- edge_layer.py
 |-- anomaly_detector.py
 |-- federated_learning.py
-|-- fl_trainer_node.py
 |-- vehicle_sensors.py
 |-- hardware_bridge.py
 |-- pi_sensor_node.py
-|-- decentralized_fl_demo.py
 |-- network_overhead_analysis.py
-|-- multi_car_majority_demo.py
-|-- v2x_demo_nodes.py
-|-- attacker_fake_zkp.py
-|-- perf_metrics.py
-|-- zkp_latency_report.py
-|-- pqc_kyber_handshake_test.py
-|-- SmartCarSensorNode.ino
-|-- camera_emergency_brake.cpp
-|-- CMakeLists.txt
+|-- fl_trainer_node.py
+|-- decentralized_fl_demo.py
+|-- readme.md
 |-- requirements.txt
 |-- .env
-|-- readme.md
 |-- logs/
-|-- build/
 |-- image_source/
+|   |-- project_theam.jpg
 |   |-- System-Architechture.png
 |   |-- privacy-security-flow.png
 |   |-- commonication-blockchain-synctrization.png
 |   |-- federaated-learning-flow.png
 |   |-- Zero-Knowladge-proofs.png
 |   |-- Large-language-model.png
-|   |-- project_theam.jpg
 |   `-- road_scene.svg
-`-- __pycache__/
+`-- build/
 ```
 
-## Image Preview (`image_source/`)
-
-![Project Theme](image_source/project_theam.jpg)
-![System Architecture](image_source/System-Architechture.png)
-![Privacy Security Flow](image_source/privacy-security-flow.png)
-![Blockchain Communication Sync](image_source/commonication-blockchain-synctrization.png)
-![Federated Learning Flow](image_source/federaated-learning-flow.png)
+## 4. Production-Oriented ZKP Parameters + Math + Mermaid + Image
 ![Zero Knowledge Proofs](image_source/Zero-Knowladge-proofs.png)
-![Large Language Model](image_source/Large-language-model.png)
 
-## Production-Oriented ZKP Parameters
+Key parameters from `.env`:
+- `SMARTCAR_ZKP_PARAM_SET`
+- `SMARTCAR_ZKP_P`, `SMARTCAR_ZKP_G`, `SMARTCAR_ZKP_H`
 
-`zkp_privacy.py` now supports dynamic parameter loading:
+Math:
+$$
+C=(G^{value\bmod Q}\cdot H^r)\bmod P
+$$
+$$
+ch=H(commitment\parallel t\parallel context)\bmod Q
+$$
 
-- `SMARTCAR_ZKP_PARAM_SET=RFC3526_GROUP14` (default, standard 2048-bit MODP group)
-- `SMARTCAR_ZKP_PARAM_SET=MERSENNE_521` (legacy lightweight mode)
-- Optional custom override:
-  - `SMARTCAR_ZKP_P`
-  - `SMARTCAR_ZKP_G`
-  - `SMARTCAR_ZKP_H`
+```mermaid
+flowchart TD
+    A[Load ZKP Params] --> B[Build Commitment]
+    B --> C[Create Knowledge Proof]
+    C --> D[Verify Proof]
+```
 
-All values are read from `.env` at runtime.
+## 5. Network Error Handling Hardening + Math + Mermaid + Image
+![Blockchain Communication](image_source/commonication-blockchain-synctrization.png)
 
-## Network Error Handling Hardening
+Scope:
+- Timeout retry loops
+- Broken pipe and reset handling
+- Safe send and safe shutdown paths
 
-`sync_protocol.py` and `v2x_protocol.py` now include stronger socket exception handling:
+Math (reliability metric used operationally):
+$$
+success\_rate=\frac{successful\_messages}{total\_messages}\times 100
+$$
 
-- timeout retry flow for receive loops
-- explicit handling for disconnect/reset conditions (`BrokenPipeError`, `ConnectionResetError`, `ConnectionAbortedError`)
-- guarded send helpers and safer shutdown/cleanup paths
+```mermaid
+flowchart TD
+    A[Receive Message] --> B{Valid Packet}
+    B -->|Yes| C[Process]
+    B -->|No| D[Drop]
+    C --> E[Send Ack]
+    D --> F[Retry Or Close]
+```
 
-## Quantum-Resistant V2V Handshake (Dynamic PQC)
+## 6. Quantum-Resistant V2V Handshake (Dynamic PQC) + Math + Mermaid + Image
+![Blockchain Communication](image_source/commonication-blockchain-synctrization.png)
 
-`v2x_protocol.py` now includes a dynamic cryptographic agility layer:
+Crypto agility and handshake:
+- PQC KEM preferred (`ML-KEM` or `Kyber`)
+- Classical fallback (`ECDH + HKDF`)
+- Dynamic `SHA3` vs `DILITHIUM` mode switching
 
-- handshake exchanges crypto capability (`SHA3`, `DILITHIUM`)
-- each node monitors latency/traffic and auto-switches mode
-- high latency / high traffic -> lightweight `SHA3` envelope
-- normal conditions / quantum-alert mode -> `DILITHIUM` path
-- handshake now attempts PQ KEM (`ML-KEM-512` / `Kyber512`) to derive a per-session secret
-- if `oqs`/PQC path is unavailable, it automatically falls back to classical `ECDH + HKDF` key exchange and `ECDSA` signatures
-- agility switching now uses EWMA-smoothed latency + traffic score with hysteresis (`up/down` thresholds)
-- mode switching requires consecutive confirmation decisions to reduce crypto-mode flapping under noisy links
+Math:
+$$
+score=w_L\cdot latency\_component+w_T\cdot traffic\_component
+$$
+$$
+latency\_component=\min\left(1,\frac{avg\_rtt}{latency\_high}\right),\quad
+traffic\_component=\min\left(1,\frac{mps}{traffic\_high}\right)
+$$
 
-This keeps real-time decision latency stable while still enabling quantum-resistant mode when possible.
+```mermaid
+flowchart TD
+    A[HELLO] --> B[Negotiate KEM]
+    B --> C{PQC Available}
+    C -->|Yes| D[PQC Session Secret]
+    C -->|No| E[ECDH Session Secret]
+    D --> F[Sign And Send]
+    E --> F
+    F --> G[Agility Score]
+    G --> H[Select SHA3 Or DILITHIUM]
+```
 
-Config in `.env`:
+## 7. Local Storage Encryption (Blockchain File) + Math + Mermaid + Image
+![System Architecture](image_source/System-Architechture.png)
 
-- `SMARTCAR_V2X_SHARED_SECRET=...`
-- `SMARTCAR_V2X_CRYPTO_DEFAULT=DILITHIUM`
-- `SMARTCAR_V2X_CRYPTO_FORCE_MODE=`
-- `SMARTCAR_V2X_CRYPTO_SWITCH_INTERVAL_SEC=2.0`
-- `SMARTCAR_V2X_CRYPTO_LATENCY_HIGH_MS=120`
-- `SMARTCAR_V2X_CRYPTO_TRAFFIC_HIGH_MPS=60`
-- `SMARTCAR_V2X_CRYPTO_METRICS_WINDOW_SEC=4.0`
-- `SMARTCAR_V2X_CRYPTO_EWMA_ALPHA=0.28`
-- `SMARTCAR_V2X_CRYPTO_WEIGHT_LATENCY=0.65`
-- `SMARTCAR_V2X_CRYPTO_WEIGHT_TRAFFIC=0.35`
-- `SMARTCAR_V2X_CRYPTO_SCORE_UP_THRESHOLD=0.72`
-- `SMARTCAR_V2X_CRYPTO_SCORE_DOWN_THRESHOLD=0.54`
-- `SMARTCAR_V2X_CRYPTO_REC_BIAS=0.08`
-- `SMARTCAR_V2X_CRYPTO_QUANTUM_GUARD_MAX_SCORE=0.90`
-- `SMARTCAR_V2X_CRYPTO_SWITCH_CONFIRM_COUNT=2`
-- `SMARTCAR_V2X_HUB_LATENCY_HINT_MS=20`
-- `SMARTCAR_V2X_QUANTUM_ALERT=0`
-- `SMARTCAR_V2X_FORCE_CLASSIC=0`
-- `SMARTCAR_V2X_PQC_SIG_ALG=Dilithium2`
-- `SMARTCAR_V2X_PQC_KEM_PREFERRED=Kyber512`
-- `SMARTCAR_V2X_PQC_KEM_ALGS=ML-KEM-512,Kyber512`
+Storage modes:
+- `AES-256-GCM` primary
+- PBKDF2 based authenticated envelope fallback
 
-## Local Storage Encryption (Blockchain File)
+Math:
+$$
+K=PBKDF2\text{-}HMAC\text{-}SHA256(passphrase,salt,iterations)
+$$
+$$
+ciphertext=AES\text{-}256\text{-}GCM(K,nonce,plaintext,aad)
+$$
 
-`blockchain.py` now supports encryption-at-rest for the saved chain file (`logs/blockchain_*.json`):
+```mermaid
+flowchart TD
+    A[Chain Payload] --> B[Derive Key]
+    B --> C[Encrypt Payload]
+    C --> D[Write Encrypted File]
+    D --> E[Read And Verify]
+```
 
-- Primary mode: `AES-256-GCM` (when `cryptography` is available)
-- Fallback mode: authenticated encrypted envelope (`PBKDF2-SHA256-STREAM-HMAC`)
+## 8. Encrypted Blackbox Logging (Forensic Analysis) + Math + Mermaid + Image
+![Privacy Security Flow](image_source/privacy-security-flow.png)
 
-Config in `.env`:
+Flow:
+- Rolling window capture
+- Triggered forensic lock package
+- Separate wrapped keys for forensic and insurance
+- Inject forensic block to chain
 
-- `SMARTCAR_STORAGE_ENCRYPTION=1`
-- `SMARTCAR_STORAGE_PASSPHRASE=` (optional, defaults to `SMARTCAR_PASSWORD`)
-- `SMARTCAR_STORAGE_KDF_ITERATIONS=200000`
+Math:
+$$
+window\_samples=sample\_hz\times window\_sec
+$$
+$$
+forensic\_trigger\_score=impact\_flag+hack\_flag+emergency\_flag
+$$
 
-## Encrypted Blackbox Logging (Forensic Analysis)
+```mermaid
+flowchart TD
+    A[Collect Raw Telemetry] --> B[Rolling Queue]
+    B --> C{Impact Or Hack Trigger}
+    C -->|Yes| D[Encrypt Forensic Package]
+    D --> E[Attach To Blockchain Block]
+    C -->|No| F[Continue Buffering]
+```
 
-If a hacking/security-breach pattern or physical-impact/emergency event is detected, the system now:
+## 9. Multi-Modal Biometric Auth via Blockchain + Math + Mermaid + Image
+![Privacy Security Flow](image_source/privacy-security-flow.png)
 
-1. keeps a rolling last `10 minutes` of raw telemetry/event samples
-2. locks that raw timeline in a strong encrypted forensic package
-3. writes the locked package into the triggered blockchain block
-4. wraps access key material separately for:
-   - forensic team
-   - insurance company
-5. additionally pushes a special `FORENSIC_BLOCK:*` from edge raw queue snapshot on impact
-
-Config in `.env`:
-
-- `SMARTCAR_BLACKBOX_WINDOW_SEC=600`
-- `SMARTCAR_BLACKBOX_SAMPLE_HZ=2`
-- `SMARTCAR_BLACKBOX_KDF_ITERATIONS=250000`
-- `SMARTCAR_FORENSIC_ACCESS_KEY=...`
-- `SMARTCAR_INSURANCE_ACCESS_KEY=...`
-- `SMARTCAR_EDGE_FORENSIC_QUEUE_SIZE=2400`
-- `SMARTCAR_EDGE_FORENSIC_WINDOW_SEC=600`
-- `SMARTCAR_FORENSIC_BLOCK_COOLDOWN_SEC=3.0`
-
-## Multi-Modal Biometric Auth via Blockchain
-
-Driver biometric safety signals are now included in each telemetry block:
-
+Fields:
 - `driver_heart_rate_bpm`
 - `driver_drowsiness_score`
 - `driver_unwell`
 
-The blockchain stores a dedicated biometric digest:
+Math:
+$$
+biometric\_hash=SHA3\text{-}256(hr\parallel drowsiness\parallel unwell\_flag)
+$$
+$$
+risk\_flag=(hr\le hr\_low)\lor(hr\ge hr\_high)\lor(drowsiness\ge threshold)\lor unwell
+$$
 
-- `biometric_hash_sha3 = SHA3-256(heart_rate | drowsiness | unwell_flag)`
+```mermaid
+flowchart TD
+    A[Read Biometric Inputs] --> B[Compute Biometric Hash]
+    B --> C[Evaluate Safety Rule]
+    C --> D{Risk Found}
+    D -->|Yes| E[Activate Safe Mode]
+    D -->|No| F[Normal Mode]
+```
 
-If biometric risk is detected (abnormal heart rate / high drowsiness / unwell flag), a smart contract can auto-trigger vehicle safe mode.
+## 10. Decentralized AI-Model Training (Federated Learning) + Math + Mermaid + Image
+![Federated Learning Flow](image_source/federaated-learning-flow.png)
 
-Config in `.env`:
+Training shape:
+- Local logistic training on each vehicle
+- Share only weight deltas
+- Robust aggregation + outlier defense + DP noise
 
-- `BIOMETRIC_SAFETY_CONTRACT_ENABLED=1`
-- `BIOMETRIC_HEART_RATE_LOW_BPM=45`
-- `BIOMETRIC_HEART_RATE_HIGH_BPM=140`
-- `BIOMETRIC_DROWSINESS_THRESHOLD=0.80`
+Math:
+$$
+\hat{y}=\sigma(Xw),\quad \sigma(x)=\frac{1}{1+e^{-x}}
+$$
+$$
+\nabla_w=\frac{X^T(\hat{y}-y)}{n},\quad w\leftarrow w-\eta\nabla_w
+$$
+$$
+\Delta'=
+\begin{cases}
+\Delta, & \|\Delta\|_2\le c \\
+\Delta\cdot\frac{c}{\|\Delta\|_2}, & \|\Delta\|_2>c
+\end{cases}
+$$
 
-## Decentralized AI-Model Training (Federated Learning)
+```mermaid
+flowchart TD
+    A[Local Samples] --> B[Feature Extraction]
+    B --> C[Local SGD]
+    C --> D[Clip And Add DP Noise]
+    D --> E[Publish Delta On Chain]
+    E --> F[Trainer Aggregate]
+    F --> G[Global Model Broadcast]
+```
 
-Cars can now train a lightweight obstacle-risk model locally and share only model `weights_delta` over blockchain.
-Raw telemetry is not shared.
+## 11. Self-Healing Blockchain (Pruning + Sharding) + Math + Mermaid + Image
+![System Architecture](image_source/System-Architechture.png)
+
+Core behavior:
+- Archive old blocks into shards
+- Keep root hash and anchor metadata on-chain
+- Build and verify cross-shard proof
+- Checkpoint state snapshots
+
+Math:
+$$
+leaf_i=SHA3\text{-}256(index\parallel block\_hash\parallel telemetry\_hash\parallel event\_hash\parallel previous\_hash)
+$$
+$$
+root=Merkle(leaf_1,leaf_2,\dots,leaf_n)
+$$
+
+```mermaid
+flowchart TD
+    A[Old Blocks] --> B[Build Shard]
+    B --> C[Compute Merkle Root]
+    C --> D[Write Archive Node]
+    D --> E[Store Signed Anchor]
+    E --> F[Checkpoint Update]
+```
+
+## 12. Platooning Security with Proof-of-Proximity (PoP) + Math + Mermaid + Image
+![Road Scene](image_source/road_scene.svg)
+
+PoP rule:
+- Own distance must be in range
+- Neighbor confirmations must pass confidence threshold
+- Approval bound to proof hash in block metadata
+
+Math:
+$$
+own\_valid=(d_{own}\in[d_{min},d_{max}])
+$$
+$$
+participants=(1\text{ if own\_valid else }0)+N_{selected}
+$$
+$$
+approved=own\_valid\land(participants\ge required\_participants)
+$$
+
+```mermaid
+flowchart TD
+    A[Collect Own Distance] --> B[Collect Peer Observations]
+    B --> C[Filter By Range And Confidence]
+    C --> D[Count Participants]
+    D --> E{Approval Rule Satisfied}
+    E -->|Yes| F[PoP Approved]
+    E -->|No| G[PoP Blocked]
+```
+
+## 13. Owner Recovery Mode + Math + Mermaid + Image
+![Project Theme](image_source/project_theam.jpg)
 
 Flow:
+- Validate recovery key hash
+- If chain valid then unlock
+- If compromised and policy allows, force reset to genesis
 
-1. each car ingests local obstacle telemetry
-2. local learner creates periodic `FL:MODEL_UPDATE:*` block events
-3. peer cars apply remote deltas via aggregation (`FL:AGGREGATE_UPDATE:*`)
-4. trainer node can aggregate and also self-train (`train_trainer`) before publishing global weights
+Math:
+$$
+provided\_hash=SHA3\text{-}256(recovery\_key)
+$$
+$$
+valid\_key \iff provided\_hash=stored\_owner\_recovery\_hash
+$$
 
-Security hardening:
+```mermaid
+flowchart TD
+    A[Owner Recovery Request] --> B[Verify Recovery Key Hash]
+    B --> C{Valid Key}
+    C -->|No| D[Reject]
+    C -->|Yes| E{Chain Healthy}
+    E -->|Yes| F[Unlock]
+    E -->|No| G{Force Reset Allowed}
+    G -->|Yes| H[Reset To Genesis And Unlock]
+    G -->|No| I[Reject]
+```
 
-- Weight poisoning defense:
-  - client delta norm gate
-  - trainer-side MAD outlier filter
-  - robust weighted trimmed-mean aggregation
-- Differential Privacy:
-  - client update delta clipping
-  - Gaussian noise on delta before sharing
-  - raw telemetry never leaves car
-
-Config in `.env`:
-
-- `SMARTCAR_FL_ENABLED=1`
-- `SMARTCAR_FL_UPDATE_INTERVAL_SEC=8.0`
-- `SMARTCAR_FL_LEARNING_RATE=0.05`
-- `SMARTCAR_FL_LOCAL_EPOCHS=3`
-- `SMARTCAR_FL_MIN_SAMPLES=12`
-- `SMARTCAR_FL_DP_ENABLED=1`
-- `SMARTCAR_FL_DP_NOISE_SIGMA=0.010`
-- `SMARTCAR_FL_DELTA_CLIP_NORM=0.25`
-- `SMARTCAR_FL_REMOTE_DELTA_MAX_NORM=0.65`
-- `SMARTCAR_FL_TRAINER_OUTLIER_MAD_K=3.5`
-- `SMARTCAR_FL_TRAINER_TRIM_RATIO=0.20`
-- `SMARTCAR_FL_TRAINER_MAX_CLIENT_DELTA_NORM=0.85`
-
-## Self-Healing Blockchain (Pruning + Sharding)
-
-To optimize limited in-vehicle memory, old low-priority blocks are compacted and archived:
-
-1. old blocks are grouped into archive shards
-2. shard payload is written to archive-node file
-3. shard root-hash is retained on-chain metadata (`archive_root_hash`)
-4. archived blocks are compacted in main chain to reduce memory footprint
-5. cross-shard verification proof can be generated/verified via Merkle membership + anchored shard root
-6. state checkpoint snapshot is generated and signed after prune milestones
-7. storage pressure (free MB / free %) can auto-trigger aggressive pruning
-8. shard sync bundle exchange allows cars to share signed shard anchors across shards/nodes
-
-Config in `.env`:
-
-- `SMARTCAR_PRUNING_ENABLED=1`
-- `SMARTCAR_PRUNE_KEEP_RECENT_BLOCKS=200`
-- `SMARTCAR_PRUNE_BATCH_SIZE=50`
-- `SMARTCAR_ARCHIVE_NODE_FILE=logs/archive_node.jsonl`
-- `SMARTCAR_SHARD_SYNC_ENABLED=1`
-- `SMARTCAR_SHARD_SYNC_MAX_ANCHORS=1024`
-- `SMARTCAR_SHARD_SYNC_BUNDLE_FILE=logs/shard_sync_bundle_smartcar.json`
-- `SMARTCAR_CHECKPOINT_ENABLED=1`
-- `SMARTCAR_CHECKPOINT_EVERY_N_SHARDS=1`
-- `SMARTCAR_CHECKPOINT_MIN_INTERVAL_SEC=8`
-- `SMARTCAR_CHECKPOINT_FILE=logs/state_checkpoint_smartcar.json`
-- `SMARTCAR_CHECKPOINT_HISTORY_FILE=logs/state_checkpoint_history_smartcar.jsonl`
-- `SMARTCAR_AUTO_STORAGE_MANAGEMENT_ENABLED=1`
-- `SMARTCAR_STORAGE_MIN_FREE_MB=512`
-- `SMARTCAR_STORAGE_MIN_FREE_PERCENT=8`
-- `SMARTCAR_STORAGE_CRITICAL_FREE_MB=256`
-- `SMARTCAR_STORAGE_CRITICAL_FREE_PERCENT=4`
-- `SMARTCAR_STORAGE_PRUNE_BATCH_MULTIPLIER=2`
-- `SMARTCAR_STORAGE_CRITICAL_PRUNE_BATCH_MULTIPLIER=4`
-
-Sharding sync APIs (in `blockchain.py`):
-
-- `export_shard_sync_bundle(max_anchors=128, write_file=True)`
-- `import_shard_sync_bundle(bundle, strict_checkpoint=False)`
-- `create_cross_shard_proof(shard_id, block_index)`
-- `verify_cross_shard_proof(proof_payload)`
-- `get_shard_sync_status()`
-
-## Platooning Security with Proof-of-Proximity (PoP)
-
-For platooning scenarios, blockchain approval can be bound to physical LIDAR proximity evidence:
-
-1. nearby vehicles submit proximity observations (`distance_m`, `confidence`)
-2. block approval requires distance-in-range + minimum participant confirmations
-3. PoP proof hash is stored in block metadata (physical-digital binding)
-4. if PoP fails, block is marked as `PLATOON:BLOCKED:POP_FAIL:*`
-
-Config in `.env`:
-
-- `SMARTCAR_PLATOON_POP_ENABLED=1`
-- `SMARTCAR_POP_DISTANCE_MIN_M=5`
-- `SMARTCAR_POP_DISTANCE_MAX_M=55`
-- `SMARTCAR_POP_OBSERVATION_TTL_SEC=1.5`
-- `SMARTCAR_POP_REQUIRED_PARTICIPANTS=2`
-- `SMARTCAR_POP_MIN_CONFIDENCE=0.80`
-
-### Real Safe-Mode Hardware Dispatch (ECU)
-
-When biometric risk triggers safe mode, `hardware_bridge.py` now dispatches hard-stop command to ECU:
-
-- primary path: CAN frame (extended ID)
-- fallback path: serial JSON command to ECU controller
-
-Config in `.env`:
-
-- `SMARTCAR_ECU_CONTROL_ENABLED=1`
-- `SMARTCAR_ECU_MODE=can` (or `serial`)
-- `SMARTCAR_ECU_CAN_CHANNEL=can0`
-- `SMARTCAR_ECU_CAN_BUSTYPE=socketcan`
-- `SMARTCAR_ECU_CAN_BITRATE=500000`
-- `SMARTCAR_ECU_CAN_ARB_ID=0x18FF50E5`
-- `SMARTCAR_ECU_SERIAL_PORT=COM5`
-- `SMARTCAR_ECU_SERIAL_BAUD=115200`
-
-## Owner Recovery Mode
-
-If normal auth is blocked due to lockout or chain mismatch:
-
-- Use dashboard `RECOVER` with owner recovery key
-- Optional `Force Chain Reset` can rebuild chain from fresh genesis (policy-controlled)
-
-Config in `.env`:
-
-- `SMARTCAR_OWNER_RECOVERY_KEY=...`
-- `SMARTCAR_OWNER_ALLOW_CHAIN_RESET=1`
+## 14. Math Calculation + Mermaid
 
 ## Function-wise Math Calculation + Mermaid
 
@@ -951,571 +953,42 @@ ang  = (now * (0.6 + i*0.08) + i*0.9) mod (2*pi)
 dist = 0.2 + ((sin(now*0.3 + i) + 1) * 0.35)
 ```
 
-## Only Math (No Mermaid)
 
-### `blockchain.py`
-```text
-sha2 = SHA2-256(data)
-sha3 = SHA3-256(data)
-combined = SHA2-256(data + sha3)
 
-raw = index || timestamp || vehicle_id || telemetry_hash_sha3 || event_hash_sha3 || previous_hash
-block_hash = SHA3-256(raw)
-
-payload = block_hash || "|" || validator_id || "|" || authority_round
-poa_signature = HMAC-SHA256(validator_key, payload)
-
-telemetry_hash_sha2 = SHA2-256(telemetry_string)
-telemetry_hash_sha3 = SHA3-256(telemetry_string)
-event_hash_sha2 = SHA2-256(event_data)
-event_hash_sha3 = SHA3-256(event_data)
-dual_hash_combined = SHA2-256(block_hash) || ":" || SHA3-256(block_hash)
-biometric_hash_sha3 = SHA3-256(heart_rate|drowsiness|unwell)
-
-key = PBKDF2-HMAC-SHA256(password, salt, 100000, 64 bytes)
-ciphertext = plaintext XOR keystream
-mac = HMAC-SHA256(mac_key, nonce || ciphertext)
-
-storage_key = PBKDF2-HMAC-SHA256(passphrase, salt, iterations, 32 bytes)
-ciphertext = AES-256-GCM(storage_key, nonce, plaintext, aad)
-
-leaf_i = SHA3-256(index|block_hash|telemetry_hash|event_hash|previous_hash)
-parent = SHA3-256(left || right)
-
-own_valid = min_dist <= own_distance <= max_dist
-participants = (1 if own_valid else 0) + valid_neighbor_count
-approved = own_valid AND participants >= required_participants
+## 15. Full System Chain Connect Mermaid
+```mermaid
+flowchart LR
+    S1[Vehicle Sensors] --> S2[Edge Layer]
+    S2 --> S3[Anomaly Detector]
+    S2 --> S4[ZKP Privacy]
+    S3 --> S5[Blockchain Core]
+    S4 --> S5
+    S5 --> S6[Smart Contracts]
+    S5 --> S7[Forensic Blackbox]
+    S5 --> S8[Federated Learning]
+    S5 --> S9[Pruning And Sharding]
+    S5 --> S10[PoP Validation]
+    S5 --> S11[DID Verification]
+    S5 --> S12[Encrypted Local Storage]
+    S5 --> S13[V2X Protocol]
+    S13 --> S14[V2X Hub And Peer Nodes]
+    S5 --> S15[Dashboard UI]
+    S15 --> S16[Owner Recovery And Control]
 ```
 
-### `zkp_privacy.py`
-```text
-C = (G^(value mod Q) * H^r) mod P
+## 16. Full System Description
+OmniGuard V2X is a full-stack smart-vehicle security platform where telemetry enters through sensor and hardware interfaces, gets filtered and summarized at edge, is validated for anomaly and privacy, and is committed to a PoA-based blockchain with optional PoP constraints. The system keeps dual-hash block integrity, cryptographically signs validation rounds, and stores sensitive state with encryption-at-rest.
 
-t = (G^k1 * H^k2) mod P
-ch = H(commitment|t|context) mod Q
-s1 = (k1 + ch*value) mod Q
-s2 = (k2 + ch*blind) mod Q
+On top of core chain integrity, the platform adds forensic blackbox packaging for incident response, biometric risk-aware safe-mode enforcement, DID-based identity checks, and dynamic smart-contract triggers for automated policy actions. In networked operation, nodes communicate through hardened sync and V2X channels that support dynamic cryptographic agility and post-quantum aware handshake paths.
 
-lhs = (G^s1 * H^s2) mod P
-rhs = (t * commitment^ch) mod P
-valid = (lhs == rhs)
-
-speed = round(speed_kmh), speed >= 0
-diff = limit - speed
-relation_blind = (r_speed + r_diff) mod Q
-
-lhs = (commit_speed * commit_diff) mod P
-rhs = (G^limit * H^relation_blind) mod P
-valid = proof_speed_ok AND proof_diff_ok AND (lhs == rhs)
-```
-
-### `anomaly_detector.py`
-```text
-mean = sum(vals)/n
-var = sum((v-mean)^2)/(n-1)
-std = sqrt(var)
-
-z = |(x-mean)/std|
-score += (z_speed + z_accel + z_temp + z_rpm)/4 + rule_penalties
-is_anomaly = (score >= threshold) OR (reason_count >= 2)
-```
-
-### `edge_layer.py`
-```text
-avg = sum(vals)/len(vals)
-speed = avg(speed_vals)
-obstacle_distance = min(obs_vals)
-brake_pressure = max(brake_vals)
-drowsiness = max(drowsy_vals)
-```
-
-### `vehicle_sensors.py`
-```text
-speed_ms = speed_kmh / 3.6
-d = speed_ms * dt / 111111
-lat += d * cos(heading)
-lon += d * sin(heading)
-
-target_rpm = 800 + (throttle/100)*6200
-rpm += (target_rpm - rpm)*0.1
-fuel -= (0.00001 + throttle*0.000005)*dt
-oil_pressure = 3.5 + (rpm/6000)*1.5 + noise
-
-if distance < 30: brake_pressure = 100
-else: brake_pressure = (1 - distance/100)*100
-```
-
-### `dashboard.py`
-```text
-distance_m = (1.70 * 850.0) / box_h
-
-angle_deg = 162 - (speed/220)*144
-needle_x = cx + (r-30)*cos(angle)
-needle_y = cy - (r-30)*sin(angle)
-
-target_speed = throttle * 1.6
-speed += (target_speed - speed) * 0.12
-rpm = 900 + speed * 36
-odometer += (speed / 3600) * 0.08
-
-ang = (now * (0.6 + i*0.08) + i*0.9) mod (2*pi)
-dist = 0.2 + ((sin(now*0.3 + i) + 1) * 0.35)
-```
-
-### `federated_learning.py`
-```text
-sigmoid(x) = 1 / (1 + exp(-clip(x,-40,40)))
-
-speed_norm = clip(speed/180, 0, 1)
-accel_norm = clip(|accel|/12, 0, 1)
-brake_norm = clip(brake/100, 0, 1)
-temp_norm = clip((temp-60)/60, 0, 1)
-near_obstacle = 1 if distance <= 35 else 0
-hr_risk = 1 if hr <= 45 or hr >= 140 else 0
-
-logits = Xw
-pred = sigmoid(logits)
-grad = X^T(pred-y)/n
-w = w - lr*grad
-loss = -mean(y*log(pred)+(1-y)*log(1-pred))
-
-n = ||delta||2
-if n > c: delta = delta * (c/n)
-
-med = median(vals)
-mad = median(|vals-med|) + 1e-9
-z = |vals-med| / mad
-keep = z <= k
-
-output_j = sum(col_j * weight_j) / sum(weight_j)
-```
-
-### `v2x_protocol.py`
-```text
-latency_component = min(1, avg_rtt/latency_hi)
-traffic_component = min(1, mps/traffic_hi)
-score = wL*latency_component + wT*traffic_component
-
-if mode == DILITHIUM and score >= up_threshold: target = SHA3
-if mode == SHA3 and score <= down_threshold: target = DILITHIUM
-
-hub_score = 0.5*traffic_ratio + 0.3*client_ratio + 0.2*latency_ratio
-mode = SHA3 if hub_score >= 0.66 else DILITHIUM
-```
-
-### `network_overhead_analysis.py`
-```text
-overhead_pct = ((protocol_bytes - plain_bytes) / plain_bytes) * 100
-```
-
-### `did_identity.py`
-```text
-digest = SHA3-256(message)
-bit = (byte >> shift) & 1
-
-challenge_hash == SHA3-256(challenge)
-for each i: SHA3(signature_i) == public_pairs_i[bit_i]
-```
-
-## Function-wise LaTeX Math + Named Image
-
-### `blockchain.py :: dual_hash(data)`
-![System Architecture](image_source/System-Architechture.png)
-
-$$
-\text{sha2}=\mathrm{SHA2\mbox{-}256}(data),\quad
-\text{sha3}=\mathrm{SHA3\mbox{-}256}(data)
-$$
-
-$$
-\text{combined}=\mathrm{SHA2\mbox{-}256}\!\left(data\parallel \text{sha3}\right)
-$$
-
-### `blockchain.py :: compute_block_hash(...)`
-![Blockchain Sync](image_source/commonication-blockchain-synctrization.png)
-
-$$
-raw=index\parallel timestamp\parallel vehicle\_id\parallel telemetry\_hash\_{sha3}\parallel event\_hash\_{sha3}\parallel previous\_hash
-$$
-
-$$
-block\_hash=\mathrm{SHA3\mbox{-}256}(raw)
-$$
-
-### `blockchain.py :: poa_sign_block(...)`
-![Blockchain Sync](image_source/commonication-blockchain-synctrization.png)
-
-$$
-payload=block\_hash\parallel "|" \parallel validator\_id\parallel "|" \parallel authority\_round
-$$
-
-$$
-poa\_signature=\mathrm{HMAC\mbox{-}SHA256}(validator\_key,\;payload)
-$$
-
-### `blockchain.py :: Block.compute_hashes(...)`
-![System Architecture](image_source/System-Architechture.png)
-
-$$
-\begin{aligned}
-telemetry\_hash\_{sha2}&=\mathrm{SHA2\mbox{-}256}(telemetry\_string)\\
-telemetry\_hash\_{sha3}&=\mathrm{SHA3\mbox{-}256}(telemetry\_string)\\
-event\_hash\_{sha2}&=\mathrm{SHA2\mbox{-}256}(event\_data)\\
-event\_hash\_{sha3}&=\mathrm{SHA3\mbox{-}256}(event\_data)
-\end{aligned}
-$$
-
-$$
-dual\_hash\_combined=\mathrm{SHA2\mbox{-}256}(block\_hash)\;:\;\mathrm{SHA3\mbox{-}256}(block\_hash)
-$$
-
-$$
-biometric\_hash\_{sha3}=\mathrm{SHA3\mbox{-}256}\!\left(hr\parallel drowsiness\parallel unwell\_flag\right)
-$$
-
-### `blockchain.py :: SmartCarCrypto.encrypt(...)`
-![Privacy Security Flow](image_source/privacy-security-flow.png)
-
-$$
-K=\mathrm{PBKDF2\mbox{-}HMAC\mbox{-}SHA256}(password,salt,100000,64\text{ bytes})
-$$
-
-$$
-ciphertext=plaintext\oplus keystream,\quad
-mac=\mathrm{HMAC\mbox{-}SHA256}(mac\_key,\;nonce\parallel ciphertext)
-$$
-
-### `blockchain.py :: LocalStorageCipher.encrypt_payload(...)`
-![System Architecture](image_source/System-Architechture.png)
-
-$$
-K_{store}=\mathrm{PBKDF2\mbox{-}HMAC\mbox{-}SHA256}(passphrase,salt,iterations,32\text{ bytes})
-$$
-
-$$
-ciphertext=\mathrm{AES\mbox{-}256\mbox{-}GCM}(K_{store},nonce,plaintext,aad)
-$$
-
-### `zkp_privacy.py :: commit(value, blind)`
-![Zero Knowledge Proofs](image_source/Zero-Knowladge-proofs.png)
-
-$$
-C=\left(G^{value\bmod Q}\cdot H^{r}\right)\bmod P
-$$
-
-### `zkp_privacy.py :: prove_knowledge(...)`
-![Zero Knowledge Proofs](image_source/Zero-Knowladge-proofs.png)
-
-$$
-t=\left(G^{k_1}\cdot H^{k_2}\right)\bmod P,\quad
-ch=H(commitment\parallel t\parallel context)\bmod Q
-$$
-
-$$
-s_1=(k_1+ch\cdot value)\bmod Q,\quad
-s_2=(k_2+ch\cdot blind)\bmod Q
-$$
-
-### `zkp_privacy.py :: verify_knowledge(...)`
-![Zero Knowledge Proofs](image_source/Zero-Knowladge-proofs.png)
-
-$$
-lhs=\left(G^{s_1}\cdot H^{s_2}\right)\bmod P,\quad
-rhs=\left(t\cdot commitment^{ch}\right)\bmod P
-$$
-
-$$
-valid \iff lhs=rhs
-$$
-
-### `zkp_privacy.py :: create_speed_limit_proof / verify_speed_limit_proof`
-![Privacy Security Flow](image_source/privacy-security-flow.png)
-
-$$
-speed=\max(0,\mathrm{round}(speed\_{kmh})),\quad
-diff=limit-speed
-$$
-
-$$
-relation\_blind=(r_{speed}+r_{diff})\bmod Q
-$$
-
-$$
-\left(commit\_{speed}\cdot commit\_{diff}\right)\bmod P
-=
-\left(G^{limit}\cdot H^{relation\_blind}\right)\bmod P
-$$
-
-### `anomaly_detector.py :: _mean_std(key)`
-![Large Language Model](image_source/Large-language-model.png)
-
-$$
-\mu=\frac{1}{n}\sum_{i=1}^{n}x_i,\quad
-\sigma^2=\frac{1}{n-1}\sum_{i=1}^{n}(x_i-\mu)^2,\quad
-\sigma=\sqrt{\sigma^2}
-$$
-
-### `anomaly_detector.py :: detect_telemetry(...)`
-![Privacy Security Flow](image_source/privacy-security-flow.png)
-
-$$
-z_k=\left|\frac{x_k-\mu_k}{\sigma_k}\right|,\quad
-score=rule\_penalties+\frac{z_{speed}+z_{accel}+z_{temp}+z_{rpm}}{4}
-$$
-
-$$
-is\_anomaly \iff (score\ge threshold)\ \lor\ (reason\_count\ge 2)
-$$
-
-### `edge_layer.py :: _avg(vals) / _flush(...)`
-![Blockchain Sync](image_source/commonication-blockchain-synctrization.png)
-
-$$
-avg(vals)=\frac{\sum v_i}{|vals|}
-$$
-
-$$
-\begin{aligned}
-speed&=avg(speed\_vals),\quad obstacle\_distance=\min(obs\_vals)\\
-brake\_pressure&=\max(brake\_vals),\quad drowsiness=\max(drowsy\_vals)
-\end{aligned}
-$$
-
-### `vehicle_sensors.py :: GPSSimulator.update(...)`
-![Road Scene](image_source/road_scene.svg)
-
-$$
-speed_{ms}=\frac{speed_{kmh}}{3.6},\quad
-d=\frac{speed_{ms}\cdot dt}{111111}
-$$
-
-$$
-lat\leftarrow lat+d\cos(\theta),\quad
-lon\leftarrow lon+d\sin(\theta)
-$$
-
-### `vehicle_sensors.py :: EngineSimulator.update(...)`
-![Project Theme](image_source/project_theam.jpg)
-
-$$
-target\_{rpm}=800+\frac{throttle}{100}\cdot 6200
-$$
-
-$$
-rpm\leftarrow rpm+(target\_{rpm}-rpm)\cdot 0.1
-$$
-
-$$
-fuel\_level\leftarrow fuel\_level-\left(0.00001+throttle\cdot 0.000005\right)\cdot dt
-$$
-
-$$
-oil\_pressure=3.5+\left(\frac{rpm}{6000}\right)\cdot 1.5+noise
-$$
-
-### `vehicle_sensors.py :: EmergencyBrakeController._on_obstacle_detected(...)`
-![Road Scene](image_source/road_scene.svg)
-
-$$
-brake\_pressure=
-\begin{cases}
-100, & distance<30\\
-\left(1-\frac{distance}{100}\right)\cdot 100, & 30\le distance<100
-\end{cases}
-$$
-
-### `dashboard.py :: _estimate_distance(box_h)`
-![Road Scene](image_source/road_scene.svg)
-
-$$
-distance_m=\frac{1.70\times 850.0}{box_h}
-$$
-
-### `dashboard.py :: _draw_speedometer()`
-![Project Theme](image_source/project_theam.jpg)
-
-$$
-angle_{deg}=162-\left(\frac{speed}{220}\right)\cdot 144
-$$
-
-$$
-needle_x=c_x+(r-30)\cos(\theta),\quad
-needle_y=c_y-(r-30)\sin(\theta)
-$$
-
-### `dashboard.py :: _update_model()`
-![Project Theme](image_source/project_theam.jpg)
-
-$$
-target\_speed=throttle\cdot 1.6,\quad
-speed\leftarrow speed+(target\_speed-speed)\cdot 0.12
-$$
-
-$$
-rpm=900+speed\cdot 36,\quad
-odometer\leftarrow odometer+\frac{speed}{3600}\cdot 0.08
-$$
-
-### `dashboard.py :: _refresh_v2x_nodes()`
-![Road Scene](image_source/road_scene.svg)
-
-$$
-ang=\left(now\cdot(0.6+i\cdot 0.08)+i\cdot 0.9\right)\bmod 2\pi
-$$
-
-$$
-dist=0.2+\left(\sin(now\cdot 0.3+i)+1\right)\cdot 0.35
-$$
-
-### `federated_learning.py :: _sigmoid(x)`
-![Federated Learning Flow](image_source/federaated-learning-flow.png)
-
-$$
-\sigma(x)=\frac{1}{1+e^{-\mathrm{clip}(x,-40,40)}}
-$$
-
-### `federated_learning.py :: _extract_features(...)`
-![Federated Learning Flow](image_source/federaated-learning-flow.png)
-
-$$
-\begin{aligned}
-speed\_{norm}&=\mathrm{clip}\!\left(\frac{speed}{180},0,1\right)\\
-accel\_{norm}&=\mathrm{clip}\!\left(\frac{|accel|}{12},0,1\right)\\
-brake\_{norm}&=\mathrm{clip}\!\left(\frac{brake}{100},0,1\right)\\
-temp\_{norm}&=\mathrm{clip}\!\left(\frac{temp-60}{60},0,1\right)
-\end{aligned}
-$$
-
-### `federated_learning.py :: _train_batch(X,y,epochs)`
-![Federated Learning Flow](image_source/federaated-learning-flow.png)
-
-$$
-logits=Xw,\quad \hat{y}=\sigma(logits)
-$$
-
-$$
-\nabla_w=\frac{X^T(\hat{y}-y)}{n},\quad
-w\leftarrow w-\eta \nabla_w
-$$
-
-$$
-\mathcal{L}=-\frac{1}{n}\sum\left(y\log(\hat{y})+(1-y)\log(1-\hat{y})\right)
-$$
-
-### `federated_learning.py :: _clip_delta(delta,c)`
-![Federated Learning Flow](image_source/federaated-learning-flow.png)
-
-$$
-n=\lVert\Delta\rVert_2,\quad
-\Delta'=
-\begin{cases}
-\Delta, & n\le c\\
-\Delta\cdot \frac{c}{n}, & n>c
-\end{cases}
-$$
-
-### `federated_learning.py :: _mad_filter(vals,k)`
-![Large Language Model](image_source/Large-language-model.png)
-
-$$
-med=\mathrm{median}(vals),\quad
-mad=\mathrm{median}(|vals-med|)+10^{-9}
-$$
-
-$$
-z=\frac{|vals-med|}{mad},\quad keep=(z\le k)
-$$
-
-### `federated_learning.py :: _robust_weighted_trimmed_mean(...)`
-![Federated Learning Flow](image_source/federaated-learning-flow.png)
-
-$$
-output_j=\frac{\sum_{i\in trimmed} w_i\cdot x_{ij}}{\sum_{i\in trimmed} w_i}
-$$
-
-### `v2x_protocol.py :: DynamicCryptoAgilityLayer._agility_score(...)`
-![Blockchain Sync](image_source/commonication-blockchain-synctrization.png)
-
-$$
-latency\_component=\min\!\left(1,\frac{avg\_rtt}{latency\_hi}\right),\quad
-traffic\_component=\min\!\left(1,\frac{mps}{traffic\_hi}\right)
-$$
-
-$$
-score=w_L\cdot latency\_component+w_T\cdot traffic\_component
-$$
-
-### `v2x_protocol.py :: DynamicCryptoAgilityLayer.maybe_switch_mode(...)`
-![Blockchain Sync](image_source/commonication-blockchain-synctrization.png)
-
-$$
-\text{If mode=DILITHIUM and } score\ge up\_thr \Rightarrow target=SHA3
-$$
-
-$$
-\text{If mode=SHA3 and } score\le down\_thr \Rightarrow target=DILITHIUM
-$$
-
-### `v2x_protocol.py :: V2XHub._recommend_crypto_mode()`
-![Blockchain Sync](image_source/commonication-blockchain-synctrization.png)
-
-$$
-hub\_score=0.5\cdot traffic\_ratio+0.3\cdot client\_ratio+0.2\cdot latency\_ratio
-$$
-
-$$
-mode=
-\begin{cases}
-SHA3, & hub\_score\ge 0.66\\
-DILITHIUM, & hub\_score<0.66
-\end{cases}
-$$
-
-### `network_overhead_analysis.py :: analyze()`
-![Blockchain Sync](image_source/commonication-blockchain-synctrization.png)
-
-$$
-overhead\_{\%}=\frac{protocol\_bytes-plain\_bytes}{plain\_bytes}\times 100
-$$
-
-### `did_identity.py :: _msg_bits(message)`
-![Privacy Security Flow](image_source/privacy-security-flow.png)
-
-$$
-digest=\mathrm{SHA3\mbox{-}256}(message),\quad
-bit=(byte\gg shift)\ \&\ 1
-$$
-
-### `did_identity.py :: verify_did_proof(...)`
-![Privacy Security Flow](image_source/privacy-security-flow.png)
-
-$$
-challenge\_hash=\mathrm{SHA3\mbox{-}256}(challenge)
-$$
-
-$$
-\forall i:\ \mathrm{SHA3\mbox{-}256}(signature_i)=public\_pairs_i[bit_i]
-$$
-
-## Docstring Update
-
-Short docstrings were added in updated modules for maintainability:
-
-- `zkp_privacy.py`
-- `sync_protocol.py`
-- `v2x_protocol.py`
-- `env_config.py`
+For long-term resilience, self-healing storage applies pruning, sharding, signed shard anchors, and checkpointed trust verification. In parallel, federated learning allows decentralized on-vehicle model improvement while sharing only clipped and protected updates, preserving privacy while improving cooperative safety.
 
 ## Run
-
-Start GUI:
-
 ```bash
 python main.py
 ```
 
 Optional demos:
-
 ```bash
 python multi_car_majority_demo.py
 python v2x_demo_nodes.py
@@ -1526,19 +999,3 @@ python network_overhead_analysis.py
 python decentralized_fl_demo.py
 python fl_trainer_node.py
 ```
-
-Camera C++ module:
-
-```bash
-g++ camera_emergency_brake.cpp -o camera_emergency_brake `pkg-config --cflags --libs opencv4`
-./camera_emergency_brake
-```
-
-## Final Check (Current)
-
-- Root-level architecture is in sync with flattened project layout
-- GUI starts from `main.py` and opens in fullscreen mode
-- Right panel supports mouse-wheel scrolling
-- Access status block shows `LOCK`, `AUTH`, and `ENGINE (START/STOP)` live
-- Dual Hash Chain panel is placed below Road Scene and Blockchain Ledger Feed
-- `_update_ui` and network stack now log exceptions instead of silent pass
