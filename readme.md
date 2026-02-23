@@ -1117,6 +1117,386 @@ challenge_hash == SHA3-256(challenge)
 for each i: SHA3(signature_i) == public_pairs_i[bit_i]
 ```
 
+## Function-wise LaTeX Math + Named Image
+
+### `blockchain.py :: dual_hash(data)`
+![System Architecture](image_source/System-Architechture.png)
+
+$$
+\text{sha2}=\mathrm{SHA2\mbox{-}256}(data),\quad
+\text{sha3}=\mathrm{SHA3\mbox{-}256}(data)
+$$
+
+$$
+\text{combined}=\mathrm{SHA2\mbox{-}256}\!\left(data\parallel \text{sha3}\right)
+$$
+
+### `blockchain.py :: compute_block_hash(...)`
+![Blockchain Sync](image_source/commonication-blockchain-synctrization.png)
+
+$$
+raw=index\parallel timestamp\parallel vehicle\_id\parallel telemetry\_hash\_{sha3}\parallel event\_hash\_{sha3}\parallel previous\_hash
+$$
+
+$$
+block\_hash=\mathrm{SHA3\mbox{-}256}(raw)
+$$
+
+### `blockchain.py :: poa_sign_block(...)`
+![Blockchain Sync](image_source/commonication-blockchain-synctrization.png)
+
+$$
+payload=block\_hash\parallel "|" \parallel validator\_id\parallel "|" \parallel authority\_round
+$$
+
+$$
+poa\_signature=\mathrm{HMAC\mbox{-}SHA256}(validator\_key,\;payload)
+$$
+
+### `blockchain.py :: Block.compute_hashes(...)`
+![System Architecture](image_source/System-Architechture.png)
+
+$$
+\begin{aligned}
+telemetry\_hash\_{sha2}&=\mathrm{SHA2\mbox{-}256}(telemetry\_string)\\
+telemetry\_hash\_{sha3}&=\mathrm{SHA3\mbox{-}256}(telemetry\_string)\\
+event\_hash\_{sha2}&=\mathrm{SHA2\mbox{-}256}(event\_data)\\
+event\_hash\_{sha3}&=\mathrm{SHA3\mbox{-}256}(event\_data)
+\end{aligned}
+$$
+
+$$
+dual\_hash\_combined=\mathrm{SHA2\mbox{-}256}(block\_hash)\;:\;\mathrm{SHA3\mbox{-}256}(block\_hash)
+$$
+
+$$
+biometric\_hash\_{sha3}=\mathrm{SHA3\mbox{-}256}\!\left(hr\parallel drowsiness\parallel unwell\_flag\right)
+$$
+
+### `blockchain.py :: SmartCarCrypto.encrypt(...)`
+![Privacy Security Flow](image_source/privacy-security-flow.png)
+
+$$
+K=\mathrm{PBKDF2\mbox{-}HMAC\mbox{-}SHA256}(password,salt,100000,64\text{ bytes})
+$$
+
+$$
+ciphertext=plaintext\oplus keystream,\quad
+mac=\mathrm{HMAC\mbox{-}SHA256}(mac\_key,\;nonce\parallel ciphertext)
+$$
+
+### `blockchain.py :: LocalStorageCipher.encrypt_payload(...)`
+![System Architecture](image_source/System-Architechture.png)
+
+$$
+K_{store}=\mathrm{PBKDF2\mbox{-}HMAC\mbox{-}SHA256}(passphrase,salt,iterations,32\text{ bytes})
+$$
+
+$$
+ciphertext=\mathrm{AES\mbox{-}256\mbox{-}GCM}(K_{store},nonce,plaintext,aad)
+$$
+
+### `zkp_privacy.py :: commit(value, blind)`
+![Zero Knowledge Proofs](image_source/Zero-Knowladge-proofs.png)
+
+$$
+C=\left(G^{value\bmod Q}\cdot H^{r}\right)\bmod P
+$$
+
+### `zkp_privacy.py :: prove_knowledge(...)`
+![Zero Knowledge Proofs](image_source/Zero-Knowladge-proofs.png)
+
+$$
+t=\left(G^{k_1}\cdot H^{k_2}\right)\bmod P,\quad
+ch=H(commitment\parallel t\parallel context)\bmod Q
+$$
+
+$$
+s_1=(k_1+ch\cdot value)\bmod Q,\quad
+s_2=(k_2+ch\cdot blind)\bmod Q
+$$
+
+### `zkp_privacy.py :: verify_knowledge(...)`
+![Zero Knowledge Proofs](image_source/Zero-Knowladge-proofs.png)
+
+$$
+lhs=\left(G^{s_1}\cdot H^{s_2}\right)\bmod P,\quad
+rhs=\left(t\cdot commitment^{ch}\right)\bmod P
+$$
+
+$$
+valid \iff lhs=rhs
+$$
+
+### `zkp_privacy.py :: create_speed_limit_proof / verify_speed_limit_proof`
+![Privacy Security Flow](image_source/privacy-security-flow.png)
+
+$$
+speed=\max(0,\mathrm{round}(speed\_{kmh})),\quad
+diff=limit-speed
+$$
+
+$$
+relation\_blind=(r_{speed}+r_{diff})\bmod Q
+$$
+
+$$
+\left(commit\_{speed}\cdot commit\_{diff}\right)\bmod P
+=
+\left(G^{limit}\cdot H^{relation\_blind}\right)\bmod P
+$$
+
+### `anomaly_detector.py :: _mean_std(key)`
+![Large Language Model](image_source/Large-language-model.png)
+
+$$
+\mu=\frac{1}{n}\sum_{i=1}^{n}x_i,\quad
+\sigma^2=\frac{1}{n-1}\sum_{i=1}^{n}(x_i-\mu)^2,\quad
+\sigma=\sqrt{\sigma^2}
+$$
+
+### `anomaly_detector.py :: detect_telemetry(...)`
+![Privacy Security Flow](image_source/privacy-security-flow.png)
+
+$$
+z_k=\left|\frac{x_k-\mu_k}{\sigma_k}\right|,\quad
+score=rule\_penalties+\frac{z_{speed}+z_{accel}+z_{temp}+z_{rpm}}{4}
+$$
+
+$$
+is\_anomaly \iff (score\ge threshold)\ \lor\ (reason\_count\ge 2)
+$$
+
+### `edge_layer.py :: _avg(vals) / _flush(...)`
+![Blockchain Sync](image_source/commonication-blockchain-synctrization.png)
+
+$$
+avg(vals)=\frac{\sum v_i}{|vals|}
+$$
+
+$$
+\begin{aligned}
+speed&=avg(speed\_vals),\quad obstacle\_distance=\min(obs\_vals)\\
+brake\_pressure&=\max(brake\_vals),\quad drowsiness=\max(drowsy\_vals)
+\end{aligned}
+$$
+
+### `vehicle_sensors.py :: GPSSimulator.update(...)`
+![Road Scene](image_source/road_scene.svg)
+
+$$
+speed_{ms}=\frac{speed_{kmh}}{3.6},\quad
+d=\frac{speed_{ms}\cdot dt}{111111}
+$$
+
+$$
+lat\leftarrow lat+d\cos(\theta),\quad
+lon\leftarrow lon+d\sin(\theta)
+$$
+
+### `vehicle_sensors.py :: EngineSimulator.update(...)`
+![Project Theme](image_source/project_theam.jpg)
+
+$$
+target\_{rpm}=800+\frac{throttle}{100}\cdot 6200
+$$
+
+$$
+rpm\leftarrow rpm+(target\_{rpm}-rpm)\cdot 0.1
+$$
+
+$$
+fuel\_level\leftarrow fuel\_level-\left(0.00001+throttle\cdot 0.000005\right)\cdot dt
+$$
+
+$$
+oil\_pressure=3.5+\left(\frac{rpm}{6000}\right)\cdot 1.5+noise
+$$
+
+### `vehicle_sensors.py :: EmergencyBrakeController._on_obstacle_detected(...)`
+![Road Scene](image_source/road_scene.svg)
+
+$$
+brake\_pressure=
+\begin{cases}
+100, & distance<30\\
+\left(1-\frac{distance}{100}\right)\cdot 100, & 30\le distance<100
+\end{cases}
+$$
+
+### `dashboard.py :: _estimate_distance(box_h)`
+![Road Scene](image_source/road_scene.svg)
+
+$$
+distance_m=\frac{1.70\times 850.0}{box_h}
+$$
+
+### `dashboard.py :: _draw_speedometer()`
+![Project Theme](image_source/project_theam.jpg)
+
+$$
+angle_{deg}=162-\left(\frac{speed}{220}\right)\cdot 144
+$$
+
+$$
+needle_x=c_x+(r-30)\cos(\theta),\quad
+needle_y=c_y-(r-30)\sin(\theta)
+$$
+
+### `dashboard.py :: _update_model()`
+![Project Theme](image_source/project_theam.jpg)
+
+$$
+target\_speed=throttle\cdot 1.6,\quad
+speed\leftarrow speed+(target\_speed-speed)\cdot 0.12
+$$
+
+$$
+rpm=900+speed\cdot 36,\quad
+odometer\leftarrow odometer+\frac{speed}{3600}\cdot 0.08
+$$
+
+### `dashboard.py :: _refresh_v2x_nodes()`
+![Road Scene](image_source/road_scene.svg)
+
+$$
+ang=\left(now\cdot(0.6+i\cdot 0.08)+i\cdot 0.9\right)\bmod 2\pi
+$$
+
+$$
+dist=0.2+\left(\sin(now\cdot 0.3+i)+1\right)\cdot 0.35
+$$
+
+### `federated_learning.py :: _sigmoid(x)`
+![Federated Learning Flow](image_source/federaated-learning-flow.png)
+
+$$
+\sigma(x)=\frac{1}{1+e^{-\mathrm{clip}(x,-40,40)}}
+$$
+
+### `federated_learning.py :: _extract_features(...)`
+![Federated Learning Flow](image_source/federaated-learning-flow.png)
+
+$$
+\begin{aligned}
+speed\_{norm}&=\mathrm{clip}\!\left(\frac{speed}{180},0,1\right)\\
+accel\_{norm}&=\mathrm{clip}\!\left(\frac{|accel|}{12},0,1\right)\\
+brake\_{norm}&=\mathrm{clip}\!\left(\frac{brake}{100},0,1\right)\\
+temp\_{norm}&=\mathrm{clip}\!\left(\frac{temp-60}{60},0,1\right)
+\end{aligned}
+$$
+
+### `federated_learning.py :: _train_batch(X,y,epochs)`
+![Federated Learning Flow](image_source/federaated-learning-flow.png)
+
+$$
+logits=Xw,\quad \hat{y}=\sigma(logits)
+$$
+
+$$
+\nabla_w=\frac{X^T(\hat{y}-y)}{n},\quad
+w\leftarrow w-\eta \nabla_w
+$$
+
+$$
+\mathcal{L}=-\frac{1}{n}\sum\left(y\log(\hat{y})+(1-y)\log(1-\hat{y})\right)
+$$
+
+### `federated_learning.py :: _clip_delta(delta,c)`
+![Federated Learning Flow](image_source/federaated-learning-flow.png)
+
+$$
+n=\lVert\Delta\rVert_2,\quad
+\Delta'=
+\begin{cases}
+\Delta, & n\le c\\
+\Delta\cdot \frac{c}{n}, & n>c
+\end{cases}
+$$
+
+### `federated_learning.py :: _mad_filter(vals,k)`
+![Large Language Model](image_source/Large-language-model.png)
+
+$$
+med=\mathrm{median}(vals),\quad
+mad=\mathrm{median}(|vals-med|)+10^{-9}
+$$
+
+$$
+z=\frac{|vals-med|}{mad},\quad keep=(z\le k)
+$$
+
+### `federated_learning.py :: _robust_weighted_trimmed_mean(...)`
+![Federated Learning Flow](image_source/federaated-learning-flow.png)
+
+$$
+output_j=\frac{\sum_{i\in trimmed} w_i\cdot x_{ij}}{\sum_{i\in trimmed} w_i}
+$$
+
+### `v2x_protocol.py :: DynamicCryptoAgilityLayer._agility_score(...)`
+![Blockchain Sync](image_source/commonication-blockchain-synctrization.png)
+
+$$
+latency\_component=\min\!\left(1,\frac{avg\_rtt}{latency\_hi}\right),\quad
+traffic\_component=\min\!\left(1,\frac{mps}{traffic\_hi}\right)
+$$
+
+$$
+score=w_L\cdot latency\_component+w_T\cdot traffic\_component
+$$
+
+### `v2x_protocol.py :: DynamicCryptoAgilityLayer.maybe_switch_mode(...)`
+![Blockchain Sync](image_source/commonication-blockchain-synctrization.png)
+
+$$
+\text{If mode=DILITHIUM and } score\ge up\_thr \Rightarrow target=SHA3
+$$
+
+$$
+\text{If mode=SHA3 and } score\le down\_thr \Rightarrow target=DILITHIUM
+$$
+
+### `v2x_protocol.py :: V2XHub._recommend_crypto_mode()`
+![Blockchain Sync](image_source/commonication-blockchain-synctrization.png)
+
+$$
+hub\_score=0.5\cdot traffic\_ratio+0.3\cdot client\_ratio+0.2\cdot latency\_ratio
+$$
+
+$$
+mode=
+\begin{cases}
+SHA3, & hub\_score\ge 0.66\\
+DILITHIUM, & hub\_score<0.66
+\end{cases}
+$$
+
+### `network_overhead_analysis.py :: analyze()`
+![Blockchain Sync](image_source/commonication-blockchain-synctrization.png)
+
+$$
+overhead\_{\%}=\frac{protocol\_bytes-plain\_bytes}{plain\_bytes}\times 100
+$$
+
+### `did_identity.py :: _msg_bits(message)`
+![Privacy Security Flow](image_source/privacy-security-flow.png)
+
+$$
+digest=\mathrm{SHA3\mbox{-}256}(message),\quad
+bit=(byte\gg shift)\ \&\ 1
+$$
+
+### `did_identity.py :: verify_did_proof(...)`
+![Privacy Security Flow](image_source/privacy-security-flow.png)
+
+$$
+challenge\_hash=\mathrm{SHA3\mbox{-}256}(challenge)
+$$
+
+$$
+\forall i:\ \mathrm{SHA3\mbox{-}256}(signature_i)=public\_pairs_i[bit_i]
+$$
+
 ## Docstring Update
 
 Short docstrings were added in updated modules for maintainability:
