@@ -1,0 +1,117 @@
+2026-02-26 11:41:52,937 INFO [SmartCar] Process log ready: C:\Users\Shagor\OneDrive\Desktop\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\main.log
+2026-02-26 11:41:53,189 INFO [SmartCarBlockchain] Genesis block: 6ec7ca476fdcd143e825635dbe1098a9...
+2026-02-26 11:41:53,191 INFO [SmartCarBlockchain] SmartCar Blockchain initialized for vehicle: SMARTCAR_VIN_2024_BD_XYZ789 | consensus=POA_POP | validator=authority_node_1 | edge_enabled=True | storage_encryption=True
+2026-02-26 11:42:01,492 INFO [SmartCarBlockchain] Authentication SUCCESS - car unlocked
+2026-02-26 11:42:07,870 INFO [SmartCarBlockchain] Engine STARTED
+2026-02-26 11:43:00,932 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:43:04,307 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:43:07,722 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:43:11,129 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:43:14,508 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:43:17,946 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:43:21,335 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:43:24,748 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:43:28,172 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:43:31,569 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:43:34,963 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:43:38,385 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:43:41,759 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:43:45,143 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:43:48,560 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:43:51,949 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:43:55,334 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:43:58,745 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:44:02,137 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:44:05,628 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:44:09,198 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:44:12,720 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:44:16,162 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:44:19,778 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:44:23,206 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:44:26,798 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:44:30,341 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:44:33,921 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:44:37,355 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:44:40,885 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:44:44,467 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:44:47,964 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:44:51,479 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:44:54,940 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:44:58,506 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:45:02,015 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:45:05,466 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:45:09,022 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:45:12,569 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:45:16,009 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:45:20,520 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:45:24,972 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:45:29,640 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:45:34,108 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:45:38,632 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:45:43,128 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:45:47,581 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:45:52,031 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:45:56,547 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:46:01,090 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:46:05,552 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:46:10,061 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:46:14,657 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:46:19,197 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:46:23,669 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:46:28,097 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:46:32,578 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:46:37,165 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:46:41,776 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:46:46,234 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:46:50,790 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:46:55,368 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:46:59,832 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:47:04,422 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:47:09,009 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:47:13,515 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:47:18,033 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:47:22,583 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:47:27,139 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:47:31,700 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:47:36,217 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:47:39,584 WARNING [SmartCarBlockchain] SAFE MODE activated: biometric_contract_rule
+2026-02-26 11:47:42,846 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:47:48,347 WARNING [SmartCarBlockchain] SAFE MODE activated: biometric_contract_rule
+2026-02-26 11:47:52,670 WARNING [SmartCarBlockchain] SAFE MODE activated: biometric_contract_rule
+2026-02-26 11:47:57,228 WARNING [SmartCarBlockchain] SAFE MODE activated: biometric_contract_rule
+2026-02-26 11:48:00,399 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:48:05,839 WARNING [SmartCarBlockchain] SAFE MODE activated: biometric_contract_rule
+2026-02-26 11:48:10,158 WARNING [SmartCarBlockchain] SAFE MODE activated: biometric_contract_rule
+2026-02-26 11:48:14,459 WARNING [SmartCarBlockchain] SAFE MODE activated: biometric_contract_rule
+2026-02-26 11:48:17,506 ERROR [SmartCarBlockchain] Block 25 speed privacy proof FAILED
+2026-02-26 11:48:17,646 INFO [SmartCarBlockchain] Blockchain saved encrypted: 103 blocks -> logs/blockchain_gui.json [cipher=AES-256-GCM]
+2026-02-26 11:48:22,707 INFO [SmartCar] Process log ready: C:\Users\Shagor\OneDrive\Desktop\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\main.log
+2026-02-26 11:48:22,972 INFO [SmartCarBlockchain] Genesis block: fe01a2860848fc3cf7c2bf3d4d38da90...
+2026-02-26 11:48:22,974 INFO [SmartCarBlockchain] SmartCar Blockchain initialized for vehicle: SMARTCAR_VIN_2024_BD_XYZ789 | consensus=POA_POP | validator=authority_node_1 | edge_enabled=True | storage_encryption=True
+2026-02-26 11:48:32,864 INFO [SmartCarBlockchain] Authentication SUCCESS - car unlocked
+2026-02-26 11:48:35,623 INFO [SmartCarBlockchain] Engine STARTED
+2026-02-26 11:49:36,450 WARNING [SmartCarBlockchain] Block 23 speed-limit violation marker accepted (speed=120.79 limit=120)
+2026-02-26 11:49:40,639 WARNING [SmartCarBlockchain] Block 24 speed-limit violation marker accepted (speed=125.49 limit=120)
+2026-02-26 11:49:44,865 WARNING [SmartCarBlockchain] Block 25 speed-limit violation marker accepted (speed=129.63 limit=120)
+2026-02-26 11:49:49,174 WARNING [SmartCarBlockchain] Block 26 speed-limit violation marker accepted (speed=133.28 limit=120)
+2026-02-26 11:49:53,462 WARNING [SmartCarBlockchain] Block 27 speed-limit violation marker accepted (speed=136.48 limit=120)
+2026-02-26 11:49:57,781 WARNING [SmartCarBlockchain] Block 28 speed-limit violation marker accepted (speed=139.31 limit=120)
+2026-02-26 11:50:02,187 WARNING [SmartCarBlockchain] Block 29 speed-limit violation marker accepted (speed=141.79 limit=120)
+2026-02-26 11:50:06,574 WARNING [SmartCarBlockchain] Block 30 speed-limit violation marker accepted (speed=143.97 limit=120)
+2026-02-26 11:50:11,026 WARNING [SmartCarBlockchain] Block 31 speed-limit violation marker accepted (speed=145.90 limit=120)
+2026-02-26 11:50:15,534 WARNING [SmartCarBlockchain] Block 32 speed-limit violation marker accepted (speed=147.59 limit=120)
+2026-02-26 11:50:20,035 WARNING [SmartCarBlockchain] Block 33 speed-limit violation marker accepted (speed=149.08 limit=120)
+2026-02-26 11:50:24,573 WARNING [SmartCarBlockchain] Block 34 speed-limit violation marker accepted (speed=150.39 limit=120)
+2026-02-26 11:50:29,181 WARNING [SmartCarBlockchain] Block 35 speed-limit violation marker accepted (speed=151.54 limit=120)
+2026-02-26 11:50:33,799 WARNING [SmartCarBlockchain] Block 36 speed-limit violation marker accepted (speed=152.56 limit=120)
+2026-02-26 11:50:38,449 WARNING [SmartCarBlockchain] Block 37 speed-limit violation marker accepted (speed=153.45 limit=120)
+2026-02-26 11:50:43,210 WARNING [SmartCarBlockchain] Block 38 speed-limit violation marker accepted (speed=154.24 limit=120)
+2026-02-26 11:50:47,955 WARNING [SmartCarBlockchain] Block 39 speed-limit violation marker accepted (speed=154.93 limit=120)
+2026-02-26 11:50:52,711 WARNING [SmartCarBlockchain] Block 40 speed-limit violation marker accepted (speed=155.54 limit=120)
+2026-02-26 11:50:57,549 WARNING [SmartCarBlockchain] Block 41 speed-limit violation marker accepted (speed=156.07 limit=120)
+2026-02-26 11:51:02,397 WARNING [SmartCarBlockchain] Block 42 speed-limit violation marker accepted (speed=156.54 limit=120)
+2026-02-26 11:51:07,260 WARNING [SmartCarBlockchain] Block 43 speed-limit violation marker accepted (speed=156.96 limit=120)
+2026-02-26 11:51:12,199 WARNING [SmartCarBlockchain] Block 44 speed-limit violation marker accepted (speed=157.32 limit=120)
+2026-02-26 11:51:17,140 WARNING [SmartCarBlockchain] Block 45 speed-limit violation marker accepted (speed=157.64 limit=120)
+2026-02-26 11:51:22,136 WARNING [SmartCarBlockchain] Block 46 speed-limit violation marker accepted (speed=157.93 limit=120)
+2026-02-26 11:51:22,260 INFO [SmartCarBlockchain] Blockchain saved encrypted: 47 blocks -> logs/blockchain_gui.json [cipher=AES-256-GCM]

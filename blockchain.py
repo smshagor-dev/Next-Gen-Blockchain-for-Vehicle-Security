@@ -768,6 +768,7 @@ class SmartCarBlockchain:
         self.locked_out = False
         self._last_forensic_block_ts = 0.0
         self.forensic_block_cooldown_sec = float(get_env("SMARTCAR_FORENSIC_BLOCK_COOLDOWN_SEC", "3.0"))
+        self._logged_speed_violation_blocks: set[int] = set()
 
         # Create genesis
         self._create_genesis()
@@ -1751,6 +1752,27 @@ class SmartCarBlockchain:
 
     # ---- Verification ----
 
+    @staticmethod
+    def _declared_speed_violation_ok(block: Block, speed_proof: Dict[str, Any]) -> bool:
+        """
+        Accept explicit speed-limit violation marker as a policy violation event,
+        not as a chain-integrity failure.
+        """
+        if not isinstance(speed_proof, dict):
+            return False
+        if speed_proof.get("scheme") != "COMMITMENT_KNOWLEDGE_LEQ":
+            return False
+        if bool(speed_proof.get("valid", True)):
+            return False
+        if str(speed_proof.get("reason", "")).upper() != "SPEED_EXCEEDS_LIMIT":
+            return False
+        try:
+            proof_limit = int(speed_proof.get("limit"))
+            block_speed = float(block.telemetry.speed)
+        except Exception:
+            return False
+        return block_speed > float(proof_limit)
+
     def verify_chain(self) -> bool:
         for i in range(1, len(self.chain)):
             curr = self.chain[i]
@@ -1807,8 +1829,18 @@ class SmartCarBlockchain:
                     extra={"block_index": curr.index, "vehicle_id": curr.vehicle_id}
                 )
                 if not speed_ok:
-                    logger.error(f"Block {i} speed privacy proof FAILED")
-                    return False
+                    if self._declared_speed_violation_ok(curr, speed_proof):
+                        if curr.index not in self._logged_speed_violation_blocks:
+                            logger.warning(
+                                "Block %s speed-limit violation marker accepted (speed=%.2f limit=%s)",
+                                i,
+                                float(curr.telemetry.speed),
+                                speed_proof.get("limit"),
+                            )
+                            self._logged_speed_violation_blocks.add(curr.index)
+                    else:
+                        logger.error(f"Block {i} speed privacy proof FAILED")
+                        return False
                 t3 = time.perf_counter()
                 loc_ok = verify_location_ownership_proof(location_proof, proof_ctx)
                 log_zkp_latency(

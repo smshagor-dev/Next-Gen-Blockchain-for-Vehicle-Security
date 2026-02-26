@@ -135,8 +135,8 @@ class SmartCarDashboard(tk.Tk):
         super().__init__()
         self.title("SmartCar Security Command Dashboard")
         self.configure(bg=C["bg"])
-        self.geometry("1720x980")
-        self.minsize(1380, 860)
+        self.geometry("1366x860")
+        self.minsize(840, 620)
         try:
             self.state("zoomed")
         except Exception:
@@ -177,6 +177,9 @@ class SmartCarDashboard(tk.Tk):
         self._last_chain_verify_ts = 0.0
         self._last_chain_verify_ok = True
         self._last_status_text = ""
+        self._layout_mode = None
+        self._center_layout_mode = None
+        self._resize_after_id = None
 
         self.anomaly_history = deque([0.02] * 120, maxlen=120)
         self._latest_anomaly = 0.02
@@ -199,11 +202,26 @@ class SmartCarDashboard(tk.Tk):
 
     def _setup_fonts(self):
         """Initialize UI fonts."""
+        self._font_base = {
+            "title": 15,
+            "head": 10,
+            "body": 9,
+            "hash": 8,
+            "big": 30,
+        }
         self.f_title = font.Font(family="Consolas", size=15, weight="bold")
         self.f_head = font.Font(family="Consolas", size=10, weight="bold")
         self.f_body = font.Font(family="Consolas", size=9)
         self.f_hash = font.Font(family="Consolas", size=8)
         self.f_big = font.Font(family="Consolas", size=30, weight="bold")
+
+    def _set_font_scale(self, scale: float):
+        """Apply proportional font scaling for smaller viewports."""
+        self.f_title.configure(size=max(10, int(self._font_base["title"] * scale)))
+        self.f_head.configure(size=max(8, int(self._font_base["head"] * scale)))
+        self.f_body.configure(size=max(7, int(self._font_base["body"] * scale)))
+        self.f_hash.configure(size=max(7, int(self._font_base["hash"] * scale)))
+        self.f_big.configure(size=max(20, int(self._font_base["big"] * scale)))
 
     def _panel(self, parent, title):
         """Create glass-like panel with title."""
@@ -218,7 +236,15 @@ class SmartCarDashboard(tk.Tk):
         """Build combined futuristic dashboard layout."""
         top = tk.Frame(self, bg=C["panel2"], pady=8)
         top.pack(fill="x")
-        tk.Label(top, text="SMART CAR SECURITY SYSTEM - FUTURISTIC OPS CONSOLE", bg=C["panel2"], fg=C["cyan"], font=self.f_title).pack(side="left", padx=14)
+        self.lbl_title = tk.Label(
+            top,
+            text="SMART CAR SECURITY SYSTEM - FUTURISTIC OPS CONSOLE",
+            bg=C["panel2"],
+            fg=C["cyan"],
+            font=self.f_title,
+            anchor="w",
+        )
+        self.lbl_title.pack(side="left", padx=14, fill="x", expand=True)
         self.lbl_clock = tk.Label(top, text="", bg=C["panel2"], fg=C["dim"], font=self.f_body)
         self.lbl_clock.pack(side="right", padx=14)
 
@@ -229,22 +255,40 @@ class SmartCarDashboard(tk.Tk):
         self.lbl_did = tk.Label(zkp_strip, text="DID Proof Verified", bg="#0f1a20", fg=C["cyan"], font=self.f_head)
         self.lbl_did.pack(side="left", padx=18)
 
-        body = tk.Frame(self, bg=C["bg"])
-        body.pack(fill="both", expand=True, padx=10, pady=8)
+        self.main_wrap = tk.Frame(self, bg=C["bg"])
+        self.main_wrap.pack(fill="both", expand=True)
+        self.main_canvas = tk.Canvas(self.main_wrap, bg=C["bg"], highlightthickness=0, bd=0)
+        self.main_scroll = ttk.Scrollbar(self.main_wrap, orient="vertical", command=self.main_canvas.yview)
+        self.main_canvas.configure(yscrollcommand=self.main_scroll.set)
+        self.main_canvas.pack(side="left", fill="both", expand=True)
+        self.main_scroll.pack(side="right", fill="y")
 
-        left_col = tk.Frame(body, bg=C["bg"], width=340)
-        left_col.pack(side="left", fill="y", padx=(0, 6))
-        left_col.pack_propagate(False)
+        self.main_inner = tk.Frame(self.main_canvas, bg=C["bg"])
+        self.main_canvas_window = self.main_canvas.create_window((0, 0), window=self.main_inner, anchor="nw")
+        self.main_inner.bind("<Configure>", self._on_main_inner_configure)
+        self.main_canvas.bind("<Configure>", self._on_main_canvas_configure)
 
-        center_col = tk.Frame(body, bg=C["bg"])
-        center_col.pack(side="left", fill="both", expand=True)
+        self.body = tk.Frame(self.main_inner, bg=C["bg"])
+        self.body.pack(fill="both", expand=True, padx=10, pady=8)
 
-        right_col = tk.Frame(body, bg=C["bg"], width=470)
-        right_col.pack(side="right", fill="y", padx=(6, 0))
-        right_col.pack_propagate(False)
+        self.left_col = tk.Frame(self.body, bg=C["bg"], width=340)
+        self.left_col.pack_propagate(False)
 
-        self.right_canvas = tk.Canvas(right_col, bg=C["bg"], highlightthickness=0, bd=0)
-        self.right_scroll = ttk.Scrollbar(right_col, orient="vertical", command=self.right_canvas.yview)
+        self.center_col = tk.Frame(self.body, bg=C["bg"])
+
+        self.right_col = tk.Frame(self.body, bg=C["bg"], width=470)
+        self.right_col.pack_propagate(False)
+
+        self.body.grid_columnconfigure(0, weight=0, minsize=300)
+        self.body.grid_columnconfigure(1, weight=1)
+        self.body.grid_columnconfigure(2, weight=0, minsize=380)
+        self.body.grid_rowconfigure(0, weight=1)
+        self.left_col.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+        self.center_col.grid(row=0, column=1, sticky="nsew")
+        self.right_col.grid(row=0, column=2, sticky="nsew", padx=(6, 0))
+
+        self.right_canvas = tk.Canvas(self.right_col, bg=C["bg"], highlightthickness=0, bd=0)
+        self.right_scroll = ttk.Scrollbar(self.right_col, orient="vertical", command=self.right_canvas.yview)
         self.right_canvas.configure(yscrollcommand=self.right_scroll.set)
         self.right_canvas.pack(side="left", fill="both", expand=True)
         self.right_scroll.pack(side="right", fill="y")
@@ -253,10 +297,9 @@ class SmartCarDashboard(tk.Tk):
         self.right_canvas_window = self.right_canvas.create_window((0, 0), window=self.right_inner, anchor="nw")
         self.right_inner.bind("<Configure>", self._on_right_inner_configure)
         self.right_canvas.bind("<Configure>", self._on_right_canvas_configure)
-        self.right_canvas.bind("<MouseWheel>", self._on_right_mousewheel)
-        self.bind_all("<MouseWheel>", self._on_right_mousewheel)
+        self.bind_all("<MouseWheel>", self._on_mousewheel)
 
-        p_control = self._panel(left_col, "ACCESS CONTROL")
+        p_control = self._panel(self.left_col, "ACCESS CONTROL")
         self.token_entry = tk.Entry(p_control, font=self.f_body, show="*", bg=C["panel2"], fg=C["text"], insertbackground=C["cyan"])
         self.token_entry.insert(0, self.AUTH_TOKEN)
         self.token_entry.pack(fill="x", pady=(0, 6))
@@ -293,50 +336,53 @@ class SmartCarDashboard(tk.Tk):
         self.lbl_auth_state = self._status_row(p_action, "AUTH", "WAITING", C["orange"])
         self.lbl_engine_cmd = self._status_row(p_action, "ENGINE", "STOP", C["red"])
 
-        p_status = self._panel(left_col, "SECURITY STATUS")
+        p_status = self._panel(self.left_col, "SECURITY STATUS")
         self.lbl_status = tk.Label(p_status, justify="left", anchor="w", bg=C["panel_glass"], fg=C["text"], font=self.f_body)
         self.lbl_status.pack(fill="x")
 
-        p_did_terminal = self._panel(left_col, "TERMINAL")
+        p_did_terminal = self._panel(self.left_col, "TERMINAL")
         self.txt_terminal = tk.Text(p_did_terminal, bg="#090f13", fg=C["green"], font=self.f_hash, height=8)
         self.txt_terminal.pack(fill="both", expand=True)
 
-        p_contract = self._panel(left_col, "SMART CONTRACT EXECUTION")
+        p_contract = self._panel(self.left_col, "SMART CONTRACT EXECUTION")
         self.txt_contract = tk.Text(p_contract, bg="#090f13", fg=C["text"], font=self.f_hash, height=9)
         self.txt_contract.pack(fill="both", expand=True)
 
-        p_camera = self._panel(center_col, "LIVE CAMERA AND OBJECT DETECTION")
+        p_camera = self._panel(self.center_col, "LIVE CAMERA AND OBJECT DETECTION")
         self.cam_label = tk.Label(p_camera, bg="#02070a")
         self.cam_label.pack(fill="both", expand=True)
 
-        center_bottom = tk.Frame(center_col, bg=C["bg"])
-        center_bottom.pack(fill="both", expand=True)
+        self.center_bottom = tk.Frame(self.center_col, bg=C["bg"])
+        self.center_bottom.pack(fill="both", expand=True)
 
-        center_left = tk.Frame(center_bottom, bg=C["bg"])
-        center_left.pack(side="left", fill="both", expand=True, padx=(0, 4))
+        self.center_left = tk.Frame(self.center_bottom, bg=C["bg"])
 
-        center_right = tk.Frame(center_bottom, bg=C["bg"])
-        center_right.pack(side="left", fill="both", expand=True, padx=(4, 0))
+        self.center_right = tk.Frame(self.center_bottom, bg=C["bg"])
+        self.center_bottom.grid_columnconfigure(0, weight=1)
+        self.center_bottom.grid_columnconfigure(1, weight=1)
+        self.center_bottom.grid_rowconfigure(0, weight=1)
+        self.center_left.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
+        self.center_right.grid(row=0, column=1, sticky="nsew", padx=(4, 0))
 
-        p_road = self._panel(center_left, "ROAD SCENE")
+        p_road = self._panel(self.center_left, "ROAD SCENE")
         self.road_canvas = tk.Canvas(p_road, width=640, height=210, bg="#101820", highlightthickness=0)
         self.road_canvas.pack(fill="x")
         self.road_svg = RoadSvgRenderer(self.road_canvas, os.path.join(os.getcwd(), "image_source", "road_scene.svg"))
         self.road_svg.render()
 
-        p_chain_feed = self._panel(center_left, "BLOCKCHAIN LEDGER FEED")
+        p_chain_feed = self._panel(self.center_left, "BLOCKCHAIN LEDGER FEED")
         self.txt_ledger = tk.Text(p_chain_feed, bg="#060c10", fg=C["hex"], font=self.f_hash, height=11)
         self.txt_ledger.pack(fill="both", expand=True)
 
-        p_dual = self._panel(center_left, "DUAL HASH CHAIN")
+        p_dual = self._panel(self.center_left, "DUAL HASH CHAIN")
         self.dual_canvas = tk.Canvas(p_dual, height=160, bg="#070d12", highlightthickness=0)
         self.dual_canvas.pack(fill="both", expand=True)
 
-        p_gps = self._panel(center_right, "DECENTRALIZED VEHICULAR NETWORK MAP")
+        p_gps = self._panel(self.center_right, "DECENTRALIZED VEHICULAR NETWORK MAP")
         self.gps_canvas = tk.Canvas(p_gps, height=230, bg="#071017", highlightthickness=0)
         self.gps_canvas.pack(fill="both", expand=True)
 
-        p_car3d = self._panel(center_right, "VEHICLE SECURITY LAYERS")
+        p_car3d = self._panel(self.center_right, "VEHICLE SECURITY LAYERS")
         self.car_canvas = tk.Canvas(p_car3d, height=190, bg="#070d12", highlightthickness=0)
         self.car_canvas.pack(fill="both", expand=True)
 
@@ -365,6 +411,89 @@ class SmartCarDashboard(tk.Tk):
         self.lbl_card_temp = self._metric_card(telem2x2, 0, 1, "TEMP")
         self.lbl_card_fuel = self._metric_card(telem2x2, 1, 0, "FUEL")
         self.lbl_card_thr = self._metric_card(telem2x2, 1, 1, "THROTTLE")
+        self.bind("<Configure>", self._on_resize)
+        self.after(80, self._apply_responsive_layout)
+
+    def _on_resize(self, event):
+        """Debounce window resize updates to keep UI smooth."""
+        if event.widget is not self:
+            return
+        if self._resize_after_id is not None:
+            self.after_cancel(self._resize_after_id)
+        self._resize_after_id = self.after(120, self._apply_responsive_layout)
+
+    def _apply_responsive_layout(self):
+        """Switch layout for desktop/tablet/narrow widths."""
+        self._resize_after_id = None
+        width = max(1, self.winfo_width())
+        if width >= 1560:
+            mode = "wide"
+            self._set_font_scale(1.0)
+        elif width >= 1180:
+            mode = "tablet"
+            self._set_font_scale(0.95)
+        else:
+            mode = "stack"
+            self._set_font_scale(0.86)
+
+        self.lbl_title.configure(wraplength=max(320, width - 320))
+
+        if mode != self._layout_mode:
+            self._layout_mode = mode
+            for col in (0, 1, 2):
+                self.body.grid_columnconfigure(col, weight=0, minsize=0)
+            for row in (0, 1, 2):
+                self.body.grid_rowconfigure(row, weight=0)
+
+            self.left_col.grid_forget()
+            self.center_col.grid_forget()
+            self.right_col.grid_forget()
+
+            if mode == "wide":
+                self.body.grid_columnconfigure(0, weight=0, minsize=300)
+                self.body.grid_columnconfigure(1, weight=1)
+                self.body.grid_columnconfigure(2, weight=0, minsize=380)
+                self.body.grid_rowconfigure(0, weight=1)
+                self.left_col.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+                self.center_col.grid(row=0, column=1, sticky="nsew")
+                self.right_col.grid(row=0, column=2, sticky="nsew", padx=(6, 0))
+            elif mode == "tablet":
+                self.body.grid_columnconfigure(0, weight=0, minsize=280)
+                self.body.grid_columnconfigure(1, weight=1)
+                self.body.grid_rowconfigure(0, weight=1)
+                self.body.grid_rowconfigure(1, weight=1)
+                self.left_col.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+                self.center_col.grid(row=0, column=1, sticky="nsew")
+                self.right_col.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(8, 0))
+            else:
+                self.body.grid_columnconfigure(0, weight=1)
+                self.body.grid_rowconfigure(0, weight=1)
+                self.body.grid_rowconfigure(1, weight=2)
+                self.body.grid_rowconfigure(2, weight=2)
+                self.left_col.grid(row=0, column=0, sticky="nsew")
+                self.center_col.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
+                self.right_col.grid(row=2, column=0, sticky="nsew", pady=(8, 0))
+
+        center_width = max(1, self.center_col.winfo_width())
+        center_mode = "split" if center_width >= 960 else "stack"
+        if center_mode != self._center_layout_mode:
+            self._center_layout_mode = center_mode
+            self.center_left.grid_forget()
+            self.center_right.grid_forget()
+            if center_mode == "split":
+                self.center_bottom.grid_columnconfigure(0, weight=1)
+                self.center_bottom.grid_columnconfigure(1, weight=1)
+                self.center_bottom.grid_rowconfigure(0, weight=1)
+                self.center_bottom.grid_rowconfigure(1, weight=0)
+                self.center_left.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
+                self.center_right.grid(row=0, column=1, sticky="nsew", padx=(4, 0))
+            else:
+                self.center_bottom.grid_columnconfigure(0, weight=1)
+                self.center_bottom.grid_columnconfigure(1, weight=0)
+                self.center_bottom.grid_rowconfigure(0, weight=1)
+                self.center_bottom.grid_rowconfigure(1, weight=1)
+                self.center_left.grid(row=0, column=0, sticky="nsew", pady=(0, 8))
+                self.center_right.grid(row=1, column=0, sticky="nsew")
 
     def _do_auth(self):
         """Handle authentication action."""
@@ -417,10 +546,36 @@ class SmartCarDashboard(tk.Tk):
         """Keep right panel width equal to canvas width."""
         self.right_canvas.itemconfigure(self.right_canvas_window, width=event.width)
 
-    def _on_right_mousewheel(self, event):
-        """Mouse wheel scroll for right panel."""
-        if event.delta:
-            self.right_canvas.yview_scroll(int(-event.delta / 120), "units")
+    def _on_main_inner_configure(self, _event):
+        """Update scrollregion when main content size changes."""
+        self.main_canvas.configure(scrollregion=self.main_canvas.bbox("all"))
+
+    def _on_main_canvas_configure(self, event):
+        """Keep main content width equal to viewport width."""
+        self.main_canvas.itemconfigure(self.main_canvas_window, width=event.width)
+
+    @staticmethod
+    def _is_descendant(widget: tk.Widget, ancestor: tk.Widget) -> bool:
+        """Return True if widget is inside ancestor hierarchy."""
+        w = widget
+        while w is not None:
+            if w is ancestor:
+                return True
+            w = w.master
+        return False
+
+    def _on_mousewheel(self, event):
+        """Route mouse wheel to right panel or full page scroll."""
+        if not event.delta:
+            return
+        target = self.winfo_containing(event.x_root, event.y_root)
+        steps = int(-event.delta / 120)
+        if steps == 0:
+            steps = -1 if event.delta > 0 else 1
+        if target is not None and self._is_descendant(target, self.right_canvas):
+            self.right_canvas.yview_scroll(steps, "units")
+        else:
+            self.main_canvas.yview_scroll(steps, "units")
 
     def _status_row(self, parent: tk.Widget, label: str, value: str, value_color: str):
         """Create one status row with dynamic color value."""

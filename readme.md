@@ -209,7 +209,43 @@ Smart Car - Blockchain for Vehicle Security/
 |   `-- road_scene.svg
 `-- build/
 ```
+### System Diagram
 
+```mermaid
+flowchart BT
+    L5["Layer 5: Application & Smart Contracts
+    - Insurance & Toll Contracts
+    - Biometric Safe Mode
+    - Security Dashboard
+    - FL Global Trainer"]
+
+    L4["Layer 4: Consensus & Sync
+    - Majority Vote
+    - PoA Validation
+    - HMAC Secure Protocol
+    - ML-KEM PQC Handshake"]
+
+    L3["Layer 3: Blockchain & Privacy
+    - Dual-Hash Chain (SHA2 + SHA3)
+    - Lamport DID
+    - Pedersen ZKP
+    - Anomaly Detection
+    - Encrypted Forensic Commit"]
+
+    L2["Layer 2: Edge Intelligence
+    - Telemetry Aggregation
+    - Rolling Forensic Buffer
+    - Local FL Update"]
+
+    L1["Layer 1: Hardware Sensors
+    - Arduino
+    - Raspberry Pi
+    - Camera & GPS
+    - Heart Rate
+    - CAN Bus"]
+
+    L1 --> L2 --> L3 --> L4 --> L5
+```
 ## 4. Production-Oriented ZKP Parameters
 
 Key parameters from `.env`:

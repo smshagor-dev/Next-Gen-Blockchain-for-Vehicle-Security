@@ -17,6 +17,10 @@ from dataclasses import dataclass
 from typing import Optional, Callable, Dict
 import logging
 
+from env_config import load_project_env_once
+
+load_project_env_once()
+
 logger = logging.getLogger('SmartCarSensors')
 
 # ============================================================
