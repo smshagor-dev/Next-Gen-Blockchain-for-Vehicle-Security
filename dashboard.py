@@ -19,8 +19,8 @@ from xml.etree import ElementTree as ET
 
 import cv2
 
-from blockchain import SmartCarBlockchain, TelemetryData
 from env_config import get_env, get_float, get_int, load_project_env_once
+from smartcar_backend import TelemetryData, create_backend
 
 load_project_env_once()
 logger = logging.getLogger("SmartCarDashboard")
@@ -142,7 +142,7 @@ class SmartCarDashboard(tk.Tk):
         except Exception:
             self.attributes("-fullscreen", True)
 
-        self.blockchain = SmartCarBlockchain(self.VEHICLE_ID, self.PASSWORD, self.AUTH_TOKEN, chain_file=self.GUI_CHAIN_FILE)
+        self.blockchain = create_backend(self.VEHICLE_ID, self.PASSWORD, self.AUTH_TOKEN, self.GUI_CHAIN_FILE)
 
         self.camera_index = get_int("SMARTCAR_CAMERA_INDEX", 0)
         self.emergency_distance_m = get_float("SMARTCAR_CAMERA_EMERGENCY_DISTANCE_M", 8.0)
