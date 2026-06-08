@@ -35,3 +35,37 @@ proof {'scheme': 'COMMITMENT_KNOWLEDGE_LEQ', 'valid': True, 'limit': 120, 'commi
 verify1 False
 2026-02-26 11:47:26,655 ERROR [SmartCarBlockchain] Block 2 verification FAILED
 verify2 False
+2026-06-04 20:23:49,269 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\interactive.log
+2026-06-04 20:24:01,971 INFO [SmartCarBlockchain] Genesis block: 4a3a3231a3b6406f8454e9eb2b123369...
+2026-06-04 20:24:01,972 INFO [SmartCarBlockchain] SmartCar Blockchain initialized for vehicle: SMARTCAR_TEST_GO | consensus=POA_POP | validator=authority_node_1 | edge_enabled=True | storage_encryption=True
+PythonBackend 1 True
+2026-06-04 20:24:02,128 INFO [SmartCarBlockchain] Authentication SUCCESS - car unlocked
+{'success': True, 'reason': 'AUTHENTICATED'}
+2026-06-04 20:24:02,439 INFO [SmartCarBlockchain] Engine STARTED
+{'success': True}
+3 True True True
+2026-06-04 20:24:03,116 INFO [SmartCarBlockchain] Blockchain saved encrypted: 4 blocks -> logs/blockchain_gui_go_test.json [cipher=AES-256-GCM]
+2026-06-04 20:24:10,761 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\interactive.log
+Traceback (most recent call last):
+  File "<stdin>", line 2, in <module>
+  File "E:\Final Project\Smart Car - Blockchain for Vehicle Security\smartcar_backend.py", line 183, in create_backend
+    return GoBackend(vehicle_id, password, auth_token, chain_file)
+  File "E:\Final Project\Smart Car - Blockchain for Vehicle Security\smartcar_backend.py", line 54, in __init__
+    self._ensure_service()
+    ~~~~~~~~~~~~~~~~~~~~^^
+  File "E:\Final Project\Smart Car - Blockchain for Vehicle Security\smartcar_backend.py", line 83, in _ensure_service
+    raise RuntimeError("Go backend did not become ready on http://127.0.0.1:8787")
+RuntimeError: Go backend did not become ready on http://127.0.0.1:8787
+2026-06-04 20:25:17,329 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\interactive.log
+GoBackend 1 True
+{'message': 'Authentication successful', 'success': True}
+{'message': 'Engine started', 'success': True}
+4 True True True
+2026-06-04 20:26:18,155 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\interactive.log
+GoBackend 1 True
+{'message': 'Authentication successful', 'success': True}
+{'message': 'Engine started', 'success': True}
+4 True True True
+2026-06-04 20:27:03,929 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\interactive.log
+GoBackend 1 True
+4 True True True

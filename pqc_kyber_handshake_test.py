@@ -4,7 +4,7 @@ Run an integration smoke test for V2X handshake key exchange.
 
 Behavior:
 - If liboqs with Kyber/ML-KEM support is available, require HS_PQC_KEM.
-- Otherwise, report fallback HS_ECDH path.
+- Otherwise, report that PQ KEM is unavailable; ECDH-P256 fallback is disabled by default.
 """
 
 import os
@@ -62,7 +62,7 @@ def main():
             assert n1.crypto_layer._negotiated_kem_alg in ("Kyber512", "ML-KEM-512"), "Unexpected negotiated KEM"
             print("KYBER_KEM_TEST=PASS")
         else:
-            print("KYBER_KEM_TEST=SKIP (liboqs or Kyber/ML-KEM not available; fallback path expected)")
+            print("KYBER_KEM_TEST=SKIP (liboqs or Kyber/ML-KEM not available; ECDH fallback disabled by default)")
     finally:
         n1.disconnect()
         n2.disconnect()
@@ -71,4 +71,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -1,0 +1,37 @@
+{
+  "attack_column": "attack_type",
+  "created_at": "2026-06-05T14:12:43.247157+00:00",
+  "dataset_required": true,
+  "experiment": "adversarial_detection",
+  "input_csv": "",
+  "input_rows": 0,
+  "label_column": "label",
+  "measured_runtime_benchmark": false,
+  "metrics": "tp,fp,tn,fn,precision,recall,specificity,f1,accuracy,false_positive_rate,false_negative_rate",
+  "rows": [
+    {
+      "accuracy": "",
+      "attack_type": "TODO_ATTACK_TYPE",
+      "dataset_required": true,
+      "f1": "",
+      "false_negative_rate": "",
+      "false_positive_rate": "",
+      "fn": "",
+      "fp": "",
+      "measured_runtime_benchmark": false,
+      "precision": "",
+      "recall": "",
+      "sample_count": "",
+      "scope": "schema_example",
+      "specificity": "",
+      "statistical_significance": false,
+      "tn": "",
+      "tp": ""
+    }
+  ],
+  "score_column": "score",
+  "seed": 0,
+  "statistical_significance": false,
+  "status": "dataset_required",
+  "threshold": 0.5
+}

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 110" width="240" height="110">
+  <ellipse cx="120" cy="91" rx="103" ry="12" fill="#081018" opacity="0.65"/>
+  <polygon points="38,69 54,48 92,34 150,32 183,41 204,62 205,78 188,82 174,81 165,67 72,67 63,82 47,82 34,77" fill="#b81d2b" stroke="#f3b6bc" stroke-width="2"/>
+  <polygon points="86,37 102,30 148,29 174,37 182,51 93,51" fill="#182c3c" stroke="#8fdcff" stroke-width="1.4"/>
+  <polygon points="95,39 106,33 130,33 129,49 96,49" fill="#89c7eb" opacity="0.82"/>
+  <polygon points="132,33 148,33 171,39 177,49 132,49" fill="#89c7eb" opacity="0.78"/>
+  <rect x="37" y="62" width="168" height="9" fill="#851722"/>
+  <rect x="34" y="66" width="10" height="6" fill="#ffe58c"/>
+  <rect x="197" y="67" width="9" height="6" fill="#ff6b6b"/>
+  <rect x="44" y="58" width="18" height="4" fill="#e9f7ff" opacity="0.9"/>
+  <rect x="175" y="59" width="16" height="4" fill="#e9f7ff" opacity="0.58"/>
+  <ellipse cx="69" cy="80" rx="18" ry="18" fill="#11161c" stroke="#d8e4eb" stroke-width="2"/>
+  <ellipse cx="169" cy="80" rx="18" ry="18" fill="#11161c" stroke="#d8e4eb" stroke-width="2"/>
+  <ellipse cx="69" cy="80" rx="8" ry="8" fill="#6e7f89"/>
+  <ellipse cx="169" cy="80" rx="8" ry="8" fill="#6e7f89"/>
+  <polyline points="58,58 76,54 99,54 120,52 151,53 180,57" stroke="#ffccd3" stroke-width="1.6"/>
+</svg>

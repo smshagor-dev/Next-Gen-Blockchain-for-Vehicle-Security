@@ -1,27 +1,36 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 220" width="640" height="220">
-  <rect x="0" y="0" width="640" height="220" fill="#0b1220"/>
-  <rect x="0" y="60" width="640" height="120" fill="#1f2937"/>
-
-  <rect x="0" y="86" width="640" height="4" fill="#f59e0b"/>
-  <rect x="0" y="150" width="640" height="4" fill="#f59e0b"/>
-
-  <line x1="0" y1="120" x2="40" y2="120" stroke="#e5e7eb" stroke-width="3"/>
-  <line x1="60" y1="120" x2="100" y2="120" stroke="#e5e7eb" stroke-width="3"/>
-  <line x1="120" y1="120" x2="160" y2="120" stroke="#e5e7eb" stroke-width="3"/>
-  <line x1="180" y1="120" x2="220" y2="120" stroke="#e5e7eb" stroke-width="3"/>
-  <line x1="240" y1="120" x2="280" y2="120" stroke="#e5e7eb" stroke-width="3"/>
-  <line x1="300" y1="120" x2="340" y2="120" stroke="#e5e7eb" stroke-width="3"/>
-  <line x1="360" y1="120" x2="400" y2="120" stroke="#e5e7eb" stroke-width="3"/>
-  <line x1="420" y1="120" x2="460" y2="120" stroke="#e5e7eb" stroke-width="3"/>
-  <line x1="480" y1="120" x2="520" y2="120" stroke="#e5e7eb" stroke-width="3"/>
-  <line x1="540" y1="120" x2="580" y2="120" stroke="#e5e7eb" stroke-width="3"/>
-  <line x1="600" y1="120" x2="640" y2="120" stroke="#e5e7eb" stroke-width="3"/>
-
-  <rect x="520" y="18" width="80" height="34" fill="#111827" stroke="#374151" stroke-width="2"/>
-  <circle cx="540" cy="35" r="8" fill="#ef4444"/>
-  <circle cx="560" cy="35" r="8" fill="#f59e0b"/>
-  <circle cx="580" cy="35" r="8" fill="#10b981"/>
-
-  <polygon points="40,70 110,70 140,110 20,110" fill="#334155" stroke="#60a5fa" stroke-width="2"/>
-  <text x="24" y="30" fill="#93c5fd" font-size="14">Real Camera + Road Context</text>
+  <rect x="0" y="0" width="640" height="220" fill="#73b8ef"/>
+  <rect x="0" y="0" width="640" height="92" fill="#9ed0f6" opacity="0.45"/>
+  <polygon points="0,90 70,64 160,82 240,48 360,88 468,58 560,81 640,62 640,0 0,0" fill="#d6eefc" opacity="0.7"/>
+  <polygon points="0,108 64,83 145,94 223,63 344,102 449,78 542,96 640,84 640,56 560,81 468,58 360,88 240,48 160,82 70,64 0,90" fill="#7ca26e"/>
+  <polygon points="0,125 72,105 141,116 215,90 337,122 437,101 527,114 640,100 640,83 542,96 449,78 344,102 223,63 145,94 64,83 0,108" fill="#5f8655"/>
+  <rect x="0" y="126" width="640" height="94" fill="#2e3138"/>
+  <polygon points="0,123 640,123 640,133 0,136" fill="#4f535c"/>
+  <polygon points="0,209 640,194 640,220 0,220" fill="#171a20"/>
+  <rect x="0" y="134" width="640" height="5" fill="#f4bf42"/>
+  <rect x="0" y="192" width="640" height="4" fill="#f4bf42"/>
+  <rect x="0" y="160" width="44" height="4" fill="#f1f5f9"/>
+  <rect x="72" y="160" width="44" height="4" fill="#f1f5f9"/>
+  <rect x="144" y="160" width="44" height="4" fill="#f1f5f9"/>
+  <rect x="216" y="160" width="44" height="4" fill="#f1f5f9"/>
+  <rect x="288" y="160" width="44" height="4" fill="#f1f5f9"/>
+  <rect x="360" y="160" width="44" height="4" fill="#f1f5f9"/>
+  <rect x="432" y="160" width="44" height="4" fill="#f1f5f9"/>
+  <rect x="504" y="160" width="44" height="4" fill="#f1f5f9"/>
+  <rect x="576" y="160" width="44" height="4" fill="#f1f5f9"/>
+  <rect x="34" y="86" width="8" height="44" fill="#3f3529"/>
+  <ellipse cx="38" cy="72" rx="21" ry="18" fill="#355f33"/>
+  <ellipse cx="56" cy="78" rx="18" ry="14" fill="#487744"/>
+  <rect x="112" y="90" width="7" height="37" fill="#43372a"/>
+  <ellipse cx="115" cy="77" rx="18" ry="16" fill="#355f33"/>
+  <ellipse cx="128" cy="81" rx="13" ry="12" fill="#4a8045"/>
+  <rect x="529" y="88" width="8" height="41" fill="#413428"/>
+  <ellipse cx="532" cy="74" rx="21" ry="17" fill="#345f33"/>
+  <ellipse cx="549" cy="80" rx="16" ry="12" fill="#487744"/>
+  <rect x="600" y="92" width="8" height="38" fill="#3f3228"/>
+  <ellipse cx="604" cy="79" rx="19" ry="16" fill="#375f36"/>
+  <ellipse cx="619" cy="84" rx="14" ry="11" fill="#4f844a"/>
+  <rect x="474" y="86" width="12" height="41" fill="#dbe7f2" stroke="#5e6874" stroke-width="1"/>
+  <rect x="487" y="90" width="42" height="22" fill="#13314a" stroke="#d9f1ff" stroke-width="2"/>
+  <rect x="493" y="95" width="30" height="5" fill="#6be4ff"/>
 </svg>

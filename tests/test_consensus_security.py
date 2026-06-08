@@ -1,0 +1,63 @@
+import unittest
+from pathlib import Path
+
+from consensus_security import consensus_security_metadata
+
+
+class ConsensusSecurityTests(unittest.TestCase):
+    def test_majority_attack_not_resistant(self):
+        metadata = consensus_security_metadata()
+        self.assertEqual(metadata["consensus_model"], "simple_majority")
+        self.assertFalse(metadata["majority_attack_resistant"])
+        self.assertFalse(metadata["protects_against_forward_majority_control"])
+        self.assertTrue(metadata["dual_hash_chaining"])
+        self.assertTrue(metadata["retroactive_tamper_evidence"])
+
+    def test_no_51_percent_probability_2_pow_512_claim(self):
+        targets = [
+            Path("readme.md"),
+            Path("docs/consensus-threat-model.md"),
+            Path("blockchain.cpp"),
+            Path("api/go/main.go"),
+            Path("dashboard.py"),
+            Path("consensus_security.py"),
+        ]
+        for target in targets:
+            text = target.read_text(encoding="utf-8").lower()
+            self.assertNotIn("2^-512", text, str(target))
+            self.assertNotIn("2^−512", text, str(target))
+
+    def test_no_dual_hash_prevents_51_percent_claim(self):
+        forbidden = [
+            "dual hashing prevents 51",
+            "dual hash prevents 51",
+            "dual-hash prevents 51",
+            "51% attack requires",
+            "majority adversary cannot append fraudulent",
+        ]
+        targets = [
+            Path("readme.md"),
+            Path("docs/consensus-threat-model.md"),
+            Path("blockchain.cpp"),
+            Path("api/go/main.go"),
+            Path("dashboard.py"),
+        ]
+        for target in targets:
+            text = target.read_text(encoding="utf-8").lower()
+            for phrase in forbidden:
+                self.assertNotIn(phrase, text, f"{target}: {phrase}")
+
+    def test_dashboard_does_not_show_51_attack_resistant(self):
+        text = Path("dashboard.py").read_text(encoding="utf-8")
+        self.assertNotIn("51% Attack Resistant", text)
+
+    def test_consensus_threat_model_doc_exists(self):
+        doc = Path("docs/consensus-threat-model.md")
+        self.assertTrue(doc.exists())
+        text = doc.read_text(encoding="utf-8")
+        self.assertIn("Why a 51% Attacker Does Not Need a Hash Collision", text)
+        self.assertIn("Forward Consensus Capture", text)
+
+
+if __name__ == "__main__":
+    unittest.main()

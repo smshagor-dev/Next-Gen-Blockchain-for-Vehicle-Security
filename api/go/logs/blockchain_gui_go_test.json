@@ -1,0 +1,158 @@
+[
+  {
+    "index": 0,
+    "timestamp": "2026-06-04T17:25:17.4312071Z",
+    "vehicle_id": "SMARTCAR_TEST_GO",
+    "telemetry": {
+      "speed": 0,
+      "acceleration": 0,
+      "fuel_level": 100,
+      "battery_voltage": 0,
+      "engine_temp": 0,
+      "gps_lat": 0,
+      "gps_lon": 0,
+      "obstacle_distance": 999,
+      "emergency_brake_active": false,
+      "steering_angle": 0,
+      "brake_pressure": 0,
+      "throttle_position": 0,
+      "rpm": 0,
+      "odometer": 0,
+      "driver_heart_rate_bpm": 0,
+      "driver_drowsiness_score": 0,
+      "driver_unwell": false,
+      "timestamp": "2026-06-04T17:25:17.4312071Z"
+    },
+    "event_data": "GENESIS:GO_BACKEND",
+    "previous_hash": "0",
+    "telemetry_hash_sha2": "d05e22129246309e6ec0c61b1dd02c70cea67d31900e1295de4b42b35a08333b",
+    "telemetry_hash_sha3": "aa75a99b90952bcad1c4d360dd3848b1bfefd5fad4958537afcb1366cf820ced",
+    "event_hash_sha2": "cb1d374ebf9943c618a7d409cf6f0653ec8085df89fad7f3bb4b407eeb493b22",
+    "event_hash_sha3": "e2f4c69470e8f2fae2ad2e7e8943f7c5cb97e37621fc23f9651c4d47144d314f",
+    "block_hash": "685953c6c0e3341e154c7b558bbde60c7f8309c6e0468a0f55cb1570e235bbb3",
+    "dual_hash_combined": "56c7b482f166db4428294787d3df9eafe1b93bdac9409f4612be7482baf9924f:be2058c0532374c7716fe6bef401b9a3f52d2d647b8973cb6cbe6d6c536c19fd",
+    "smart_contract_receipts": [
+      {
+        "receipt_id": "go_block_0",
+        "status": "ok"
+      }
+    ]
+  },
+  {
+    "index": 1,
+    "timestamp": "2026-06-04T17:25:17.465687Z",
+    "vehicle_id": "SMARTCAR_TEST_GO",
+    "telemetry": {
+      "speed": 0,
+      "acceleration": 0,
+      "fuel_level": 0,
+      "battery_voltage": 0,
+      "engine_temp": 0,
+      "gps_lat": 0,
+      "gps_lon": 0,
+      "obstacle_distance": 0,
+      "emergency_brake_active": false,
+      "steering_angle": 0,
+      "brake_pressure": 0,
+      "throttle_position": 0,
+      "rpm": 0,
+      "odometer": 0,
+      "driver_heart_rate_bpm": 0,
+      "driver_drowsiness_score": 0,
+      "driver_unwell": false,
+      "timestamp": "2026-06-04T17:25:17.465687Z"
+    },
+    "event_data": "AUTH:SUCCESS",
+    "previous_hash": "685953c6c0e3341e154c7b558bbde60c7f8309c6e0468a0f55cb1570e235bbb3",
+    "telemetry_hash_sha2": "5795173bbe732d2e8b5290a8d697f42cd24578d1ed20b1cac302878a18ec1a37",
+    "telemetry_hash_sha3": "7260a9a2b1775b8a3b427824e0cbe055102610255347f361c45356ddd6e5459a",
+    "event_hash_sha2": "ee4e5351ea212cca76e4855da178082ff6ecc24bb127a2a54ac3811528bf8360",
+    "event_hash_sha3": "3444aa5eaad4a1fe15705b61e9b8760197cbc77af5eda8031457af2cc245e29a",
+    "block_hash": "af07f6b64361e6805ce3ec508f8d5b95af652980eb3557bd1b150c875c3cedb5",
+    "dual_hash_combined": "44ac419789ea82a858c7820c0be7c0a6dc0b6ab7c937b9013be594c228f4eaef:d574c14e67eeac623f724fc2dc5ce1d1a1d7d3605587db8d5246b93a679d1461",
+    "smart_contract_receipts": [
+      {
+        "receipt_id": "go_block_1",
+        "status": "ok"
+      }
+    ]
+  },
+  {
+    "index": 2,
+    "timestamp": "2026-06-04T17:25:17.4961026Z",
+    "vehicle_id": "SMARTCAR_TEST_GO",
+    "telemetry": {
+      "speed": 0,
+      "acceleration": 0,
+      "fuel_level": 0,
+      "battery_voltage": 0,
+      "engine_temp": 0,
+      "gps_lat": 0,
+      "gps_lon": 0,
+      "obstacle_distance": 0,
+      "emergency_brake_active": false,
+      "steering_angle": 0,
+      "brake_pressure": 0,
+      "throttle_position": 0,
+      "rpm": 0,
+      "odometer": 0,
+      "driver_heart_rate_bpm": 0,
+      "driver_drowsiness_score": 0,
+      "driver_unwell": false,
+      "timestamp": "2026-06-04T17:25:17.4961026Z"
+    },
+    "event_data": "ENGINE:STARTED",
+    "previous_hash": "af07f6b64361e6805ce3ec508f8d5b95af652980eb3557bd1b150c875c3cedb5",
+    "telemetry_hash_sha2": "bfe27e0c18c779e540d80afb7c336da9dc2e2e692079e20f636f37b15a4b4a60",
+    "telemetry_hash_sha3": "d78ec8c2905e099da006c0b316c7c0dbd535ddfefc92182357885a88f10f0114",
+    "event_hash_sha2": "dc587863e28c7fa530177952fed822838ef7edd8fb4feb485ddf0f1f79947904",
+    "event_hash_sha3": "87080ec07201fe79d6b88a51ab338e9f9b1c63364b05ffcf1987280dbad9eabc",
+    "block_hash": "c8c83cf34da236211e314cc73b8e05f6575190205f0530235712c99f4209e4a8",
+    "dual_hash_combined": "fd9fec95f8acfcc2cd38bfd06a1887eb9654d96dd53d69aca62db3015254c2d2:318ebfd62916bc16ea524de887fce35979de43bf9274caa7192f1cacea057b69",
+    "smart_contract_receipts": [
+      {
+        "receipt_id": "go_block_2",
+        "status": "ok"
+      }
+    ]
+  },
+  {
+    "index": 3,
+    "timestamp": "2026-06-04T17:25:17.511483Z",
+    "vehicle_id": "SMARTCAR_TEST_GO",
+    "telemetry": {
+      "speed": 42.5,
+      "acceleration": 0,
+      "fuel_level": 91,
+      "battery_voltage": 12.6,
+      "engine_temp": 20,
+      "gps_lat": 0,
+      "gps_lon": 0,
+      "obstacle_distance": 88,
+      "emergency_brake_active": false,
+      "steering_angle": 0,
+      "brake_pressure": 0,
+      "throttle_position": 0,
+      "rpm": 0,
+      "odometer": 0,
+      "driver_heart_rate_bpm": 72,
+      "driver_drowsiness_score": 0,
+      "driver_unwell": false,
+      "timestamp": "test"
+    },
+    "event_data": "",
+    "previous_hash": "c8c83cf34da236211e314cc73b8e05f6575190205f0530235712c99f4209e4a8",
+    "telemetry_hash_sha2": "6b5951140fc12a7e6c87009274c856bfdd1bebea9a212673004e1db03e9bd5e1",
+    "telemetry_hash_sha3": "0552a111277b36626575586bbb7519847eeb7d70e3e41bae987df4b5f640e719",
+    "event_hash_sha2": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "event_hash_sha3": "a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a",
+    "block_hash": "390c76a6734125d77a9556036aa0b12a765f0428073f0feed626d7e8348bbc10",
+    "dual_hash_combined": "e4a4a9ca54b97f1df3261d3cd43a8e82ba6e297fe109caf71d0b708134de31fd:757baa7f01c80a6748d329a371b5f5b07220d60038126680f345d0ca35da003e",
+    "smart_contract_receipts": [
+      {
+        "receipt_id": "go_block_3",
+        "status": "ok"
+      }
+    ]
+  }
+]

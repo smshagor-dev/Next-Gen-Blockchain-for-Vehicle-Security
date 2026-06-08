@@ -1,12 +1,12 @@
 {
   "format": "SMARTCAR_STATE_CHECKPOINT_V1",
-  "vehicle_id": "SMARTCAR_VIN_2024_BD_XYZ789",
-  "created_at": "2026-02-26T08:48:22.973465+00:00",
+  "vehicle_id": "LATENCY_BENCH_0",
+  "created_at": "2026-06-05T13:51:11.347264+00:00",
   "reason": "GENESIS_BOOTSTRAP",
   "chain_length": 1,
   "latest_block_index": 0,
-  "latest_block_hash": "fe01a2860848fc3cf7c2bf3d4d38da900b009cacc5b1f04ee6ff049582e2790b",
-  "latest_timestamp": "2026-02-26T08:48:22.972588+00:00",
+  "latest_block_hash": "332b59146a4500752524255d0eedf0efa961483fe988b4b5f883d7ae1afa7193",
+  "latest_timestamp": "2026-06-05T13:51:11.347057+00:00",
   "active_blocks": 1,
   "archived_compacted_blocks": 0,
   "archive_shards_count": 0,
@@ -15,9 +15,9 @@
     "authority_node_1"
   ],
   "validator_id": "authority_node_1",
-  "did": "did:smartcar:b133a912bc6fb8da5c274295c237b1ced9e898affb6a90af51796603b4fcd713",
+  "did": "did:smartcar:009719056dc408c65fa90daf9eaa31820def207ad3ef4e2d5e877d83a6da4820",
   "fl_round_id": 0,
   "consensus": "POA_POP",
-  "checkpoint_hash_sha3": "ce0b2004bfc3e198dd4b24a3a578f6cb81682cf7a25a01e9354ca8df8e349137",
-  "checkpoint_signature": "329f971c7a7bef6bb9109da7870492aa77bc0a7b8b59c4b6f869f475e1be0c62"
+  "checkpoint_hash_sha3": "444b3e4f27790f771cf0997664eb22d314f6937b36167ab2f90d9bc5403f134b",
+  "checkpoint_signature": "74e254135dbceedefafc29239e6ae942a701ede17b54ae9e40ff6c2219fe3176"
 }

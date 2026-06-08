@@ -10,7 +10,7 @@ Federated trainer node demo:
 """
 
 from blockchain import SmartCarBlockchain, TelemetryData
-from federated_learning import FederatedTrainer
+from federated_learning import FederatedTrainer, print_prototype_fl_sanity_check
 from env_config import load_project_env_once, get_float
 
 load_project_env_once()
@@ -81,7 +81,8 @@ def main():
     trainer_train = trainer.train_trainer(trainer_samples, epochs=3)
     global_model = trainer.export_global_model()
 
-    print("=== Trainer Node ===")
+    print_prototype_fl_sanity_check(num_peers=3, test_samples=24)
+    print("=== Trainer Node Demo ===")
     print(f"aggregated_updates={agg.get('updates_count')}")
     print(f"global_round_after_aggregate={agg.get('global_round')}")
     print(f"trainer_self_train_ok={trainer_train.get('ok')}")

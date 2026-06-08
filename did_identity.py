@@ -5,6 +5,10 @@
 Lightweight DID for SmartCar using Lamport one-time signatures (hash-based).
 No central server is required for verification:
 verifier only needs DID document + challenge + proof.
+
+Security boundary: Lamport DID provides cryptographic identity authenticity.
+It proves control of signing secrets for a DID document, but it does not make
+identity creation costly and does not provide Sybil resistance by itself.
 """
 
 import hashlib

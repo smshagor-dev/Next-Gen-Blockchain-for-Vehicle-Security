@@ -1,0 +1,455 @@
+{
+  "created_at": "2026-06-05T13:57:07.710430+00:00",
+  "rows": [
+    {
+      "component": "security_capabilities",
+      "iteration": 0,
+      "latency_ms": 0.0019,
+      "phase": "cold",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.198846+00:00"
+    },
+    {
+      "component": "security_capabilities",
+      "iteration": 0,
+      "latency_ms": 0.0012,
+      "phase": "warmup",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.198861+00:00"
+    },
+    {
+      "component": "security_capabilities",
+      "iteration": 0,
+      "latency_ms": 0.0024,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.198868+00:00"
+    },
+    {
+      "component": "security_capabilities",
+      "iteration": 1,
+      "latency_ms": 0.0005,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.198872+00:00"
+    },
+    {
+      "component": "security_capabilities",
+      "iteration": 2,
+      "latency_ms": 0.0004,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.198875+00:00"
+    },
+    {
+      "component": "security_capabilities",
+      "iteration": 3,
+      "latency_ms": 0.0004,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.198878+00:00"
+    },
+    {
+      "component": "security_capabilities",
+      "iteration": 4,
+      "latency_ms": 0.0004,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.198880+00:00"
+    },
+    {
+      "component": "identity_security",
+      "iteration": 0,
+      "latency_ms": 0.0088,
+      "phase": "cold",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.204698+00:00"
+    },
+    {
+      "component": "identity_security",
+      "iteration": 0,
+      "latency_ms": 0.0051,
+      "phase": "warmup",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.204712+00:00"
+    },
+    {
+      "component": "identity_security",
+      "iteration": 0,
+      "latency_ms": 0.0026,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.204718+00:00"
+    },
+    {
+      "component": "identity_security",
+      "iteration": 1,
+      "latency_ms": 0.0019,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.204723+00:00"
+    },
+    {
+      "component": "identity_security",
+      "iteration": 2,
+      "latency_ms": 0.0015,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.204727+00:00"
+    },
+    {
+      "component": "identity_security",
+      "iteration": 3,
+      "latency_ms": 0.0016,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.204731+00:00"
+    },
+    {
+      "component": "identity_security",
+      "iteration": 4,
+      "latency_ms": 0.0015,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.204735+00:00"
+    },
+    {
+      "component": "consensus_security",
+      "iteration": 0,
+      "latency_ms": 0.001,
+      "phase": "cold",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.205282+00:00"
+    },
+    {
+      "component": "consensus_security",
+      "iteration": 0,
+      "latency_ms": 0.001,
+      "phase": "warmup",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.205290+00:00"
+    },
+    {
+      "component": "consensus_security",
+      "iteration": 0,
+      "latency_ms": 0.0004,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.205293+00:00"
+    },
+    {
+      "component": "consensus_security",
+      "iteration": 1,
+      "latency_ms": 0.0004,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.205296+00:00"
+    },
+    {
+      "component": "consensus_security",
+      "iteration": 2,
+      "latency_ms": 0.0003,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.205299+00:00"
+    },
+    {
+      "component": "consensus_security",
+      "iteration": 3,
+      "latency_ms": 0.0003,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.205301+00:00"
+    },
+    {
+      "component": "consensus_security",
+      "iteration": 4,
+      "latency_ms": 0.0003,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.205304+00:00"
+    },
+    {
+      "component": "pedersen_privacy",
+      "iteration": 0,
+      "latency_ms": 0.0009,
+      "phase": "cold",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.214967+00:00"
+    },
+    {
+      "component": "pedersen_privacy",
+      "iteration": 0,
+      "latency_ms": 0.0007,
+      "phase": "warmup",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.214976+00:00"
+    },
+    {
+      "component": "pedersen_privacy",
+      "iteration": 0,
+      "latency_ms": 0.0004,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.214980+00:00"
+    },
+    {
+      "component": "pedersen_privacy",
+      "iteration": 1,
+      "latency_ms": 0.0002,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.214983+00:00"
+    },
+    {
+      "component": "pedersen_privacy",
+      "iteration": 2,
+      "latency_ms": 0.0002,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.214986+00:00"
+    },
+    {
+      "component": "pedersen_privacy",
+      "iteration": 3,
+      "latency_ms": 0.0002,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.214988+00:00"
+    },
+    {
+      "component": "pedersen_privacy",
+      "iteration": 4,
+      "latency_ms": 0.0002,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.214991+00:00"
+    },
+    {
+      "component": "reviewer_audit",
+      "iteration": 0,
+      "latency_ms": 0.0011,
+      "phase": "cold",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.215074+00:00"
+    },
+    {
+      "component": "reviewer_audit",
+      "iteration": 0,
+      "latency_ms": 0.0005,
+      "phase": "warmup",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.215079+00:00"
+    },
+    {
+      "component": "reviewer_audit",
+      "iteration": 0,
+      "latency_ms": 0.0003,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.215082+00:00"
+    },
+    {
+      "component": "reviewer_audit",
+      "iteration": 1,
+      "latency_ms": 0.0002,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.215085+00:00"
+    },
+    {
+      "component": "reviewer_audit",
+      "iteration": 2,
+      "latency_ms": 0.0002,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.215087+00:00"
+    },
+    {
+      "component": "reviewer_audit",
+      "iteration": 3,
+      "latency_ms": 0.0002,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.215090+00:00"
+    },
+    {
+      "component": "reviewer_audit",
+      "iteration": 4,
+      "latency_ms": 0.0002,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.215092+00:00"
+    },
+    {
+      "component": "blockchain_append_validate",
+      "iteration": 0,
+      "latency_ms": 303.8451,
+      "phase": "cold",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:02.693551+00:00"
+    },
+    {
+      "component": "blockchain_append_validate",
+      "iteration": 0,
+      "latency_ms": 434.0461,
+      "phase": "warmup",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:03.127606+00:00"
+    },
+    {
+      "component": "blockchain_append_validate",
+      "iteration": 0,
+      "latency_ms": 544.2623,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:03.671878+00:00"
+    },
+    {
+      "component": "blockchain_append_validate",
+      "iteration": 1,
+      "latency_ms": 681.6734,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:04.353573+00:00"
+    },
+    {
+      "component": "blockchain_append_validate",
+      "iteration": 2,
+      "latency_ms": 802.9422,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:05.156524+00:00"
+    },
+    {
+      "component": "blockchain_append_validate",
+      "iteration": 3,
+      "latency_ms": 954.3164,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:06.110848+00:00"
+    },
+    {
+      "component": "blockchain_append_validate",
+      "iteration": 4,
+      "latency_ms": 1084.0945,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:07.194953+00:00"
+    },
+    {
+      "component": "fl_validation",
+      "iteration": 0,
+      "latency_ms": 0.0025,
+      "phase": "cold",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:07.195411+00:00"
+    },
+    {
+      "component": "fl_validation",
+      "iteration": 0,
+      "latency_ms": 0.0021,
+      "phase": "warmup",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:07.195421+00:00"
+    },
+    {
+      "component": "fl_validation",
+      "iteration": 0,
+      "latency_ms": 0.0008,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:07.195425+00:00"
+    },
+    {
+      "component": "fl_validation",
+      "iteration": 1,
+      "latency_ms": 0.0004,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:07.195428+00:00"
+    },
+    {
+      "component": "fl_validation",
+      "iteration": 2,
+      "latency_ms": 0.0004,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:07.195431+00:00"
+    },
+    {
+      "component": "fl_validation",
+      "iteration": 3,
+      "latency_ms": 0.0004,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:07.195434+00:00"
+    },
+    {
+      "component": "fl_validation",
+      "iteration": 4,
+      "latency_ms": 0.0003,
+      "phase": "measured",
+      "seed": 7,
+      "status": "measured",
+      "timestamp_utc": "2026-06-05T13:57:07.195437+00:00"
+    }
+  ],
+  "schema": [
+    "component",
+    "iteration",
+    "phase",
+    "latency_ms",
+    "seed",
+    "timestamp_utc",
+    "status"
+  ]
+}

@@ -9,6 +9,7 @@ and peer cars aggregate those deltas without sharing raw data.
 """
 
 from blockchain import SmartCarBlockchain, TelemetryData
+from federated_learning import print_prototype_fl_sanity_check
 
 
 def _mk_car(cid: str) -> SmartCarBlockchain:
@@ -58,6 +59,7 @@ def main():
         if car_c.apply_remote_fl_update(up).get("applied"):
             applied_c += 1
 
+    print_prototype_fl_sanity_check(num_peers=3, test_samples=24)
     print("=== Decentralized FL Demo ===")
     print(f"car_a_updates_shared={len(updates_from_a)}")
     print(f"car_b_updates_applied={applied_b}")

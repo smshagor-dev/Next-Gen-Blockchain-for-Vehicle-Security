@@ -1,0 +1,90 @@
+{
+  "artifacts": [
+    "experiments\\reports\\smoke\\scalability\\scalability_plan.json",
+    "experiments\\reports\\smoke\\scalability\\scalability_plan.csv",
+    "experiments\\reports\\smoke\\scalability\\scalability_report.md",
+    "experiments\\reports\\smoke\\scalability\\scalability_no_results.png",
+    "experiments\\reports\\smoke\\fl\\fl_plan.json",
+    "experiments\\reports\\smoke\\fl\\fl_plan.csv",
+    "experiments\\reports\\smoke\\fl\\fl_report.md",
+    "experiments\\reports\\smoke\\fl\\fl_no_results.png",
+    "experiments\\reports\\smoke\\adversarial\\adversarial_plan.json",
+    "experiments\\reports\\smoke\\adversarial\\adversarial_plan.csv",
+    "experiments\\reports\\smoke\\adversarial\\adversarial_report.md",
+    "experiments\\reports\\smoke\\adversarial\\adversarial_no_results.png",
+    "experiments\\reports\\smoke\\latency\\latency_plan.json",
+    "experiments\\reports\\smoke\\latency\\latency_plan.csv",
+    "experiments\\reports\\smoke\\latency\\latency_report.md",
+    "experiments\\reports\\smoke\\latency\\latency_no_results.png"
+  ],
+  "created_at": "2026-06-05T13:46:56.226839+00:00",
+  "experiments": {
+    "adversarial": {
+      "artifacts": [
+        "experiments\\reports\\smoke\\adversarial\\adversarial_plan.json",
+        "experiments\\reports\\smoke\\adversarial\\adversarial_plan.csv",
+        "experiments\\reports\\smoke\\adversarial\\adversarial_report.md",
+        "experiments\\reports\\smoke\\adversarial\\adversarial_no_results.png"
+      ],
+      "configurations": 180,
+      "created_at": "2026-06-05T13:46:56.056479+00:00",
+      "experiment": "adversarial_detection",
+      "metrics": "tp,fp,tn,fn,precision,recall,f1,roc_auc",
+      "scenarios": "realistic-speed-range,replay-attack,timing-attack,gps-drift,sensor-noise,gradual-poisoning",
+      "seeds": 30,
+      "status": "framework_only_no_benchmark_results"
+    },
+    "fl": {
+      "artifacts": [
+        "experiments\\reports\\smoke\\fl\\fl_plan.json",
+        "experiments\\reports\\smoke\\fl\\fl_plan.csv",
+        "experiments\\reports\\smoke\\fl\\fl_report.md",
+        "experiments\\reports\\smoke\\fl\\fl_no_results.png"
+      ],
+      "attacks": "sign-flip,label-flip,gaussian-noise,scaling-attack,random-update,backdoor",
+      "configurations": 540,
+      "created_at": "2026-06-05T13:46:55.904921+00:00",
+      "experiment": "federated_learning",
+      "metrics": "accuracy,precision,recall,f1,attack_success_rate",
+      "peer_counts": "10,20,50",
+      "seeds": 30,
+      "status": "framework_only_no_benchmark_results"
+    },
+    "latency": {
+      "artifacts": [
+        "experiments\\reports\\smoke\\latency\\latency_plan.json",
+        "experiments\\reports\\smoke\\latency\\latency_plan.csv",
+        "experiments\\reports\\smoke\\latency\\latency_report.md",
+        "experiments\\reports\\smoke\\latency\\latency_no_results.png"
+      ],
+      "components": "pipeline,zkp,block_append,api_status,dashboard_refresh",
+      "configurations": 10,
+      "created_at": "2026-06-05T13:46:56.149284+00:00",
+      "experiment": "latency",
+      "percentiles": "p50,p95,p99",
+      "start_modes": "cold-start,warm-start",
+      "status": "framework_only_no_benchmark_results"
+    },
+    "scalability": {
+      "artifacts": [
+        "experiments\\reports\\smoke\\scalability\\scalability_plan.json",
+        "experiments\\reports\\smoke\\scalability\\scalability_plan.csv",
+        "experiments\\reports\\smoke\\scalability\\scalability_report.md",
+        "experiments\\reports\\smoke\\scalability\\scalability_no_results.png"
+      ],
+      "created_at": "2026-06-05T13:46:53.759989+00:00",
+      "experiment": "scalability",
+      "metrics": "latency,throughput,message_volume,cpu,ram,consensus_duration",
+      "node_counts": "10,50,100,500,1000,5000,10000",
+      "seed": 0,
+      "status": "framework_only_no_benchmark_results"
+    }
+  },
+  "status": "framework_only_no_benchmark_results",
+  "todo": [
+    "Connect real distributed scalability deployment harness.",
+    "Connect real FL datasets/models and attack implementations.",
+    "Connect labeled adversarial detection datasets.",
+    "Run repeated cold/warm latency benchmarks with raw logs."
+  ]
+}

@@ -1,0 +1,2 @@
+topology,node_count,rounds,fanout,committee_size,active_validators,messages_per_round,total_messages,average_messages_per_node,theoretical_complexity,measured_runtime_benchmark,seed
+gossip-fanout,10,2,3,50,10,30,60,6.0,O(n*fanout),False,0

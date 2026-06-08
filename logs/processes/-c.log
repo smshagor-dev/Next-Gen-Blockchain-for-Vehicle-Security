@@ -1,0 +1,51 @@
+2026-06-04 20:17:11,608 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\-c.log
+python imports ok
+2026-06-04 20:18:22,157 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\-c.log
+2026-06-04 20:18:22,453 INFO [SmartCarBlockchain] Genesis block: c9d792807ee0ca8c40873479e9a65fd9...
+2026-06-04 20:18:22,453 INFO [SmartCarBlockchain] SmartCar Blockchain initialized for vehicle: SMARTCAR_VIN_2024_BD_XYZ789 | consensus=POA_POP | validator=authority_node_1 | edge_enabled=True | storage_encryption=True
+created 1
+smoke ok
+2026-06-04 20:18:36,600 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\-c.log
+ok
+2026-06-04 20:18:36,796 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\-c.log
+ok
+2026-06-04 20:18:37,125 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\-c.log
+ok
+2026-06-04 20:18:37,265 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\-c.log
+ok
+2026-06-04 20:18:37,708 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\-c.log
+ok
+2026-06-04 20:18:37,891 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\-c.log
+ok
+2026-06-04 20:18:38,645 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\-c.log
+ok
+2026-06-04 20:18:38,721 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\-c.log
+ok
+2026-06-04 20:18:38,896 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\-c.log
+ok
+2026-06-04 20:18:39,037 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\-c.log
+ok
+2026-06-04 20:18:39,123 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\-c.log
+ok
+2026-06-04 20:18:39,242 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\-c.log
+ok
+2026-06-04 20:18:39,318 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\-c.log
+ok
+2026-06-04 20:18:39,387 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\-c.log
+ok
+2026-06-04 20:18:39,491 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\-c.log
+ok
+2026-06-04 20:18:39,577 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\-c.log
+ok
+2026-06-04 20:18:39,668 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\-c.log
+ok
+2026-06-04 20:18:39,737 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\-c.log
+ok
+2026-06-04 20:23:21,052 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\-c.log
+adapter import ok
+2026-06-04 20:25:26,520 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\-c.log
+GoBackend 5
+dashboard go smoke ok
+2026-06-04 20:26:27,947 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\-c.log
+GoBackend 5 True
+gui smoke ok

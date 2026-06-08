@@ -1,0 +1,29 @@
+{
+  "committee_size": 50,
+  "created_at": "2026-06-05T14:08:01.494004+00:00",
+  "experiment": "scalability",
+  "fanout": 8,
+  "measured_runtime_benchmark": false,
+  "metrics": "total_messages,messages_per_round,average_messages_per_node,theoretical_complexity",
+  "node_counts": "10",
+  "rounds": 2,
+  "rows": [
+    {
+      "active_validators": 10,
+      "average_messages_per_node": 18.0,
+      "committee_size": 50,
+      "fanout": 8,
+      "measured_runtime_benchmark": false,
+      "messages_per_round": 90,
+      "node_count": 10,
+      "rounds": 2,
+      "seed": 0,
+      "theoretical_complexity": "O(n^2)",
+      "topology": "full-mesh",
+      "total_messages": 180
+    }
+  ],
+  "seed": 0,
+  "status": "communication_volume_analysis_only",
+  "topology": "full-mesh"
+}

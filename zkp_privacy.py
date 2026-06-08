@@ -9,7 +9,9 @@ This module provides commitment-based proofs to verify:
 2) Speed policy compliance (value <= limit) using commitment relation
 
 Note: This is a practical educational construction, not a full formal ZK range proof
-like Bulletproofs.
+like Bulletproofs. It is a CLASSICAL_SECURITY privacy/proof component:
+Pedersen hiding is information-theoretic, but binding/soundness relies on
+discrete-log assumptions and is not post-quantum secure.
 """
 
 import hashlib
@@ -20,7 +22,8 @@ from env_config import load_project_env_once, get_env
 
 load_project_env_once()
 
-# RFC 3526, 2048-bit MODP Group (Group 14)
+# RFC 3526, 2048-bit MODP Group (Group 14).
+# CLASSICAL_SECURITY: MODP/DDH discrete-log assumptions are not post-quantum secure.
 _RFC3526_GROUP14_P_HEX = (
     "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E08"
     "8A67CC74020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B"
@@ -87,21 +90,51 @@ def _load_group_params() -> Tuple[int, int, int, int]:
 
 P, Q, G, H = _load_group_params()
 
+PEDERSEN_MODE_COMMIT_ONLY = "COMMIT_ONLY"
+PEDERSEN_MODE_AGGREGATE_OPENING = "AGGREGATE_OPENING"
+PEDERSEN_MODE_SECURE_AGGREGATION_FUTURE = "SECURE_AGGREGATION_FUTURE"
+
+PEDERSEN_PRIVACY_METADATA = {
+    "pedersen_mode": PEDERSEN_MODE_COMMIT_ONLY,
+    "commitment_homomorphic": True,
+    "aggregate_statistics_recoverable": False,
+    "requires_opening_for_aggregate": True,
+    "secure_aggregation_implemented": False,
+}
+
 
 def _h(data: str) -> int:
     """Hash arbitrary text into field order."""
     return int(hashlib.sha3_256(data.encode()).hexdigest(), 16) % Q
 
 
+def pedersen_privacy_metadata() -> Dict:
+    """Return the active Pedersen aggregation/privacy mode.
+
+    Pedersen commitments support additive homomorphism over committed values,
+    but the aggregate remains hidden unless participants provide valid openings
+    or a separate secure aggregation / zero-knowledge disclosure protocol is
+    implemented.
+    """
+    return dict(PEDERSEN_PRIVACY_METADATA)
+
+
 def commit(value: int, blind: int = None) -> Tuple[int, int]:
-    """Create Pedersen-like commitment for integer value."""
+    """Create Pedersen-like commitment for integer value.
+
+    Pedersen hiding is information-theoretic, but binding/soundness relies on
+    discrete-log assumptions and is not post-quantum secure.
+    """
     r = blind if blind is not None else secrets.randbelow(Q - 1) + 1
     c = (pow(G, value % Q, P) * pow(H, r, P)) % P
     return c, r
 
 
 def prove_knowledge(commitment: int, value: int, blind: int, context: str) -> Dict:
-    """Create Schnorr-style knowledge proof for a commitment opening."""
+    """Create Schnorr-style knowledge proof for a commitment opening.
+
+    CLASSICAL_SECURITY: Schnorr-style proof soundness relies on discrete log.
+    """
     k1 = secrets.randbelow(Q - 1) + 1
     k2 = secrets.randbelow(Q - 1) + 1
     t = (pow(G, k1, P) * pow(H, k2, P)) % P

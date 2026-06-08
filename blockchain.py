@@ -37,6 +37,7 @@ except Exception:
 try:
     from zkp_privacy import (
         create_speed_limit_proof,
+        pedersen_privacy_metadata,
         verify_speed_limit_proof,
         create_location_ownership_proof,
         verify_location_ownership_proof,
@@ -44,6 +45,7 @@ try:
 except Exception:
     from zkp_privacy import (
         create_speed_limit_proof,
+        pedersen_privacy_metadata,
         verify_speed_limit_proof,
         create_location_ownership_proof,
         verify_location_ownership_proof,
@@ -70,9 +72,24 @@ except Exception:
     from perf_metrics import log_zkp_latency
 
 try:
-    from federated_learning import FederatedObstacleLearner
+    from federated_learning import FederatedObstacleLearner, fl_validation_metadata
 except Exception:
-    from federated_learning import FederatedObstacleLearner
+    from federated_learning import FederatedObstacleLearner, fl_validation_metadata
+
+try:
+    from security_capabilities import (
+        adversarial_validation_metadata,
+        complexity_boundary_metadata,
+        contribution_boundary_metadata,
+        reviewer_audit_metadata,
+    )
+except Exception:
+    from security_capabilities import (
+        adversarial_validation_metadata,
+        complexity_boundary_metadata,
+        contribution_boundary_metadata,
+        reviewer_audit_metadata,
+    )
 
 load_project_env_once()
 
@@ -1942,6 +1959,12 @@ class SmartCarBlockchain:
                 'delta_clip_norm': self.fl_learner.delta_clip_norm,
                 'remote_delta_max_norm': self.fl_learner.remote_delta_max_norm,
             },
+            'fl_validation': fl_validation_metadata(),
+            'adversarial_validation': adversarial_validation_metadata(),
+            'contribution_boundary': contribution_boundary_metadata(),
+            'complexity_boundary': complexity_boundary_metadata(),
+            'pedersen_privacy': pedersen_privacy_metadata(),
+            'reviewer_audit': reviewer_audit_metadata(),
             'forensic_blackbox': {
                 'enabled': True,
                 'window_seconds': self.blackbox_window_sec,
@@ -2007,6 +2030,12 @@ class SmartCarBlockchain:
             'fl_dp_enabled': self.fl_learner.dp_enabled,
             'fl_dp_noise_sigma': self.fl_learner.dp_noise_sigma,
             'fl_delta_clip_norm': self.fl_learner.delta_clip_norm,
+            'fl_validation': fl_validation_metadata(),
+            'adversarial_validation': adversarial_validation_metadata(),
+            'contribution_boundary': contribution_boundary_metadata(),
+            'complexity_boundary': complexity_boundary_metadata(),
+            'pedersen_privacy': pedersen_privacy_metadata(),
+            'reviewer_audit': reviewer_audit_metadata(),
             'pruning_enabled': self.pruning_enabled,
             'archive_shards_count': len(self.archive_shards_meta),
             'archive_node_file': self.archive_node_file,

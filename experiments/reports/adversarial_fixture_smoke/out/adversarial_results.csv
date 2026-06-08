@@ -1,0 +1,4 @@
+scope,attack_type,tp,fp,tn,fn,precision,recall,specificity,f1,accuracy,false_positive_rate,false_negative_rate,sample_count,measured_runtime_benchmark,dataset_required,statistical_significance
+overall,overall,1,1,1,1,0.5,0.5,0.5,0.5,0.5,0.5,0.5,4,False,False,False
+per_attack_type,normal,0,1,1,0,0.0,0.0,0.5,0.0,0.5,0.5,0.0,2,False,False,False
+per_attack_type,replay,1,0,0,1,1.0,0.5,0.0,0.666667,0.5,0.0,0.5,2,False,False,False

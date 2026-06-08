@@ -1,0 +1,11 @@
+component,start_mode,iterations,seed,status,p50_ms,p95_ms,p99_ms,raw_log
+pipeline,cold-start,100,0,TODO_DATASET_OR_DEPLOYMENT_REQUIRED,TODO: run repeated benchmark,TODO: run repeated benchmark,TODO: run repeated benchmark,TODO: attach reproducible raw timing log
+pipeline,warm-start,100,0,TODO_DATASET_OR_DEPLOYMENT_REQUIRED,TODO: run repeated benchmark,TODO: run repeated benchmark,TODO: run repeated benchmark,TODO: attach reproducible raw timing log
+zkp,cold-start,100,0,TODO_DATASET_OR_DEPLOYMENT_REQUIRED,TODO: run repeated benchmark,TODO: run repeated benchmark,TODO: run repeated benchmark,TODO: attach reproducible raw timing log
+zkp,warm-start,100,0,TODO_DATASET_OR_DEPLOYMENT_REQUIRED,TODO: run repeated benchmark,TODO: run repeated benchmark,TODO: run repeated benchmark,TODO: attach reproducible raw timing log
+block_append,cold-start,100,0,TODO_DATASET_OR_DEPLOYMENT_REQUIRED,TODO: run repeated benchmark,TODO: run repeated benchmark,TODO: run repeated benchmark,TODO: attach reproducible raw timing log
+block_append,warm-start,100,0,TODO_DATASET_OR_DEPLOYMENT_REQUIRED,TODO: run repeated benchmark,TODO: run repeated benchmark,TODO: run repeated benchmark,TODO: attach reproducible raw timing log
+api_status,cold-start,100,0,TODO_DATASET_OR_DEPLOYMENT_REQUIRED,TODO: run repeated benchmark,TODO: run repeated benchmark,TODO: run repeated benchmark,TODO: attach reproducible raw timing log
+api_status,warm-start,100,0,TODO_DATASET_OR_DEPLOYMENT_REQUIRED,TODO: run repeated benchmark,TODO: run repeated benchmark,TODO: run repeated benchmark,TODO: attach reproducible raw timing log
+dashboard_refresh,cold-start,100,0,TODO_DATASET_OR_DEPLOYMENT_REQUIRED,TODO: run repeated benchmark,TODO: run repeated benchmark,TODO: run repeated benchmark,TODO: attach reproducible raw timing log
+dashboard_refresh,warm-start,100,0,TODO_DATASET_OR_DEPLOYMENT_REQUIRED,TODO: run repeated benchmark,TODO: run repeated benchmark,TODO: run repeated benchmark,TODO: attach reproducible raw timing log

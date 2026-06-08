@@ -18,6 +18,40 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
+PROTOTYPE_FL_WARNING = "WARNING: This FL experiment is too small for Byzantine-robustness claims."
+
+FL_VALIDATION_METADATA = {
+    "fl_validation_level": "prototype_sanity_check",
+    "num_peers": 3,
+    "samples_per_peer": 10,
+    "test_samples": 24,
+    "byzantine_peers": 1,
+    "attack_type": "100x_weight_delta",
+    "statistical_significance": False,
+    "supports_byzantine_robustness_claim": False,
+}
+
+
+def fl_validation_metadata(num_peers: int = 3, test_samples: int = 24) -> Dict:
+    """Return conservative metadata for the current prototype FL sanity check."""
+    meta = dict(FL_VALIDATION_METADATA)
+    meta["num_peers"] = int(num_peers)
+    meta["test_samples"] = int(test_samples)
+    warnings = []
+    if meta["num_peers"] < 5 or meta["test_samples"] < 100:
+        warnings.append(PROTOTYPE_FL_WARNING)
+    meta["warnings"] = warnings
+    return meta
+
+
+def print_prototype_fl_sanity_check(num_peers: int = 3, test_samples: int = 24) -> Dict:
+    """Print the current small FL run label and limitation warning."""
+    meta = fl_validation_metadata(num_peers=num_peers, test_samples=test_samples)
+    print("=== Prototype FL Sanity Check ===")
+    for warning in meta.get("warnings", []):
+        print(warning)
+    return meta
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()

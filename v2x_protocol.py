@@ -28,6 +28,8 @@ try:
 except Exception:
     from env_config import load_project_env_once, get_env, get_int
 
+from security_capabilities import ECDH_P256_WARNING, security_capability_output
+
 load_project_env_once()
 logger = logging.getLogger("SmartCarV2X")
 
@@ -139,6 +141,9 @@ class DynamicCryptoAgilityLayer:
         self._last_agility_score = 0.0
         self._quantum_alert = get_env("SMARTCAR_V2X_QUANTUM_ALERT", "0") == "1"
         self._force_classic = get_env("SMARTCAR_V2X_FORCE_CLASSIC", "0") == "1"
+        self._allow_ecdh_fallback = get_env("SMARTCAR_V2X_ALLOW_CLASSICAL_ECDH_FALLBACK", "0") == "1"
+        if self._allow_ecdh_fallback:
+            logger.warning(ECDH_P256_WARNING)
         self._pqc_kem_preferred = get_env("SMARTCAR_V2X_PQC_KEM_PREFERRED", "Kyber512").strip() or "Kyber512"
         self._pqc_kem_candidates = [
             a.strip() for a in get_env("SMARTCAR_V2X_PQC_KEM_ALGS", "ML-KEM-512,Kyber512").split(",") if a.strip()
@@ -170,7 +175,7 @@ class DynamicCryptoAgilityLayer:
 
         self._ecdsa_priv = None
         self._ecdsa_pub_hex = ""
-        if CRYPTOGRAPHY_AVAILABLE:
+        if CRYPTOGRAPHY_AVAILABLE and self._allow_ecdh_fallback:
             try:
                 self._ecdsa_priv = ec.generate_private_key(ec.SECP256R1())
                 pub = self._ecdsa_priv.public_key().public_bytes(
@@ -217,11 +222,14 @@ class DynamicCryptoAgilityLayer:
     def handshake_hello_payload(self) -> Dict[str, Any]:
         payload: Dict[str, Any] = {
             "pqc_sig_alg": self._pqc_sig_alg,
-            "classic_sig_alg": "ECDSA_SECP256R1" if self._ecdsa_pub_hex else "NONE",
-            "ecdh_pubkey": self._ecdsa_pub_hex,
+            "classic_sig_alg": "ECDSA_SECP256R1" if self._allow_ecdh_fallback and self._ecdsa_pub_hex else "NONE",
+            "ecdh_fallback": "enabled_classical" if self._allow_ecdh_fallback else "disabled_by_default",
             "preferred_kem_alg": self._pqc_kem_preferred,
             "kem_candidates": list(self._pqc_kem_candidates),
+            "security_capabilities": security_capability_output(self._allow_ecdh_fallback),
         }
+        if self._allow_ecdh_fallback and self._ecdsa_pub_hex:
+            payload["ecdh_pubkey"] = self._ecdsa_pub_hex
         if self._kem_alg and self._kem_pub_hex:
             payload["kem_alg"] = self._kem_alg
             payload["kem_pubkey"] = self._kem_pub_hex
@@ -247,7 +255,7 @@ class DynamicCryptoAgilityLayer:
                     return hs
             except Exception:
                 pass
-        if CRYPTOGRAPHY_AVAILABLE and self._ecdsa_priv:
+        if self._allow_ecdh_fallback and CRYPTOGRAPHY_AVAILABLE and self._ecdsa_priv:
             try:
                 peer_ecdh_hex = str(hello_payload.get("ecdh_pubkey", "")).strip()
                 if peer_ecdh_hex:
@@ -291,7 +299,7 @@ class DynamicCryptoAgilityLayer:
             except Exception:
                 return False
         if hs_mode == self.HS_ECDH:
-            if not (CRYPTOGRAPHY_AVAILABLE and self._ecdsa_priv):
+            if not (self._allow_ecdh_fallback and CRYPTOGRAPHY_AVAILABLE and self._ecdsa_priv):
                 return False
             try:
                 peer_ecdh_hex = str(ack_payload.get("ecdh_pubkey", "")).strip()
@@ -784,7 +792,13 @@ class V2XNode:
                 sender_type=self.node_type,
                 payload={
                     "node_version": "1.0",
-                    "crypto_capabilities": ["SHA3", "DILITHIUM", "ECDSA", "ECDH", "PQC_KEM"],
+                    "crypto_capabilities": [
+                        "SHA3",
+                        "DILITHIUM",
+                        "ECDSA",
+                        "PQC_KEM",
+                        "ECDH_DISABLED_BY_DEFAULT",
+                    ],
                     "selected_crypto_mode": self.crypto_layer.mode,
                     **self.crypto_layer.handshake_hello_payload(),
                 },

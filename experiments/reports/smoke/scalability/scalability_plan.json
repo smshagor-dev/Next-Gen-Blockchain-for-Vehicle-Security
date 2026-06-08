@@ -1,0 +1,101 @@
+{
+  "created_at": "2026-06-05T13:46:53.759989+00:00",
+  "experiment": "scalability",
+  "metrics": "latency,throughput,message_volume,cpu,ram,consensus_duration",
+  "node_counts": "10,50,100,500,1000,5000,10000",
+  "rows": [
+    {
+      "consensus": "simple_majority",
+      "consensus_duration_ms": "TODO: instrument consensus round",
+      "cpu_percent": "TODO: collect host metrics",
+      "latency_ms": "TODO: run distributed benchmark",
+      "message_volume_count": "TODO: instrument network transport",
+      "nodes": 10,
+      "ram_mb": "TODO: collect host metrics",
+      "seed": 0,
+      "status": "TODO_DATASET_OR_DEPLOYMENT_REQUIRED",
+      "throughput_msgs_per_sec": "TODO: run distributed benchmark",
+      "topology": "TODO_DEPLOYMENT_TOPOLOGY"
+    },
+    {
+      "consensus": "simple_majority",
+      "consensus_duration_ms": "TODO: instrument consensus round",
+      "cpu_percent": "TODO: collect host metrics",
+      "latency_ms": "TODO: run distributed benchmark",
+      "message_volume_count": "TODO: instrument network transport",
+      "nodes": 50,
+      "ram_mb": "TODO: collect host metrics",
+      "seed": 0,
+      "status": "TODO_DATASET_OR_DEPLOYMENT_REQUIRED",
+      "throughput_msgs_per_sec": "TODO: run distributed benchmark",
+      "topology": "TODO_DEPLOYMENT_TOPOLOGY"
+    },
+    {
+      "consensus": "simple_majority",
+      "consensus_duration_ms": "TODO: instrument consensus round",
+      "cpu_percent": "TODO: collect host metrics",
+      "latency_ms": "TODO: run distributed benchmark",
+      "message_volume_count": "TODO: instrument network transport",
+      "nodes": 100,
+      "ram_mb": "TODO: collect host metrics",
+      "seed": 0,
+      "status": "TODO_DATASET_OR_DEPLOYMENT_REQUIRED",
+      "throughput_msgs_per_sec": "TODO: run distributed benchmark",
+      "topology": "TODO_DEPLOYMENT_TOPOLOGY"
+    },
+    {
+      "consensus": "simple_majority",
+      "consensus_duration_ms": "TODO: instrument consensus round",
+      "cpu_percent": "TODO: collect host metrics",
+      "latency_ms": "TODO: run distributed benchmark",
+      "message_volume_count": "TODO: instrument network transport",
+      "nodes": 500,
+      "ram_mb": "TODO: collect host metrics",
+      "seed": 0,
+      "status": "TODO_DATASET_OR_DEPLOYMENT_REQUIRED",
+      "throughput_msgs_per_sec": "TODO: run distributed benchmark",
+      "topology": "TODO_DEPLOYMENT_TOPOLOGY"
+    },
+    {
+      "consensus": "simple_majority",
+      "consensus_duration_ms": "TODO: instrument consensus round",
+      "cpu_percent": "TODO: collect host metrics",
+      "latency_ms": "TODO: run distributed benchmark",
+      "message_volume_count": "TODO: instrument network transport",
+      "nodes": 1000,
+      "ram_mb": "TODO: collect host metrics",
+      "seed": 0,
+      "status": "TODO_DATASET_OR_DEPLOYMENT_REQUIRED",
+      "throughput_msgs_per_sec": "TODO: run distributed benchmark",
+      "topology": "TODO_DEPLOYMENT_TOPOLOGY"
+    },
+    {
+      "consensus": "simple_majority",
+      "consensus_duration_ms": "TODO: instrument consensus round",
+      "cpu_percent": "TODO: collect host metrics",
+      "latency_ms": "TODO: run distributed benchmark",
+      "message_volume_count": "TODO: instrument network transport",
+      "nodes": 5000,
+      "ram_mb": "TODO: collect host metrics",
+      "seed": 0,
+      "status": "TODO_DATASET_OR_DEPLOYMENT_REQUIRED",
+      "throughput_msgs_per_sec": "TODO: run distributed benchmark",
+      "topology": "TODO_DEPLOYMENT_TOPOLOGY"
+    },
+    {
+      "consensus": "simple_majority",
+      "consensus_duration_ms": "TODO: instrument consensus round",
+      "cpu_percent": "TODO: collect host metrics",
+      "latency_ms": "TODO: run distributed benchmark",
+      "message_volume_count": "TODO: instrument network transport",
+      "nodes": 10000,
+      "ram_mb": "TODO: collect host metrics",
+      "seed": 0,
+      "status": "TODO_DATASET_OR_DEPLOYMENT_REQUIRED",
+      "throughput_msgs_per_sec": "TODO: run distributed benchmark",
+      "topology": "TODO_DEPLOYMENT_TOPOLOGY"
+    }
+  ],
+  "seed": 0,
+  "status": "framework_only_no_benchmark_results"
+}

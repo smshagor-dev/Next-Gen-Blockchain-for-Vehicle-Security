@@ -1,0 +1,2 @@
+scope,attack_type,tp,fp,tn,fn,precision,recall,specificity,f1,accuracy,false_positive_rate,false_negative_rate,sample_count,measured_runtime_benchmark,dataset_required,statistical_significance
+schema_example,TODO_ATTACK_TYPE,,,,,,,,,,,,,False,True,False

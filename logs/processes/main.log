@@ -115,3 +115,210 @@
 2026-02-26 11:51:17,140 WARNING [SmartCarBlockchain] Block 45 speed-limit violation marker accepted (speed=157.64 limit=120)
 2026-02-26 11:51:22,136 WARNING [SmartCarBlockchain] Block 46 speed-limit violation marker accepted (speed=157.93 limit=120)
 2026-02-26 11:51:22,260 INFO [SmartCarBlockchain] Blockchain saved encrypted: 47 blocks -> logs/blockchain_gui.json [cipher=AES-256-GCM]
+2026-03-06 21:43:18,076 INFO [SmartCar] Process log ready: C:\Users\Shahanur Islam\OneDrive\Desktop\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\main.log
+2026-03-06 21:43:30,006 INFO [SmartCarBlockchain] Genesis block: 58700070a365558691080611ff39df42...
+2026-03-06 21:43:30,008 INFO [SmartCarBlockchain] SmartCar Blockchain initialized for vehicle: SMARTCAR_VIN_2024_BD_XYZ789 | consensus=POA_POP | validator=authority_node_1 | edge_enabled=True | storage_encryption=True
+2026-03-06 21:44:16,200 INFO [SmartCarBlockchain] Authentication SUCCESS - car unlocked
+2026-03-06 21:44:45,647 INFO [SmartCarBlockchain] Blockchain saved encrypted: 31 blocks -> logs/blockchain_gui.json [cipher=AES-256-GCM]
+2026-03-21 14:41:32,401 INFO [SmartCar] Process log ready: C:\Users\Shagor\OneDrive\Desktop\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\main.log
+2026-03-21 14:41:32,686 INFO [SmartCarBlockchain] Genesis block: bfe1747ef11103a3f3b775417a168467...
+2026-03-21 14:41:32,689 INFO [SmartCarBlockchain] SmartCar Blockchain initialized for vehicle: SMARTCAR_VIN_2024_BD_XYZ789 | consensus=POA_POP | validator=authority_node_1 | edge_enabled=True | storage_encryption=True
+2026-03-21 14:42:12,863 INFO [SmartCarBlockchain] Authentication SUCCESS - car unlocked
+2026-03-21 14:42:23,732 INFO [SmartCarBlockchain] Engine STARTED
+2026-03-21 14:43:05,589 INFO [SmartCarBlockchain] Blockchain saved encrypted: 30 blocks -> logs/blockchain_gui.json [cipher=AES-256-GCM]
+2026-03-29 17:20:01,003 INFO [SmartCar] Process log ready: C:\Users\Shagor\OneDrive\Desktop\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\main.log
+2026-03-29 17:20:02,532 INFO [SmartCarBlockchain] Genesis block: 131a26f7e40dab0edd7b728081e9a902...
+2026-03-29 17:20:02,534 INFO [SmartCarBlockchain] SmartCar Blockchain initialized for vehicle: SMARTCAR_VIN_2024_BD_XYZ789 | consensus=POA_POP | validator=authority_node_1 | edge_enabled=True | storage_encryption=True
+2026-03-29 17:21:47,301 INFO [SmartCarBlockchain] Blockchain saved encrypted: 33 blocks -> logs/blockchain_gui.json [cipher=AES-256-GCM]
+2026-03-29 17:21:50,169 INFO [SmartCar] Process log ready: C:\Users\Shagor\OneDrive\Desktop\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\main.log
+2026-03-29 17:21:50,472 INFO [SmartCarBlockchain] Genesis block: f1b350a9161c101b7baebd8e6f2b2937...
+2026-03-29 17:21:50,474 INFO [SmartCarBlockchain] SmartCar Blockchain initialized for vehicle: SMARTCAR_VIN_2024_BD_XYZ789 | consensus=POA_POP | validator=authority_node_1 | edge_enabled=True | storage_encryption=True
+2026-03-29 17:22:07,596 INFO [SmartCarBlockchain] Blockchain saved encrypted: 8 blocks -> logs/blockchain_gui.json [cipher=AES-256-GCM]
+2026-03-29 17:24:19,129 INFO [SmartCar] Process log ready: C:\Users\Shagor\OneDrive\Desktop\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\main.log
+2026-03-29 17:24:19,422 INFO [SmartCarBlockchain] Genesis block: 6ce4ba261150471087563c1fdb24b84f...
+2026-03-29 17:24:19,424 INFO [SmartCarBlockchain] SmartCar Blockchain initialized for vehicle: SMARTCAR_VIN_2024_BD_XYZ789 | consensus=POA_POP | validator=authority_node_1 | edge_enabled=True | storage_encryption=True
+2026-03-29 17:26:36,567 INFO [SmartCarBlockchain] Authentication SUCCESS - car unlocked
+2026-03-29 17:26:53,784 INFO [SmartCarBlockchain] Engine STARTED
+2026-03-29 17:36:08,831 INFO [SmartCarBlockchain] Blockchain saved encrypted: 99 blocks -> logs/blockchain_gui.json [cipher=AES-256-GCM]
+2026-06-04 20:17:56,908 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\main.log
+2026-06-04 20:17:57,499 INFO [SmartCarBlockchain] Genesis block: 114ba076ff51eae913b3e485e49890b8...
+2026-06-04 20:17:57,500 INFO [SmartCarBlockchain] SmartCar Blockchain initialized for vehicle: SMARTCAR_VIN_2024_BD_XYZ789 | consensus=POA_POP | validator=authority_node_1 | edge_enabled=True | storage_encryption=True
+2026-06-04 20:18:05,516 INFO [SmartCarBlockchain] Blockchain saved encrypted: 4 blocks -> logs/blockchain_gui.json [cipher=AES-256-GCM]
+2026-06-04 21:51:13,378 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\main.log
+2026-06-05 14:39:27,640 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\main.log
+Exception in Tkinter callback
+Traceback (most recent call last):
+  File "C:\Python314\Lib\tkinter\__init__.py", line 2093, in __call__
+    return self.func(*args)
+           ~~~~~~~~~^^^^^^^
+  File "E:\Final Project\Smart Car - Blockchain for Vehicle Security\dashboard.py", line 756, in _do_start
+    result = self.blockchain.start_engine()
+  File "E:\Final Project\Smart Car - Blockchain for Vehicle Security\smartcar_backend.py", line 178, in start_engine
+    result = self._post("/engine/start")
+  File "E:\Final Project\Smart Car - Blockchain for Vehicle Security\smartcar_backend.py", line 142, in _post
+    return self._request("POST", path, payload or {})
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\Final Project\Smart Car - Blockchain for Vehicle Security\smartcar_backend.py", line 131, in _request
+    with urllib.request.urlopen(req, timeout=2.5) as resp:
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\urllib\request.py", line 187, in urlopen
+    return opener.open(url, data, timeout)
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\urllib\request.py", line 487, in open
+    response = self._open(req, data)
+  File "C:\Python314\Lib\urllib\request.py", line 504, in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+                              '_open', req)
+  File "C:\Python314\Lib\urllib\request.py", line 464, in _call_chain
+    result = func(*args)
+  File "C:\Python314\Lib\urllib\request.py", line 1350, in http_open
+    return self.do_open(http.client.HTTPConnection, req)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\urllib\request.py", line 1325, in do_open
+    r = h.getresponse()
+  File "C:\Python314\Lib\http\client.py", line 1459, in getresponse
+    response.begin()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Python314\Lib\http\client.py", line 336, in begin
+    version, status, reason = self._read_status()
+                              ~~~~~~~~~~~~~~~~~^^
+  File "C:\Python314\Lib\http\client.py", line 297, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+               ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\socket.py", line 729, in readinto
+    return self._sock.recv_into(b)
+           ~~~~~~~~~~~~~~~~~~~~^^^
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+2026-06-05 16:41:01,398 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\main.log
+2026-06-05 16:43:13,354 ERROR [SmartCarDashboard] Failed to save blockchain on close: [WinError 10054] An existing connection was forcibly closed by the remote host
+Traceback (most recent call last):
+  File "E:\Final Project\Smart Car - Blockchain for Vehicle Security\dashboard.py", line 1513, in on_closing
+    self.blockchain.save()
+    ~~~~~~~~~~~~~~~~~~~~^^
+  File "E:\Final Project\Smart Car - Blockchain for Vehicle Security\smartcar_backend.py", line 238, in save
+    return self._post("/save")
+           ~~~~~~~~~~^^^^^^^^^
+  File "E:\Final Project\Smart Car - Blockchain for Vehicle Security\smartcar_backend.py", line 165, in _post
+    return self._request("POST", path, payload or {})
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\Final Project\Smart Car - Blockchain for Vehicle Security\smartcar_backend.py", line 154, in _request
+    with urllib.request.urlopen(req, timeout=2.5) as resp:
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\urllib\request.py", line 187, in urlopen
+    return opener.open(url, data, timeout)
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\urllib\request.py", line 487, in open
+    response = self._open(req, data)
+  File "C:\Python314\Lib\urllib\request.py", line 504, in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+                              '_open', req)
+  File "C:\Python314\Lib\urllib\request.py", line 464, in _call_chain
+    result = func(*args)
+  File "C:\Python314\Lib\urllib\request.py", line 1350, in http_open
+    return self.do_open(http.client.HTTPConnection, req)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\urllib\request.py", line 1325, in do_open
+    r = h.getresponse()
+  File "C:\Python314\Lib\http\client.py", line 1459, in getresponse
+    response.begin()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Python314\Lib\http\client.py", line 336, in begin
+    version, status, reason = self._read_status()
+                              ~~~~~~~~~~~~~~~~~^^
+  File "C:\Python314\Lib\http\client.py", line 297, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+               ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\socket.py", line 729, in readinto
+    return self._sock.recv_into(b)
+           ~~~~~~~~~~~~~~~~~~~~^^^
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+2026-06-05 17:36:35,231 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\main.log
+Exception in Tkinter callback
+Traceback (most recent call last):
+  File "C:\Python314\Lib\tkinter\__init__.py", line 2093, in __call__
+    return self.func(*args)
+           ~~~~~~~~~^^^^^^^
+  File "E:\Final Project\Smart Car - Blockchain for Vehicle Security\dashboard.py", line 796, in _do_start
+    result = self.blockchain.start_engine()
+  File "E:\Final Project\Smart Car - Blockchain for Vehicle Security\smartcar_backend.py", line 205, in start_engine
+    result = self._post("/engine/start")
+  File "E:\Final Project\Smart Car - Blockchain for Vehicle Security\smartcar_backend.py", line 165, in _post
+    return self._request("POST", path, payload or {})
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\Final Project\Smart Car - Blockchain for Vehicle Security\smartcar_backend.py", line 154, in _request
+    with urllib.request.urlopen(req, timeout=2.5) as resp:
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\urllib\request.py", line 187, in urlopen
+    return opener.open(url, data, timeout)
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\urllib\request.py", line 487, in open
+    response = self._open(req, data)
+  File "C:\Python314\Lib\urllib\request.py", line 504, in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+                              '_open', req)
+  File "C:\Python314\Lib\urllib\request.py", line 464, in _call_chain
+    result = func(*args)
+  File "C:\Python314\Lib\urllib\request.py", line 1350, in http_open
+    return self.do_open(http.client.HTTPConnection, req)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\urllib\request.py", line 1325, in do_open
+    r = h.getresponse()
+  File "C:\Python314\Lib\http\client.py", line 1459, in getresponse
+    response.begin()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Python314\Lib\http\client.py", line 336, in begin
+    version, status, reason = self._read_status()
+                              ~~~~~~~~~~~~~~~~~^^
+  File "C:\Python314\Lib\http\client.py", line 297, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+               ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\socket.py", line 729, in readinto
+    return self._sock.recv_into(b)
+           ~~~~~~~~~~~~~~~~~~~~^^^
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+2026-06-05 17:42:39,843 ERROR [SmartCarDashboard] Failed to save blockchain on close: [WinError 10054] An existing connection was forcibly closed by the remote host
+Traceback (most recent call last):
+  File "E:\Final Project\Smart Car - Blockchain for Vehicle Security\dashboard.py", line 1513, in on_closing
+    self.blockchain.save()
+    ~~~~~~~~~~~~~~~~~~~~^^
+  File "E:\Final Project\Smart Car - Blockchain for Vehicle Security\smartcar_backend.py", line 238, in save
+    return self._post("/save")
+           ~~~~~~~~~~^^^^^^^^^
+  File "E:\Final Project\Smart Car - Blockchain for Vehicle Security\smartcar_backend.py", line 165, in _post
+    return self._request("POST", path, payload or {})
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\Final Project\Smart Car - Blockchain for Vehicle Security\smartcar_backend.py", line 154, in _request
+    with urllib.request.urlopen(req, timeout=2.5) as resp:
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\urllib\request.py", line 187, in urlopen
+    return opener.open(url, data, timeout)
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\urllib\request.py", line 487, in open
+    response = self._open(req, data)
+  File "C:\Python314\Lib\urllib\request.py", line 504, in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+                              '_open', req)
+  File "C:\Python314\Lib\urllib\request.py", line 464, in _call_chain
+    result = func(*args)
+  File "C:\Python314\Lib\urllib\request.py", line 1350, in http_open
+    return self.do_open(http.client.HTTPConnection, req)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\urllib\request.py", line 1325, in do_open
+    r = h.getresponse()
+  File "C:\Python314\Lib\http\client.py", line 1459, in getresponse
+    response.begin()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Python314\Lib\http\client.py", line 336, in begin
+    version, status, reason = self._read_status()
+                              ~~~~~~~~~~~~~~~~~^^
+  File "C:\Python314\Lib\http\client.py", line 297, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+               ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\socket.py", line 729, in readinto
+    return self._sock.recv_into(b)
+           ~~~~~~~~~~~~~~~~~~~~^^^
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+2026-06-06 10:15:49,901 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\main.log
+2026-06-06 10:24:09,533 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\main.log
+2026-06-06 10:26:15,842 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\main.log
+2026-06-06 10:34:02,785 INFO [SmartCar] Process log ready: E:\Final Project\Smart Car - Blockchain for Vehicle Security\logs\processes\main.log

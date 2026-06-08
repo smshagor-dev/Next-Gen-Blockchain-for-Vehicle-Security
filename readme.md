@@ -10,10 +10,14 @@
 ## Project Overview
 This is a modern security framework designed to protect smart and autonomous vehicle data against present-day cyber threats and future quantum-era risks. The platform uses Zero-Knowledge Proofs to preserve privacy, decentralized identity for trust without a central authority, and federated learning to improve AI behavior without exposing raw personal data.
 
-1. Decentralized Identity (DID). File: `did_identity.py`. Core functions/classes: `DIDIdentity.generate`, `DIDIdentity.sign_challenge`, `verify_did_proof`. It creates a vehicle-specific decentralized digital passport and verifies identity through Lamport one-time hash signatures, providing strong post-quantum-friendly identity assurance.
+This prototype is positioned as an engineering integration and validation-transparency framework rather than a new cryptographic primitive. OmniGuard V2X does not introduce new cryptographic primitives; its contribution is a prototype system architecture that integrates post-quantum key establishment metadata using the ML-KEM/Kyber path, classical privacy commitments with explicit assumption labeling, Lamport-based identity authenticity, simple-majority blockchain audit logging with documented majority limitations, prototype FL poisoning sanity checks, and GUI/API security capability reporting.
+
+The prototype has component-dependent complexity. Several local operations are `O(1)` or `O(n)`, but naive full-mesh communication and all-validator broadcast can produce `O(n^2)` network message volume. See `docs/complexity-analysis.md` for the component-level table and scalability boundary.
+
+1. Decentralized Identity (DID). File: `did_identity.py`. Core functions/classes: `DIDIdentity.generate`, `DIDIdentity.sign_challenge`, `verify_did_proof`. It creates a vehicle-specific decentralized digital passport and verifies identity through Lamport one-time hash signatures, providing cryptographic identity authenticity. It does not provide Sybil resistance under open registration.
 2. Zero-Knowledge Privacy (ZKP). File: `zkp_privacy.py`. Core functions: `create_speed_limit_proof`, `verify_speed_limit_proof`, `create_location_ownership_proof`, `verify_location_ownership_proof`. It proves compliance (like speed-limit adherence) without revealing exact sensitive values such as true speed or exact location.
-3. Dual-Hash Blockchain Integrity. Files: `blockchain.py`, `blockchain.cpp`. Core functions: `dual_hash`, `compute_block_hash`. It secures each block with SHA2 and SHA3 paths so integrity remains resilient even if one hash family weakens in the future.
-4. Federated Learning and AI Security. Files: `federated_learning.py`, `fl_trainer_node.py`. Core functions/classes: `FederatedObstacleLearner.maybe_create_local_update`, `FederatedTrainer.aggregate_updates`, `_mad_filter`, `_robust_weighted_trimmed_mean`. Vehicles train locally, share only protected model deltas, and reject poisoned updates through robust outlier filtering.
+3. Dual-Hash Blockchain Integrity. Files: `blockchain.py`, `blockchain.cpp`. Core functions: `dual_hash`, `compute_block_hash`. It records SHA2 and SHA3 paths for audit integrity and retroactive tamper evidence. Majority-control limitation: under simple-majority consensus, validators controlling quorum can approve syntactically valid malicious blocks. Dual hash chaining provides tamper evidence for historical modification but does not prevent forward majority control.
+4. Federated Learning and AI Security. Files: `federated_learning.py`, `fl_trainer_node.py`. Core functions/classes: `FederatedObstacleLearner.maybe_create_local_update`, `FederatedTrainer.aggregate_updates`, `_mad_filter`, `_robust_weighted_trimmed_mean`. Vehicles train locally and share only protected model deltas. Current poisoning validation is a prototype-level FL poisoning detection sanity check using a limited three-peer demonstration, not statistically sufficient for Byzantine-robustness claims.
 5. Encrypted Forensic Blackbox. Files: `edge_layer.py`, `blockchain.py`. Core functions/classes: `EdgeTelemetryLayer.record_forensic_sample`, `EdgeTelemetryLayer.build_forensic_block`, `ForensicBlackboxLogger.create_locked_package`. On impact or attack signals, the system preserves a rolling raw timeline as encrypted forensic evidence for authorized investigators.
 6. Real-Time Anomaly Detection. File: `anomaly_detector.py`. Core functions/classes: `LightweightAnomalyDetector.detect_telemetry`, `LightweightAnomalyDetector.detect_security_event`, `_mean_std`. It continuously scores abnormal behavior (sensor spikes, auth anomalies, integrity threats) with lightweight statistics suitable for edge hardware.
 7. Smart Contract Automation. File: `smart_contracts.py`. Core functions/classes: `DynamicSmartContractEngine.evaluate_and_invoke`, `_insurance_rule`, `_toll_rule`, `_maintenance_rule`, `_biometric_safety_rule`. It auto-executes policy workflows (insurance/toll/safety actions) from trusted blockchain event context.
@@ -30,6 +34,7 @@ This is a modern security framework designed to protect smart and autonomous veh
 - Why: A centralized identity server is a single point of failure for fleet trust.
 - How it works: The vehicle publishes a DID document, signs challenge bits with one-time hash keys, and peers verify signature-hash pairs.
 - Practical value: Reduces identity spoofing and strengthens V2X trust bootstrap.
+- Sybil boundary: Lamport DID provides cryptographic identity authenticity, not Sybil resistance. The default `OPEN_REGISTRATION` policy has no Sybil-resistance guarantee because unlimited identities may be created.
 - Stability now: high (lightweight, deterministic verification, and minimal external dependencies).
 - Future direction: key rotation registry, DID revocation list, multi-proof identity bundle.
 - Importance: critical; secure inter-vehicle trust cannot start without strong identity verification.
@@ -38,6 +43,7 @@ This is a modern security framework designed to protect smart and autonomous veh
 - What was done: Implemented `commit`, `prove_knowledge`, `verify_knowledge`, `create_speed_limit_proof`, and `verify_speed_limit_proof`.
 - Why: Exposing raw speed/location increases privacy and surveillance risk.
 - How it works: Commitment plus knowledge proofs allow compliance verification without revealing secret values.
+- Pedersen aggregation boundary: Pedersen commitments support additive homomorphism over committed values, but the aggregate remains hidden unless participants provide valid openings or a separate secure aggregation / zero-knowledge disclosure protocol is implemented. Default mode is `COMMIT_ONLY`, so aggregate statistics such as mean velocity are not recoverable from commitments alone.
 - Practical value: Enables regulation compliance while preserving user privacy.
 - Stability now: medium-high (practical and robust, but not a formally verified production range-proof system yet).
 - Future direction: Bulletproofs/zkSNARK integration, formally verified proof circuits.
@@ -48,16 +54,17 @@ This is a modern security framework designed to protect smart and autonomous veh
 - Why: Relying on only one hash family increases long-term cryptographic risk.
 - How it works: block payload canonical hash chaining + dual digest verification.
 - Practical value: Improves tamper detection and forensic confidence.
+- Consensus boundary: dual hash chaining does not provide protection from majority validator control, colluding validators with quorum, or valid but malicious future blocks.
 - Stability now: high (simple deterministic cryptographic primitive usage).
 - Future direction: domain-separated hash contexts, hardware-accelerated hashing.
 - Importance: critical; this is the foundation of ledger trust.
 
 ### 4. Federated Learning Security (`federated_learning.py`, `fl_trainer_node.py`)
-- What was done: local training + delta sharing + `_mad_filter` outlier defense + clipped updates.
+- What was done: local training + delta sharing + `_mad_filter` outlier screening + clipped updates.
 - Why: The system needs collective model improvement without sharing raw private driving data.
-- How it works: Each car computes local updates, the trainer performs robust aggregation, and extreme/poisoned deltas are rejected.
+- How it works: Each car computes local updates, the trainer performs small-scale aggregation with norm and MAD outlier screening. The current three-peer check can catch a trivial 100x weight-delta outlier but does not support broad poisoning-robustness or Byzantine-robustness claims.
 - Practical value: Improves fleet-wide AI safety without exposing personal data.
-- Stability now: medium (works well; model simplicity logistic baseline).
+- Stability now: prototype sanity check for FL validation; not statistically sufficient for Byzantine-robustness claims.
 - Future direction: secure aggregation, personalized FL, stronger poisoning defenses.
 - Importance: high; a key enabler for privacy-preserving intelligence scaling.
 
@@ -119,7 +126,7 @@ This is a modern security framework designed to protect smart and autonomous veh
 - What was done: local candidate verification + distributed vote/tally interfaces.
 - Why: Reduces risk of forged events and single-node authority abuse.
 - How it works: Peer nodes independently verify candidate blocks and majority outcomes determine acceptance.
-- Practical value: trust decentralization and anti-Sybil hardening (demo scope).
+- Practical value: trust decentralization for validated blocks. Sybil resistance is deployment-dependent and requires an external admission policy such as proof-of-stake, proof-of-work, certificate authorities, manufacturer registries, or transportation authority enrollment.
 - Stability now: medium (demo-grade orchestration, core logic clear).
 - Future direction: production BFT voting and weighted trust scoring.
 - Importance: medium-high for decentralized resilience.
@@ -128,6 +135,7 @@ This is a modern security framework designed to protect smart and autonomous veh
 - What was done: zkp latency logging, overhead profiling and reports.
 - Why: Security features must prove timing feasibility for real-time operation.
 - How it works: Operation-level latency is logged and payload overhead is measured and compared.
+- Metric source of truth: `docs/metrics-source-of-truth.md`; current active latency wording is `5.34 ms warm-start prototype pipeline latency`.
 - Practical value: optimization decisions, publication/report quality evidence.
 - Stability now: high (simple instrumentation pipeline).
 - Future direction: end-to-end distributed tracing, percentile SLA dashboard.
@@ -143,29 +151,37 @@ This is a modern security framework designed to protect smart and autonomous veh
 - Importance: critical baseline and foundation layer for secure system operation.
 
 ## 2. Project Layers
-1. Presentation Layer
-- `main.py`, `dashboard.py`
-- Live UI, camera detection, speed/radar/map, chain feed, control panel.
+OmniGuard V2X is described as six implemented prototype layers:
 
-2. Application Layer
-- `blockchain.py`, `smart_contracts.py`, `edge_layer.py`, `anomaly_detector.py`, `did_identity.py`
-- Chain logic, contracts, edge summarization, anomaly scoring, DID verification.
-
-3. Network Layer
-- `sync_protocol.py`, `v2x_protocol.py`, `v2x_demo_nodes.py`, `multi_car_majority_demo.py`
-- Sync packets, V2V/V2I message flow, majority validation demos.
-
-4. Privacy and Crypto Layer
-- `zkp_privacy.py`
-- Commitment-based proofs for speed and location ownership privacy.
-
-5. Hardware and Edge Integration Layer
+1. L1 Vehicle sensing/input validation
 - `hardware_bridge.py`, `pi_sensor_node.py`, `SmartCarSensorNode.ino`, `camera_emergency_brake.cpp`, `vehicle_sensors.py`
-- Sensor fusion, emergency braking path, ECU bridge.
+- Sensor fusion, camera/object input, emergency-brake signals, biometric input, and basic telemetry validation.
 
-6. Observability and Analytics Layer
-- `perf_metrics.py`, `zkp_latency_report.py`, `network_overhead_analysis.py`, `logs/`
-- ZKP latency logs, overhead reports, runtime forensic artifacts.
+2. L2 Cryptographic session/key establishment
+- `sync_protocol.py`, `v2x_protocol.py`, `v2x_demo_nodes.py`
+- V2X messages, authenticated envelopes, session-secret establishment, and dynamic crypto-agility controls.
+
+3. L3 Privacy/commitment layer
+- `zkp_privacy.py`, `did_identity.py`
+- Pedersen-style commitments, Schnorr-style proof checks, and decentralized identity authenticity checks.
+
+4. L3.5 Federated learning sanity-check layer
+- `federated_learning.py`, `fl_trainer_node.py`, `decentralized_fl_demo.py`
+- Local model updates and prototype-level FL poisoning detection sanity checks. Current validation is not statistically sufficient for Byzantine-robustness claims.
+
+5. L4 Blockchain audit layer
+- `blockchain.py`, `blockchain.cpp`, `smart_contracts.py`, `edge_layer.py`, `anomaly_detector.py`
+- Dual-hash audit records, chain events, edge summaries, anomaly scoring, forensic blackbox records, and policy receipts.
+
+6. L5 API/dashboard monitoring layer
+- `main.py`, `dashboard.py`, `smartcar_backend.py`, `api/go/main.go`, `perf_metrics.py`, `zkp_latency_report.py`, `network_overhead_analysis.py`
+- Operator UI, API status surfaces, metrics reporting, and runtime monitoring.
+
+## Reviewer-Driven Corrections
+
+The project has been revised to remove overstated claims and document limitations. These corrections improve scientific validity but do not replace the need for larger-scale experiments. The current paper claim status is `corrected_but_requires_new_experiments`.
+
+The reviewer audit trail is maintained in `docs/reviewer-issue-resolution-matrix.md`. It records corrections for post-quantum security boundaries, Sybil resistance, majority-attack limits, FL validation, adversarial detection, layer count, latency, novelty, complexity, and Pedersen aggregate-statistics claims.
 
 ## Structure
 
@@ -213,38 +229,36 @@ Smart Car - Blockchain for Vehicle Security/
 
 ```mermaid
 flowchart BT
-    L5["Layer 5: Application & Smart Contracts
-    - Insurance & Toll Contracts
-    - Biometric Safe Mode
-    - Security Dashboard
-    - FL Global Trainer"]
+    L5["L5 API/dashboard monitoring layer
+    - UI/API status
+    - Metrics reporting
+    - Runtime monitoring"]
 
-    L4["Layer 4: Consensus & Sync
-    - Majority Vote
-    - PoA Validation
-    - HMAC Secure Protocol
-    - ML-KEM PQC Handshake"]
+    L4["L4 Blockchain audit layer
+    - Dual-hash audit records
+    - Chain events
+    - Forensic records"]
 
-    L3["Layer 3: Blockchain & Privacy
-    - Dual-Hash Chain (SHA2 + SHA3)
-    - Lamport DID
-    - Pedersen ZKP
-    - Anomaly Detection
-    - Encrypted Forensic Commit"]
+    L35["L3.5 Federated learning sanity-check layer
+    - Local updates
+    - Prototype poisoning sanity checks"]
 
-    L2["Layer 2: Edge Intelligence
-    - Telemetry Aggregation
-    - Rolling Forensic Buffer
-    - Local FL Update"]
+    L3["L3 Privacy/commitment layer
+    - Pedersen commitments
+    - Schnorr-style checks
+    - DID authenticity"]
 
-    L1["Layer 1: Hardware Sensors
-    - Arduino
-    - Raspberry Pi
-    - Camera & GPS
-    - Heart Rate
-    - CAN Bus"]
+    L2["L2 Cryptographic session/key establishment
+    - V2X envelopes
+    - Session secrets
+    - Crypto agility"]
 
-    L1 --> L2 --> L3 --> L4 --> L5
+    L1["L1 Vehicle sensing/input validation
+    - Sensors
+    - Camera input
+    - Telemetry validation"]
+
+    L1 --> L2 --> L3 --> L35 --> L4 --> L5
 ```
 ## 4. Production-Oriented ZKP Parameters
 
@@ -260,8 +274,9 @@ ch&=H(commitment\parallel t\parallel context)\bmod Q
 \end{aligned}
 ```
 
-- First formula creates the Pedersen-style commitment used to hide sensitive value.
+- First formula creates the Pedersen-style commitment used to hide sensitive value. Pedersen hiding is information-theoretic, but binding relies on classical discrete-log/DDH assumptions and is not post-quantum secure.
 - Second formula creates Fiat-Shamir challenge for non-interactive knowledge proof verification.
+- The Schnorr-style knowledge/range proof soundness is a classical discrete-log assumption.
 
 ```mermaid
 flowchart TD
@@ -269,6 +284,8 @@ flowchart TD
     B --> C[Create Knowledge Proof]
     C --> D[Verify Proof]
 ```
+
+Majority-control limitation: under simple-majority consensus, validators controlling quorum can approve syntactically valid malicious blocks. Dual hash chaining provides tamper evidence for historical modification but does not prevent forward majority control.
 
 ## 5. Network Error Handling Hardening
 
@@ -293,12 +310,15 @@ flowchart TD
     D --> F[Retry Or Close]
 ```
 
-## 6. Quantum-Resistant V2V Handshake (Dynamic PQC)
+## 6. Hybrid V2V Handshake (Dynamic PQC)
 
 Crypto agility and handshake:
 - PQC KEM preferred (`ML-KEM` or `Kyber`)
-- Classical fallback (`ECDH + HKDF`)
+- Classical fallback (`ECDH-P256 + HKDF`) is disabled by default and is not post-quantum secure
 - Dynamic `SHA3` vs `DILITHIUM` mode switching
+- OmniGuard V2X uses ML-KEM/Kyber for post-quantum key establishment, while its Pedersen commitment binding and Schnorr-style proof soundness rely on classical discrete-log assumptions.
+- The current prototype provides hybrid security, not end-to-end post-quantum security.
+- Post-quantum protection is limited to the key-establishment path unless classical commitment/proof components are replaced.
 
 
 ```math
@@ -317,7 +337,7 @@ flowchart TD
     A[HELLO] --> B[Negotiate KEM]
     B --> C{PQC Available}
     C -->|Yes| D[PQC Session Secret]
-    C -->|No| E[ECDH Session Secret]
+    C -->|No, opt-in only| E[ECDH Session Secret - Classical]
     D --> F[Sign And Send]
     E --> F
     F --> G[Agility Score]
@@ -409,7 +429,11 @@ flowchart TD
 Training shape:
 - Local logistic training on each vehicle
 - Share only weight deltas
-- Robust aggregation + outlier defense + DP noise
+- Prototype aggregation + outlier screening + DP noise
+- Validation Level: Prototype sanity check
+- Byzantine Robustness Claim: Not supported by current test
+- Dataset Size: 24 test samples
+- Trial Count: 1
 
 
 ```math
@@ -426,7 +450,7 @@ Training shape:
 
 - First formula is logistic prediction used by local obstacle-risk model.
 - Second formula is SGD update rule for local training.
-- Third formula is norm clipping to defend against poisoned/extreme client updates.
+- Third formula is norm clipping for limiting extreme client updates. Current validation covers only a small sanity check and does not prove Byzantine robustness.
 
 ```mermaid
 flowchart TD
@@ -1159,7 +1183,7 @@ OmniGuard V2X is a full-stack smart-vehicle security platform where telemetry en
 
 On top of core chain integrity, the platform adds forensic blackbox packaging for incident response, biometric risk-aware safe-mode enforcement, DID-based identity checks, and dynamic smart-contract triggers for automated policy actions. In networked operation, nodes communicate through hardened sync and V2X channels that support dynamic cryptographic agility and post-quantum aware handshake paths.
 
-For long-term resilience, self-healing storage applies pruning, sharding, signed shard anchors, and checkpointed trust verification. In parallel, federated learning allows decentralized on-vehicle model improvement while sharing only clipped and protected updates, preserving privacy while improving cooperative safety.
+For long-term resilience, self-healing storage applies pruning, sharding, signed shard anchors, and checkpointed trust verification. In parallel, federated learning allows decentralized on-vehicle model improvement while sharing only clipped and protected updates. Its current validation remains a small-scale FL sanity check, not a fleet-scale robustness result.
 
 ## Run
 ```bash

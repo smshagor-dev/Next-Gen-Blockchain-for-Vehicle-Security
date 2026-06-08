@@ -61,6 +61,29 @@
 
 using json = nlohmann::json;
 
+// Security-mode model used by the prototype:
+// - PQ_HYBRID_AUTHENTICATION: ML-KEM/Kyber + Dilithium path when liboqs is available.
+// - CLASSICAL_PRIVACY_COMMITMENT: Pedersen/Schnorr-style proof components rely on
+//   classical discrete-log/DDH assumptions and are not post-quantum secure.
+// - LEGACY_ECDH_FALLBACK_DISABLED_BY_DEFAULT: this C++ blockchain demo has no
+//   ECDH-P256 fallback path; any legacy ECDH integration must be explicit opt-in.
+static constexpr const char* PQ_HYBRID_AUTHENTICATION = "PQ_HYBRID_AUTHENTICATION";
+static constexpr const char* CLASSICAL_PRIVACY_COMMITMENT = "CLASSICAL_PRIVACY_COMMITMENT";
+static constexpr const char* LEGACY_ECDH_FALLBACK_DISABLED_BY_DEFAULT = "LEGACY_ECDH_FALLBACK_DISABLED_BY_DEFAULT";
+
+struct ConsensusSecurityMetadata {
+    const char* consensus_model = "simple_majority";
+    bool majority_attack_resistant = false;
+    bool hash_collision_resistance = true;
+    bool retroactive_tamper_evidence = true;
+    bool protects_against_forward_majority_control = false;
+    const char* notes = "A voting majority can approve syntactically valid malicious blocks without finding hash collisions.";
+};
+
+static ConsensusSecurityMetadata consensusSecurityMetadata() {
+    return ConsensusSecurityMetadata{};
+}
+
 // ========== SHA-256 Implementation ==========
 class SHA256 {
 private:
@@ -233,7 +256,9 @@ const uint64_t SHA3_256::RC[24] = {
 };
 const int SHA3_256::ROT[24] = {1,62,28,27,36,44,6,55,20,3,10,43,25,39,41,45,15,21,8,18,2,61,56,14};
 
-// ========== Optional PQC Hybrid Layer (Dilithium + Kyber) ==========
+// ========== Optional PQC Hybrid Layer (Dilithium + ML-KEM/Kyber) ==========
+// ML-KEM/Kyber is the default key-establishment method when liboqs is present.
+// The simulated fallback is a development/testing stand-in, not a PQ security claim.
 static std::string bytesToHex(const uint8_t* data, size_t len) {
     std::ostringstream ss;
     for(size_t i = 0; i < len; ++i) {
@@ -887,6 +912,20 @@ public:
         std::cout << "Engine     : " << (engine_started ? "RUNNING" : "OFF") << std::endl;
         std::cout << "PQC Mode   : " << pqc_engine.getAlgorithm()
                   << " (" << (pqc_engine.isRealPQC() ? "liboqs" : "simulated") << ")" << std::endl;
+        std::cout << "Security   : Hybrid; ML-KEM/Kyber key establishment is post-quantum when real liboqs is active." << std::endl;
+        std::cout << "Assumptions: " << PQ_HYBRID_AUTHENTICATION << ", "
+                  << CLASSICAL_PRIVACY_COMMITMENT << ", "
+                  << LEGACY_ECDH_FALLBACK_DISABLED_BY_DEFAULT << std::endl;
+        std::cout << "Limit      : Pedersen binding/Schnorr soundness use classical discrete-log assumptions." << std::endl;
+        const auto consensus_meta = consensusSecurityMetadata();
+        std::cout << "Consensus  : " << consensus_meta.consensus_model << std::endl;
+        std::cout << "51% Resist : " << (consensus_meta.majority_attack_resistant ? "YES" : "NO") << std::endl;
+        std::cout << "Dual Hash  : tamper evidence="
+                  << (consensus_meta.retroactive_tamper_evidence ? "true" : "false")
+                  << ", forward majority control prevented="
+                  << (consensus_meta.protects_against_forward_majority_control ? "true" : "false")
+                  << std::endl;
+        std::cout << "Consensus Limit: " << consensus_meta.notes << std::endl;
         std::cout << "Chain Valid: " << (verifyChain() ? "YES" : "NO - TAMPERED!") << std::endl;
         std::cout << "Latest Hash: " << chain.back().block_hash.substr(0,32) << "..." << std::endl;
         std::cout << "==================================\n" << std::endl;

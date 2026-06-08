@@ -15,6 +15,19 @@ import (
 	"time"
 )
 
+const (
+	PQHybridAuthentication              = "PQ_HYBRID_AUTHENTICATION"
+	ClassicalPrivacyCommitment          = "CLASSICAL_PRIVACY_COMMITMENT"
+	LegacyECDHFallbackDisabledByDefault = "LEGACY_ECDH_FALLBACK_DISABLED_BY_DEFAULT"
+	hybridSecuritySummary               = "Hybrid security: post-quantum key establishment with classical commitment/proof components."
+	ecdhP256Warning                     = "WARNING: ECDH-P256 fallback is classical and not post-quantum secure."
+	openRegistration                    = "OPEN_REGISTRATION"
+	openRegistrationSybilWarning        = "No Sybil-resistance guarantee. Unlimited identities may be created."
+	consensusModelSimpleMajority        = "simple_majority"
+	majorityAttackNote                  = "A voting majority can approve syntactically valid malicious blocks without finding hash collisions."
+	prototypeFLWarning                  = "WARNING: This FL experiment is too small for Byzantine-robustness claims."
+)
+
 type TelemetryData struct {
 	Speed                 float64 `json:"speed"`
 	Acceleration          float64 `json:"acceleration"`
@@ -70,6 +83,157 @@ var state = &State{
 	AuthToken: "SECURE_AUTH_TOKEN_SHA3_2024",
 	Password:  "SmartCarSecretKey2024!@#",
 	ChainFile: "logs/blockchain_gui_go.json",
+}
+
+func ecdhFallbackEnabled() bool {
+	return os.Getenv("SMARTCAR_GO_ALLOW_CLASSICAL_ECDH_FALLBACK") == "1"
+}
+
+func securityCapabilityOutput() map[string]any {
+	fallback := "disabled_by_default/classical"
+	if ecdhFallbackEnabled() {
+		fallback = "enabled/classical"
+	}
+	return map[string]any{
+		"security_modes": []string{
+			PQHybridAuthentication,
+			ClassicalPrivacyCommitment,
+			LegacyECDHFallbackDisabledByDefault,
+		},
+		"summary":               hybridSecuritySummary,
+		"key_establishment":     "ML-KEM/Kyber - post-quantum",
+		"commitment_hiding":     "Pedersen - information-theoretic hiding",
+		"commitment_binding":    "Pedersen - classical discrete-log assumption",
+		"range_proof_soundness": "Schnorr/classical assumption",
+		"fallback_ecdh_p256":    fallback,
+	}
+}
+
+func identityAdmissionPolicy() string {
+	switch os.Getenv("SMARTCAR_IDENTITY_ADMISSION_POLICY") {
+	case "PROOF_OF_STAKE", "PROOF_OF_WORK", "CERTIFICATE_AUTHORITY", "VEHICLE_MANUFACTURER_REGISTRY", "TRANSPORT_AUTHORITY_REGISTRY":
+		return os.Getenv("SMARTCAR_IDENTITY_ADMISSION_POLICY")
+	default:
+		return openRegistration
+	}
+}
+
+func identitySecurityOutput() map[string]any {
+	policy := identityAdmissionPolicy()
+	sybilResistance := policy != openRegistration
+	out := map[string]any{
+		"identity_authenticity":     true,
+		"sybil_resistance":          sybilResistance,
+		"identity_admission_policy": policy,
+		"identity_authenticity_model": map[string]bool{
+			"secret_key_ownership": true,
+			"valid_signatures":     true,
+			"non_repudiation":      true,
+		},
+	}
+	if sybilResistance {
+		out["sybil_resistance_model"] = "Identity creation is limited by an external admission policy."
+	} else {
+		out["sybil_resistance_model"] = openRegistrationSybilWarning
+		out["warning"] = openRegistrationSybilWarning
+	}
+	return out
+}
+
+func consensusSecurityOutput() map[string]any {
+	return map[string]any{
+		"consensus_model":                           consensusModelSimpleMajority,
+		"majority_attack_resistant":                 false,
+		"dual_hash_chaining":                        true,
+		"hash_collision_resistance":                 true,
+		"retroactive_tamper_evidence":               true,
+		"protects_against_forward_majority_control": false,
+		"notes": majorityAttackNote,
+	}
+}
+
+func flValidationOutput() map[string]any {
+	return map[string]any{
+		"fl_validation_level":                 "prototype_sanity_check",
+		"num_peers":                           3,
+		"samples_per_peer":                    10,
+		"test_samples":                        24,
+		"byzantine_peers":                     1,
+		"attack_type":                         "100x_weight_delta",
+		"statistical_significance":            false,
+		"supports_byzantine_robustness_claim": false,
+		"warnings":                            []string{prototypeFLWarning},
+	}
+}
+
+func adversarialValidationOutput() map[string]any {
+	return map[string]any{
+		"adversarial_validation_level":     "single_run_sanity_check",
+		"supports_general_detection_claim": false,
+		"detection_rate_headline_allowed":  false,
+		"attack_trials_per_type":           1,
+		"statistical_significance":         false,
+		"known_trivial_triggers":           []string{"350_kmh_speed", "100x_fl_weight_delta"},
+	}
+}
+
+func contributionBoundaryOutput() map[string]any {
+	return map[string]any{
+		"claims_new_cryptographic_primitive": false,
+		"contribution_type":                  "system_integration_and_validation_transparency",
+		"reused_components": []string{
+			"ML-KEM/Kyber",
+			"Pedersen commitments",
+			"Lamport OTS/DID",
+			"SHA2/SHA3 hashing",
+			"mTLS/API security",
+			"majority blockchain logic",
+			"robust aggregation concepts",
+		},
+		"novel_components": []string{
+			"cross-layer prototype integration",
+			"security capability reporting",
+			"assumption-aware dashboard/API metadata",
+			"validation-plan scaffolding",
+		},
+	}
+}
+
+func complexityBoundaryOutput() map[string]any {
+	return map[string]any{
+		"overall_complexity_claim":        "component_dependent",
+		"full_system_o_n_claim":           false,
+		"naive_full_mesh_network_volume":  "O(n^2)",
+		"single_proposal_vote_collection": "O(n)",
+		"fl_aggregation":                  "O(n*d)",
+		"chain_audit":                     "O(k)",
+	}
+}
+
+func pedersenPrivacyOutput() map[string]any {
+	return map[string]any{
+		"pedersen_mode":                    "COMMIT_ONLY",
+		"commitment_homomorphic":           true,
+		"aggregate_statistics_recoverable": false,
+		"requires_opening_for_aggregate":   true,
+		"secure_aggregation_implemented":   false,
+	}
+}
+
+func reviewerAuditOutput() map[string]any {
+	return map[string]any{
+		"paper_ready_claim_status":            "corrected_but_requires_new_experiments",
+		"full_post_quantum_security_claim":    false,
+		"sybil_resistance_claim":              false,
+		"majority_attack_resistance_claim":    false,
+		"byzantine_robustness_claim":          false,
+		"general_100_percent_detection_claim": false,
+		"new_crypto_primitive_claim":          false,
+		"whole_system_o_n_claim":              false,
+		"secure_aggregation_claim":            false,
+		"canonical_layer_count":               "six implemented prototype layers",
+		"canonical_latency":                   "5.34 ms warm-start prototype pipeline latency",
+	}
 }
 
 func sha2s(s string) string {
@@ -211,7 +375,23 @@ func handleInit(w http.ResponseWriter, r *http.Request) {
 func handleStatus(w http.ResponseWriter, r *http.Request) {
 	state.mu.RLock()
 	defer state.mu.RUnlock()
-	writeJSON(w, state)
+	writeJSON(w, map[string]any{
+		"vehicle_id":             state.VehicleID,
+		"car_unlocked":           state.CarUnlocked,
+		"engine_started":         state.EngineStarted,
+		"emergency_brake_active": state.EmergencyBrakeActive,
+		"safe_mode_active":       state.SafeModeActive,
+		"chain":                  state.Chain,
+		"security_capabilities":  securityCapabilityOutput(),
+		"identity_security":      identitySecurityOutput(),
+		"consensus_security":     consensusSecurityOutput(),
+		"fl_validation":          flValidationOutput(),
+		"adversarial_validation": adversarialValidationOutput(),
+		"contribution_boundary":  contributionBoundaryOutput(),
+		"complexity_boundary":    complexityBoundaryOutput(),
+		"pedersen_privacy":       pedersenPrivacyOutput(),
+		"reviewer_audit":         reviewerAuditOutput(),
+	})
 }
 
 func handleAuth(w http.ResponseWriter, r *http.Request) {
@@ -338,6 +518,9 @@ func handleSave(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	if ecdhFallbackEnabled() {
+		log.Println(ecdhP256Warning)
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, map[string]any{"ok": true}) })
 	mux.HandleFunc("/init", handleInit)
@@ -353,6 +536,33 @@ func main() {
 	mux.HandleFunc("/emergency/brake", handleEmergencyBrake)
 	mux.HandleFunc("/recovery/unlock", handleRecovery)
 	mux.HandleFunc("/verify", handleVerify)
+	mux.HandleFunc("/security/capabilities", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, securityCapabilityOutput())
+	})
+	mux.HandleFunc("/identity/security", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, identitySecurityOutput())
+	})
+	mux.HandleFunc("/consensus/security", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, consensusSecurityOutput())
+	})
+	mux.HandleFunc("/fl/validation", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, flValidationOutput())
+	})
+	mux.HandleFunc("/adversarial/validation", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, adversarialValidationOutput())
+	})
+	mux.HandleFunc("/contribution/boundary", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, contributionBoundaryOutput())
+	})
+	mux.HandleFunc("/complexity/boundary", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, complexityBoundaryOutput())
+	})
+	mux.HandleFunc("/privacy/pedersen", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, pedersenPrivacyOutput())
+	})
+	mux.HandleFunc("/reviewer/audit", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, reviewerAuditOutput())
+	})
 	mux.HandleFunc("/save", handleSave)
 	log.Println("SmartCar Go backend listening on 127.0.0.1:8787")
 	log.Fatal(http.ListenAndServe("127.0.0.1:8787", mux))

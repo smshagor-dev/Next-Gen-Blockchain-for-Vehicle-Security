@@ -1,0 +1,120 @@
+{
+  "components": "pipeline,zkp,block_append,api_status,dashboard_refresh",
+  "created_at": "2026-06-05T13:46:56.149284+00:00",
+  "experiment": "latency",
+  "percentiles": "p50,p95,p99",
+  "rows": [
+    {
+      "component": "pipeline",
+      "iterations": 100,
+      "p50_ms": "TODO: run repeated benchmark",
+      "p95_ms": "TODO: run repeated benchmark",
+      "p99_ms": "TODO: run repeated benchmark",
+      "raw_log": "TODO: attach reproducible raw timing log",
+      "seed": 0,
+      "start_mode": "cold-start",
+      "status": "TODO_DATASET_OR_DEPLOYMENT_REQUIRED"
+    },
+    {
+      "component": "pipeline",
+      "iterations": 100,
+      "p50_ms": "TODO: run repeated benchmark",
+      "p95_ms": "TODO: run repeated benchmark",
+      "p99_ms": "TODO: run repeated benchmark",
+      "raw_log": "TODO: attach reproducible raw timing log",
+      "seed": 0,
+      "start_mode": "warm-start",
+      "status": "TODO_DATASET_OR_DEPLOYMENT_REQUIRED"
+    },
+    {
+      "component": "zkp",
+      "iterations": 100,
+      "p50_ms": "TODO: run repeated benchmark",
+      "p95_ms": "TODO: run repeated benchmark",
+      "p99_ms": "TODO: run repeated benchmark",
+      "raw_log": "TODO: attach reproducible raw timing log",
+      "seed": 0,
+      "start_mode": "cold-start",
+      "status": "TODO_DATASET_OR_DEPLOYMENT_REQUIRED"
+    },
+    {
+      "component": "zkp",
+      "iterations": 100,
+      "p50_ms": "TODO: run repeated benchmark",
+      "p95_ms": "TODO: run repeated benchmark",
+      "p99_ms": "TODO: run repeated benchmark",
+      "raw_log": "TODO: attach reproducible raw timing log",
+      "seed": 0,
+      "start_mode": "warm-start",
+      "status": "TODO_DATASET_OR_DEPLOYMENT_REQUIRED"
+    },
+    {
+      "component": "block_append",
+      "iterations": 100,
+      "p50_ms": "TODO: run repeated benchmark",
+      "p95_ms": "TODO: run repeated benchmark",
+      "p99_ms": "TODO: run repeated benchmark",
+      "raw_log": "TODO: attach reproducible raw timing log",
+      "seed": 0,
+      "start_mode": "cold-start",
+      "status": "TODO_DATASET_OR_DEPLOYMENT_REQUIRED"
+    },
+    {
+      "component": "block_append",
+      "iterations": 100,
+      "p50_ms": "TODO: run repeated benchmark",
+      "p95_ms": "TODO: run repeated benchmark",
+      "p99_ms": "TODO: run repeated benchmark",
+      "raw_log": "TODO: attach reproducible raw timing log",
+      "seed": 0,
+      "start_mode": "warm-start",
+      "status": "TODO_DATASET_OR_DEPLOYMENT_REQUIRED"
+    },
+    {
+      "component": "api_status",
+      "iterations": 100,
+      "p50_ms": "TODO: run repeated benchmark",
+      "p95_ms": "TODO: run repeated benchmark",
+      "p99_ms": "TODO: run repeated benchmark",
+      "raw_log": "TODO: attach reproducible raw timing log",
+      "seed": 0,
+      "start_mode": "cold-start",
+      "status": "TODO_DATASET_OR_DEPLOYMENT_REQUIRED"
+    },
+    {
+      "component": "api_status",
+      "iterations": 100,
+      "p50_ms": "TODO: run repeated benchmark",
+      "p95_ms": "TODO: run repeated benchmark",
+      "p99_ms": "TODO: run repeated benchmark",
+      "raw_log": "TODO: attach reproducible raw timing log",
+      "seed": 0,
+      "start_mode": "warm-start",
+      "status": "TODO_DATASET_OR_DEPLOYMENT_REQUIRED"
+    },
+    {
+      "component": "dashboard_refresh",
+      "iterations": 100,
+      "p50_ms": "TODO: run repeated benchmark",
+      "p95_ms": "TODO: run repeated benchmark",
+      "p99_ms": "TODO: run repeated benchmark",
+      "raw_log": "TODO: attach reproducible raw timing log",
+      "seed": 0,
+      "start_mode": "cold-start",
+      "status": "TODO_DATASET_OR_DEPLOYMENT_REQUIRED"
+    },
+    {
+      "component": "dashboard_refresh",
+      "iterations": 100,
+      "p50_ms": "TODO: run repeated benchmark",
+      "p95_ms": "TODO: run repeated benchmark",
+      "p99_ms": "TODO: run repeated benchmark",
+      "raw_log": "TODO: attach reproducible raw timing log",
+      "seed": 0,
+      "start_mode": "warm-start",
+      "status": "TODO_DATASET_OR_DEPLOYMENT_REQUIRED"
+    }
+  ],
+  "start_modes": "cold-start,warm-start",
+  "status": "framework_only_no_benchmark_results"
+}
