@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(SmartCarBlockchain LANGUAGES CXX)
+project(SmartCarBlockchain VERSION 3.0.2 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -157,10 +157,15 @@ if(SMARTCAR_BUILD_BLOCKCHAIN)
             OpenSSL::Crypto
             ${SMARTCAR_LIBOQS_TARGET}
     )
-    target_compile_definitions(smartcar_blockchain PRIVATE SMARTCAR_SECURE_NATIVE_CORE=1)
+    target_compile_definitions(
+        smartcar_blockchain
+        PRIVATE
+            SMARTCAR_SECURE_NATIVE_CORE=1
+            SMARTCAR_RELEASE_VERSION="${PROJECT_VERSION}"
+    )
     smartcar_apply_release_options(smartcar_blockchain)
     message(STATUS
-        "Hardened native target: OpenSSL AES-256-GCM + liboqs ML-DSA-44/ML-KEM-512; simulated PQC excluded."
+        "Hardened native target ${PROJECT_VERSION}: OpenSSL AES-256-GCM + liboqs ML-DSA-44/ML-KEM-512; simulated PQC excluded."
     )
 endif()
 
