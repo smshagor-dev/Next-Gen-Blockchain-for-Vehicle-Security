@@ -1,4 +1,4 @@
-"""v2.6 permissioned wrapper around the hardened legacy sync transport."""
+"""v2.6+ permissioned wrapper around the hardened legacy sync transport."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import os
 from typing import Dict, List, Optional
 
 from permissioned_consensus import ConsensusError, PermissionedConsensusEngine, sign_vote
+from replay_security import BoundedReplayCache
 from sync_protocol_legacy import *
 from sync_protocol_legacy import (
     SyncClient as _LegacySyncClient,
@@ -33,7 +34,7 @@ def _bool_env(name: str, default: bool = False) -> bool:
 
 
 class SyncServer(_LegacySyncServer):
-    """Sync server with fail-closed admission and epoch-scoped signed voting."""
+    """Sync server with fail-closed admission, voting, and bounded replay state."""
 
     def __init__(
         self,
@@ -57,6 +58,14 @@ class SyncServer(_LegacySyncServer):
         self.consensus_quorum_denominator = max(1, get_int("SMARTCAR_CONSENSUS_QUORUM_DENOMINATOR", 3))
         self.consensus_proposal_ttl_sec = max(3, get_int("SMARTCAR_CONSENSUS_PROPOSAL_TTL_SEC", 30))
         self.consensus_max_proposals = max(16, get_int("SMARTCAR_CONSENSUS_MAX_PROPOSALS", 4096))
+        self.replay_cache_max_entries = max(64, get_int("SMARTCAR_SYNC_REPLAY_CACHE_MAX_ENTRIES", 4096))
+        self.handshake_replay_cache_max_entries = max(
+            64,
+            get_int("SMARTCAR_SYNC_HANDSHAKE_REPLAY_CACHE_MAX_ENTRIES", 4096),
+        )
+        self._handshake_replay_cache = BoundedReplayCache(
+            max_entries=self.handshake_replay_cache_max_entries
+        )
         self._permissioned_consensus = None
 
     def _vehicle_secret(self, vehicle_id: str) -> str:
@@ -116,11 +125,41 @@ class SyncServer(_LegacySyncServer):
                 "secret_values_exposed": False,
             }
 
+    def replay_security_metadata(self) -> Dict[str, object]:
+        with self._lock:
+            session_caches = [
+                state.get("replay_cache")
+                for state in self.clients.values()
+                if isinstance(state.get("replay_cache"), BoundedReplayCache)
+            ]
+        return {
+            "policy": "OMNIGUARD_BOUNDED_REPLAY_CACHE_V1",
+            "session_cache_max_entries": self.replay_cache_max_entries,
+            "handshake_cache": self._handshake_replay_cache.metadata(),
+            "active_bounded_session_caches": len(session_caches),
+            "session_saturation_rejections": sum(
+                cache.saturation_rejections for cache in session_caches
+            ),
+            "evicts_live_nonces": False,
+            "fail_closed_on_saturation": True,
+        }
+
     def _process_message(self, msg: dict, client_id: str, session_key: str):
         mtype = msg.get("type")
         payload = msg.get("payload", {})
         if mtype not in {MessageType.VOTE_SUBMIT, MessageType.VOTE_TALLY_REQUEST}:
-            return super()._process_message(msg, client_id, session_key)
+            response = super()._process_message(msg, client_id, session_key)
+            if mtype == MessageType.HANDSHAKE and response:
+                with self._lock:
+                    state = self.clients.get(client_id)
+                    if state is not None and not isinstance(
+                        state.get("replay_cache"), BoundedReplayCache
+                    ):
+                        state["replay_cache"] = BoundedReplayCache(
+                            state.get("replay_cache", {}),
+                            max_entries=self.replay_cache_max_entries,
+                        )
+            return response
 
         if not session_key or not self._bound_vehicle(client_id):
             return None
@@ -173,7 +212,7 @@ class SyncServer(_LegacySyncServer):
 
 
 class SyncClient(_LegacySyncClient):
-    """Rotation/epoch-aware client that signs validator votes."""
+    """Rotation/epoch-aware client with signed voting and bounded replay state."""
 
     def __init__(self, *args, validator_key: str = None, consensus_epoch: int = None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -181,6 +220,11 @@ class SyncClient(_LegacySyncClient):
         self.consensus_epoch = max(
             1,
             int(consensus_epoch if consensus_epoch is not None else get_int("SMARTCAR_CONSENSUS_EPOCH", 1)),
+        )
+        self.replay_cache_max_entries = max(64, get_int("SMARTCAR_SYNC_REPLAY_CACHE_MAX_ENTRIES", 4096))
+        self._replay_cache = BoundedReplayCache(
+            self._replay_cache,
+            max_entries=self.replay_cache_max_entries,
         )
 
     def submit_vote(

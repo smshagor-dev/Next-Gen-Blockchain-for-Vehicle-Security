@@ -1,0 +1,14 @@
+[
+  {"field":"vehicle_id","value":"ATTACKER-VEHICLE"},
+  {"field":"block_hash","value":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"},
+  {"field":"previous_hash","value":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"},
+  {"field":"event_data","value":"TAMPERED"},
+  {"field":"validator_id","value":"UNAUTHORIZED"},
+  {"field":"authority_round","value":999999},
+  {"field":"privacy_preserving","value":true},
+  {"field":"metadata","value":{"source":"tampered","version":999}},
+  {"field":"metadata.nested","value":{"unexpected":[1,2,3]}},
+  {"field":"timestamp","value":"1970-01-01T00:00:00+00:00"},
+  {"field":"telemetry_hash_sha3","value":"0000000000000000000000000000000000000000000000000000000000000000"},
+  {"field":"event_hash_sha3","value":"0000000000000000000000000000000000000000000000000000000000000000"}
+]
