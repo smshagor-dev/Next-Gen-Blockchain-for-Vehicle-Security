@@ -33,13 +33,14 @@ jobs:
 
       - name: Compile hardened Python modules
         run: |
-          python -m py_compile env_config.py sync_protocol.py did_identity.py v2x_protocol.py control_api_security.py ledger_integrity.py smartcar_backend.py
+          python -m py_compile credential_policy.py env_config.py sync_protocol.py did_identity.py v2x_protocol.py control_api_security.py ledger_integrity.py smartcar_backend.py
 
       - name: Run Python security regression tests
         env:
           PYTHONPATH: .
         run: |
           python -m unittest -v tests.test_security_baseline
+          python -m unittest -v tests.test_credential_policy
           python -m unittest -v tests.test_sync_protocol_security
           python -m unittest -v tests.test_did_one_time_security
           python -m unittest -v tests.test_v2x_security
