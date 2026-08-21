@@ -18,6 +18,7 @@ from control_api_security import build_signed_headers, validate_loopback_base_ur
 from env_config import get_env, get_required_secret
 from federated_learning import fl_validation_metadata
 from identity_security import identity_security_metadata
+from ledger_integrity import GoLedgerSnapshotVerifier, LedgerIntegrityError, PythonLedgerIntegrityGuard
 from zkp_privacy import pedersen_privacy_metadata
 from security_capabilities import (
     adversarial_validation_metadata,
@@ -43,9 +44,13 @@ class BackendBlock:
 class PythonBackend:
     def __init__(self, vehicle_id: str, password: str, auth_token: str, chain_file: str):
         self._core = SmartCarBlockchain(vehicle_id, password, auth_token, chain_file=chain_file)
+        self._ledger_guard = PythonLedgerIntegrityGuard(self._core).install()
 
     def __getattr__(self, name: str):
         return getattr(self._core, name)
+
+    def ledger_integrity(self) -> Dict[str, Any]:
+        return self._ledger_guard.metadata()
 
     def security_capabilities(self) -> Dict[str, Any]:
         return security_capability_output(False)
@@ -107,6 +112,7 @@ class GoBackend:
         self._reviewer_audit: Dict[str, Any] = reviewer_audit_metadata()
         self._proc = None
         self._service_instance = ""
+        self._ledger_verifier = GoLedgerSnapshotVerifier(self.vehicle_id)
         self._ensure_service()
         self._initialize_remote_state()
         self._refresh()
@@ -219,6 +225,10 @@ class GoBackend:
 
     def _refresh(self):
         status = self._get("/status")
+        raw_chain = status.get("chain", [])
+        if not isinstance(raw_chain, list):
+            raise LedgerIntegrityError("Go backend returned a non-list ledger")
+        self._ledger_verifier.verify_and_track(raw_chain, self._service_instance)
         self.car_unlocked = bool(status.get("car_unlocked", False))
         self.engine_started = bool(status.get("engine_started", False))
         self.emergency_brake_active = bool(status.get("emergency_brake_active", False))
@@ -243,53 +253,86 @@ class GoBackend:
                 previous_hash=str(b.get("previous_hash", "")),
                 smart_contract_receipts=b.get("smart_contract_receipts") or [],
             )
-            for b in status.get("chain", [])
+            for b in raw_chain
         ]
+
+    def _assert_remote_ledger_valid(self):
+        self._refresh()
+        if not bool(self._get("/verify").get("valid", False)):
+            raise LedgerIntegrityError("Go backend rejected its own ledger hash chain")
 
     @staticmethod
     def _telemetry_payload(telemetry: TelemetryData) -> Dict[str, Any]:
         return telemetry.__dict__.copy()
 
     def authenticate(self, token: str) -> Dict[str, Any]:
+        self._assert_remote_ledger_valid()
         result = self._post("/auth", {"token": token})
         self._refresh()
         return result
 
     def start_engine(self) -> Dict[str, Any]:
+        self._assert_remote_ledger_valid()
         result = self._post("/engine/start")
         self._refresh()
         return result
 
     def stop_engine(self):
         result = self._post("/engine/stop")
-        self._refresh()
+        try:
+            self._refresh()
+        except LedgerIntegrityError as exc:
+            self.engine_started = False
+            result = dict(result)
+            result["ledger_integrity_warning"] = str(exc)
         return result
 
     def lock_car(self):
         result = self._post("/vehicle/lock")
-        self._refresh()
+        try:
+            self._refresh()
+        except LedgerIntegrityError as exc:
+            self.car_unlocked = False
+            self.engine_started = False
+            result = dict(result)
+            result["ledger_integrity_warning"] = str(exc)
         return result
 
     def owner_recover_unlock(self, key: str, force_chain_reset: bool = False) -> Dict[str, Any]:
+        self._assert_remote_ledger_valid()
         result = self._post("/recovery/unlock", {"key": key, "force_chain_reset": force_chain_reset})
         self._refresh()
         return result
 
     def emergency_brake(self, distance: float):
         result = self._post("/emergency/brake", {"distance": distance})
-        self._refresh()
+        try:
+            self._refresh()
+        except LedgerIntegrityError as exc:
+            self.emergency_brake_active = True
+            result = dict(result)
+            result["ledger_integrity_warning"] = str(exc)
         return result
 
     def push_telemetry(self, telemetry: TelemetryData, event: str = ""):
+        self._assert_remote_ledger_valid()
         result = self._post("/telemetry", {"event": event, "telemetry": self._telemetry_payload(telemetry)})
         self._refresh()
         return result
 
     def verify_chain(self) -> bool:
-        return bool(self._get("/verify").get("valid", False))
+        try:
+            self._refresh()
+            return self._ledger_verifier.last_valid and bool(self._get("/verify").get("valid", False))
+        except LedgerIntegrityError:
+            return False
 
     def save(self):
+        self._assert_remote_ledger_valid()
         return self._post("/save")
+
+    def ledger_integrity(self) -> Dict[str, Any]:
+        return self._ledger_verifier.metadata()
 
     def security_capabilities(self) -> Dict[str, Any]:
         try:

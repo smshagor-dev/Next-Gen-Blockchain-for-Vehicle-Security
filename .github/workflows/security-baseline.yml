@@ -33,7 +33,7 @@ jobs:
 
       - name: Compile hardened Python modules
         run: |
-          python -m py_compile env_config.py sync_protocol.py did_identity.py v2x_protocol.py control_api_security.py smartcar_backend.py
+          python -m py_compile env_config.py sync_protocol.py did_identity.py v2x_protocol.py control_api_security.py ledger_integrity.py smartcar_backend.py
 
       - name: Run Python security regression tests
         env:
@@ -44,6 +44,7 @@ jobs:
           python -m unittest -v tests.test_did_one_time_security
           python -m unittest -v tests.test_v2x_security
           python -m unittest -v tests.test_control_api_security
+          python -m unittest -v tests.test_ledger_integrity
 
       - name: Normalize Go formatting for validation
         working-directory: api/go
