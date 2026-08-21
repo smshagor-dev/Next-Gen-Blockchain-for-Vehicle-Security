@@ -53,6 +53,7 @@ class ReleaseVersionTests(unittest.TestCase):
         integrity_tool = Path("release_integrity.py")
         integrity_test = Path("tests/test_release_integrity.py")
         tag_operator = Path("scripts/create_v3_0_2_tag.sh")
+        manual_tag_workflow = Path(".github/workflows/create-v3.0.2-tag.yml")
         for path in (
             release_note,
             checklist,
@@ -61,6 +62,7 @@ class ReleaseVersionTests(unittest.TestCase):
             integrity_tool,
             integrity_test,
             tag_operator,
+            manual_tag_workflow,
         ):
             self.assertTrue(path.exists(), str(path))
         release_text = release_note.read_text(encoding="utf-8")
@@ -82,6 +84,30 @@ class ReleaseVersionTests(unittest.TestCase):
         self.assertIn("Run secure native crypto self-test", text)
         self.assertIn("Run bounded Go fuzz campaigns", text)
         self.assertIn("Package v3.0.2 Linux validation artifacts", text)
+
+    def test_manual_tag_workflow_is_explicit_and_exact_main_guarded(self):
+        path = Path(".github/workflows/create-v3.0.2-tag.yml")
+        text = path.read_text(encoding="utf-8")
+        trigger_block = text.split("permissions:", 1)[0]
+        self.assertIn("workflow_dispatch:", trigger_block)
+        self.assertNotIn("\n  push:\n", trigger_block)
+        self.assertIn('test "${{ inputs.confirm }}" = "CREATE-v3.0.2"', text)
+        self.assertIn("permissions:\n  contents: write\n  actions: read", text)
+        self.assertIn("ref: main", text)
+        self.assertIn("git fetch origin main --tags", text)
+        self.assertIn('main_sha="$(git rev-parse origin/main)"', text)
+        self.assertIn('test "$(git rev-parse HEAD)" = "$main_sha"', text)
+        self.assertIn('--workflow "Security Baseline"', text)
+        self.assertIn("--branch main", text)
+        self.assertIn("--event push", text)
+        self.assertIn('run.get("headSha") == target', text)
+        self.assertIn('run.get("status") != "completed"', text)
+        self.assertIn('run.get("conclusion") != "success"', text)
+        self.assertIn('git ls-remote --exit-code --tags origin "refs/tags/$TAG"', text)
+        self.assertIn('gh release view "$TAG" --repo "$GITHUB_REPOSITORY"', text)
+        self.assertIn('git tag -a "$TAG" "$main_sha"', text)
+        self.assertIn('git push origin "refs/tags/$TAG"', text)
+        self.assertIn('test "$(git rev-list -n 1 "$TAG")" = "$main_sha"', text)
 
     def test_publication_workflow_is_tag_commit_and_permission_guarded(self):
         path = Path(".github/workflows/release-v3.0.2.yml")
