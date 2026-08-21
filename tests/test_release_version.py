@@ -58,6 +58,22 @@ class ReleaseVersionTests(unittest.TestCase):
         self.assertIn("v3.0.2", changelog.read_text(encoding="utf-8"))
         self.assertIn("Expected tag: `v3.0.2`", checklist.read_text(encoding="utf-8"))
 
+    def test_publication_workflow_is_tag_and_commit_guarded(self):
+        path = Path(".github/workflows/release-v3.0.2.yml")
+        self.assertTrue(path.exists())
+        text = path.read_text(encoding="utf-8")
+        self.assertIn("- v3.0.2", text)
+        self.assertIn('test "$GITHUB_REF_NAME" = "v3.0.2"', text)
+        self.assertIn('git merge-base --is-ancestor "$GITHUB_SHA" origin/main', text)
+        self.assertIn('test "$(git rev-parse HEAD)" = "$GITHUB_SHA"', text)
+        self.assertIn('gh release view "$GITHUB_REF_NAME"', text)
+        self.assertIn('--commit-sha "$GITHUB_SHA"', text)
+        self.assertIn('--verify security-reports/release-integrity-manifest.json', text)
+        self.assertIn('sha256sum -c SHA256SUMS', text)
+        self.assertIn('gh release create "$GITHUB_REF_NAME"', text)
+        self.assertIn('--verify-tag', text)
+        self.assertIn('permissions:\n  contents: write', text)
+
 
 if __name__ == "__main__":
     unittest.main()
