@@ -8,6 +8,8 @@ Security properties:
 - preserves literal '#' characters inside unquoted secrets;
 - only treats '#' as an inline comment when it is preceded by whitespace;
 - validates environment variable names before loading them;
+- rejects silent defaults for security-sensitive credentials;
+- validates secret quality, cross-domain separation, registries, and rotation slots;
 - provides fail-closed helpers for required secrets.
 """
 
@@ -18,23 +20,20 @@ import sys
 from pathlib import Path
 from typing import Optional, Tuple
 
+from credential_policy import (
+    credential_policy_metadata,
+    insecure_secret_defaults_allowed,
+    is_secret_registry,
+    is_sensitive_secret,
+    validate_rotation_pair,
+    validate_secret_registry_json,
+    validate_secret_separation,
+    validate_secret_value,
+)
+
 _LOADED = False
 _PROCESS_LOGGING_READY = False
 _ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-_WEAK_SECRET_VALUES = {
-    "changeme",
-    "change-me",
-    "change_me",
-    "default",
-    "example",
-    "password",
-    "replace-me",
-    "replace_me",
-    "secret",
-    "token",
-    "your-secret-here",
-    "your_secret_here",
-}
 
 
 class _TeeStream:
@@ -179,8 +178,25 @@ def load_project_env_once():
 
 
 def get_env(name: str, default: str = "") -> str:
-    """Return string env value with fallback."""
-    return os.getenv(name, default)
+    """Return an env value while refusing unsafe secret fallbacks by default."""
+    raw = os.getenv(name)
+    if raw is None or (is_sensitive_secret(name) and not raw.strip()):
+        if is_sensitive_secret(name) and default:
+            if insecure_secret_defaults_allowed():
+                return default
+            raise RuntimeError(
+                f"Sensitive credential {name} must be explicitly configured; "
+                "caller-provided fallback was rejected"
+            )
+        return default
+
+    value = raw
+    if is_sensitive_secret(name):
+        value = validate_secret_value(name, value)
+        validate_secret_separation(name, value)
+    elif is_secret_registry(name):
+        validate_secret_registry_json(name, value)
+    return value
 
 
 def get_required_env(name: str) -> str:
@@ -192,16 +208,36 @@ def get_required_env(name: str) -> str:
 
 
 def get_required_secret(name: str, min_length: int = 32) -> str:
-    """Return a required secret after basic weak/default-value rejection."""
+    """Return a required secret after quality and domain-separation checks."""
     value = get_required_env(name)
-    normalized = value.strip().lower()
-    if normalized in _WEAK_SECRET_VALUES or normalized.startswith(("example-", "changeme-", "replace-me-")):
-        raise RuntimeError(f"Environment variable {name} contains a placeholder secret")
-    if len(value) < max(1, int(min_length)):
-        raise RuntimeError(
-            f"Environment variable {name} must contain at least {max(1, int(min_length))} characters"
-        )
+    value = validate_secret_value(name, value, min_length=min_length)
+    validate_secret_separation(name, value)
     return value
+
+
+def get_secret_ring(name: str, min_length: Optional[int] = None) -> Tuple[str, ...]:
+    """Return current + optional previous secret for rotation-aware verifiers.
+
+    This helper does not automatically make a protocol rotation-aware. Callers
+    must deliberately verify against the returned ring and always sign new data
+    with ring[0].
+    """
+    current = get_required_secret(name, min_length=min_length or 32)
+    previous = os.getenv(name + "_PREVIOUS")
+    ring = validate_rotation_pair(name, current, previous)
+    if min_length is not None:
+        for slot, value in enumerate(ring):
+            validate_secret_value(
+                name if slot == 0 else name + "_PREVIOUS",
+                value,
+                min_length=min_length,
+            )
+    return ring
+
+
+def get_credential_policy_metadata():
+    """Return non-secret credential-policy diagnostics."""
+    return credential_policy_metadata()
 
 
 def get_bool(name: str, default: bool = False) -> bool:
