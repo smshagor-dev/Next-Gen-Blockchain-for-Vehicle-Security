@@ -1,0 +1,208 @@
+name: Publish OmniGuard V2X v3.0.2
+
+on:
+  push:
+    tags:
+      - v3.0.2
+
+permissions:
+  contents: write
+
+jobs:
+  validate-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout tagged commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify tag identity and main ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_TYPE" = "tag"
+          test "$GITHUB_REF_NAME" = "v3.0.2"
+          test "$(tr -d '\r\n' < VERSION)" = "3.0.2"
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+
+      - name: Refuse duplicate GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "GitHub Release $GITHUB_REF_NAME already exists; refusing overwrite."
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+          cache-dependency-path: api/go/go.mod
+
+      - name: Verify canonical release identity and integrity tests
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest -v tests.test_release_version
+          python -m unittest -v tests.test_release_integrity
+
+      - name: Run release security regression suites
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest -v tests.test_security_baseline
+          python -m unittest -v tests.test_credential_policy
+          python -m unittest -v tests.test_key_runtime_security
+          python -m unittest -v tests.test_permissioned_consensus
+          python -m unittest -v tests.test_consensus_security
+          python -m unittest -v tests.test_identity_security
+          python -m unittest -v tests.test_sync_protocol_security
+          python -m unittest -v tests.test_replay_flood_security
+          python -m unittest -v tests.test_runtime_security_monitor
+          python -m unittest -v tests.test_runtime_security_hooks
+          python -m unittest -v tests.test_incident_response
+          python -m unittest -v tests.test_did_one_time_security
+          python -m unittest -v tests.test_v2x_security
+          python -m unittest -v tests.test_control_api_security
+          python -m unittest -v tests.test_ledger_integrity
+          python -m unittest -v tests.test_adversarial_validation
+          python -m unittest -v tests.test_hil_security_validation
+          python -m unittest -v tests.test_native_build_security
+
+      - name: Run deterministic security validation reports
+        env:
+          PYTHONPATH: .
+        run: |
+          python adversarial_validation.py \
+            --seed 168938023 \
+            --iterations 256 \
+            --max-duration-sec 20 \
+            --output security-reports/adversarial-validation.json
+          python hil_security_validation.py \
+            --output security-reports/hil-security-validation.json
+          python incident_response_validation.py \
+            --output security-reports/incident-response-validation.json
+
+      - name: Verify hardened native target fails closed without liboqs
+        shell: bash
+        run: |
+          set +e
+          cmake -S . -B build/native-strict \
+            -DSMARTCAR_FORCE_PQC_UNAVAILABLE_FOR_TESTS=ON \
+            -DSMARTCAR_FETCH_PINNED_LIBOQS=OFF \
+            -DSMARTCAR_BUILD_LEGACY_CPP_DEMO=OFF \
+            -DSMARTCAR_BUILD_CAMERA_MODULE=OFF \
+            > build/native-strict.log 2>&1
+          status=$?
+          set -e
+          cat build/native-strict.log
+          test "$status" -ne 0
+          grep -F "Real liboqs is required for the hardened native blockchain target" build/native-strict.log
+
+      - name: Build pinned real-PQC native target
+        run: |
+          cmake -S . -B build/native-real \
+            -DSMARTCAR_FETCH_PINNED_LIBOQS=ON \
+            -DSMARTCAR_BUILD_LEGACY_CPP_DEMO=OFF \
+            -DSMARTCAR_ENABLE_NATIVE_OPT=OFF \
+            -DSMARTCAR_ENABLE_UNSAFE_FAST_MATH=OFF \
+            -DSMARTCAR_ENABLE_IPO=OFF \
+            -DSMARTCAR_BUILD_CAMERA_MODULE=OFF
+          grep -F "CMAKE_PROJECT_VERSION:STATIC=3.0.2" build/native-real/CMakeCache.txt
+          cmake --build build/native-real --config Release --target smartcar_blockchain --parallel 2
+
+      - name: Run secure native crypto self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          export SMARTCAR_CPP_DATA_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          export SMARTCAR_AUTH_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          ./build/native-real/smartcar_blockchain --self-test
+
+      - name: Run Go tests and build release validation binary
+        working-directory: api/go
+        run: |
+          gofmt -w .
+          go test ./... -count=1
+          go build -trimpath -o ../../build/smartcar_go_backend-v3.0.2-linux-amd64 .
+
+      - name: Run bounded Go fuzz campaigns
+        working-directory: api/go
+        run: |
+          go test -run=^$ -fuzz=FuzzSafeChainPathConfined -fuzztime=2s -timeout=30s
+          go test -run=^$ -fuzz=FuzzControlAPIMalformedEmergency -fuzztime=2s -timeout=30s
+          go test -run=^$ -fuzz=FuzzHealthChallengeParser -fuzztime=2s -timeout=30s
+          go test -run=^$ -fuzz=FuzzControlAPIUnsignedMutation -fuzztime=2s -timeout=30s
+
+      - name: Generate commit-bound release integrity manifest
+        env:
+          PYTHONPATH: .
+        shell: bash
+        run: |
+          set -euo pipefail
+          python release_integrity.py \
+            --commit-sha "$GITHUB_SHA" \
+            --output security-reports/release-integrity-manifest.json
+          python release_integrity.py \
+            --verify security-reports/release-integrity-manifest.json
+
+      - name: Package tagged validation artifacts and verify SHA-256
+        shell: bash
+        run: |
+          set -euo pipefail
+          package_dir="dist/omniguard-v3.0.2-linux-amd64-validation"
+          mkdir -p "$package_dir"
+          cp build/native-real/smartcar_blockchain "$package_dir/smartcar_blockchain-v3.0.2-linux-amd64"
+          cp build/smartcar_go_backend-v3.0.2-linux-amd64 "$package_dir/"
+          cp VERSION "$package_dir/VERSION"
+          cp docs/releases/v3.0.2.md "$package_dir/RELEASE_NOTES.md"
+          cp security-reports/release-integrity-manifest.json "$package_dir/"
+          cp security-reports/adversarial-validation.json "$package_dir/"
+          cp security-reports/hil-security-validation.json "$package_dir/"
+          cp security-reports/incident-response-validation.json "$package_dir/"
+          (
+            cd "$package_dir"
+            sha256sum \
+              smartcar_blockchain-v3.0.2-linux-amd64 \
+              smartcar_go_backend-v3.0.2-linux-amd64 \
+              VERSION \
+              RELEASE_NOTES.md \
+              release-integrity-manifest.json \
+              adversarial-validation.json \
+              hil-security-validation.json \
+              incident-response-validation.json \
+              > SHA256SUMS
+            sha256sum -c SHA256SUMS
+          )
+
+      - name: Publish GitHub Release from validated tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          package_dir="dist/omniguard-v3.0.2-linux-amd64-validation"
+          gh release create "$GITHUB_REF_NAME" \
+            --verify-tag \
+            --title "OmniGuard V2X v3.0.2" \
+            --notes-file docs/releases/v3.0.2.md \
+            "$package_dir/smartcar_blockchain-v3.0.2-linux-amd64#Hardened native C++ validation binary (Linux amd64)" \
+            "$package_dir/smartcar_go_backend-v3.0.2-linux-amd64#Go control backend validation binary (Linux amd64)" \
+            "$package_dir/SHA256SUMS#SHA-256 checksums" \
+            "$package_dir/release-integrity-manifest.json#Commit-bound release integrity manifest" \
+            "$package_dir/adversarial-validation.json#Adversarial validation report" \
+            "$package_dir/hil-security-validation.json#Software-HIL security validation report" \
+            "$package_dir/incident-response-validation.json#Incident-response validation report"
