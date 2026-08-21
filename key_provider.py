@@ -90,11 +90,13 @@ class SecretBuffer:
         return self._closed
 
     def bytes_copy(self) -> bytes:
+        """Compatibility escape hatch; callers should avoid retaining the returned immutable copy."""
         if self._closed:
             raise RuntimeError("secret buffer is closed")
         return bytes(self._data)
 
     def text_copy(self) -> str:
+        """Compatibility escape hatch for legacy APIs that require text secrets."""
         if self._closed:
             raise RuntimeError("secret buffer is closed")
         return self._data.decode("utf-8")
@@ -140,7 +142,8 @@ class KeyProvider:
     def hmac_sha256(self, key_name: str, payload: bytes, purpose: str = "sign") -> str:
         try:
             with self.export_secret(key_name, purpose=purpose) as secret:
-                digest = hmac.new(secret.bytes_copy(), bytes(payload), hashlib.sha256).hexdigest()
+                # hmac accepts bytearray, avoiding an additional immutable key copy.
+                digest = hmac.new(secret._data, bytes(payload), hashlib.sha256).hexdigest()
             self.audit.record(self.capabilities.provider, key_name, "hmac_sha256", purpose, True)
             return digest
         except Exception:
@@ -209,7 +212,7 @@ class UnavailableHardwareKeyProvider(KeyProvider):
             provider=self._provider_name,
             hardware_backed=True,
             exportable=False,
-            supports_hmac_sha256=True,
+            supports_hmac_sha256=False,
         )
 
     def export_secret(self, key_name: str, purpose: str = "runtime") -> SecretBuffer:
