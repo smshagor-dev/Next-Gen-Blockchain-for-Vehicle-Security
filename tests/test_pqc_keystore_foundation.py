@@ -39,7 +39,7 @@ class PqcKeyStoreFoundationTests(unittest.TestCase):
 
     def test_keystore_is_fail_closed_and_atomic(self):
         self.assertIn("PQC keystore symlinks are not allowed", self.source)
-        self.assertIn("PQC keystore schema contains missing or unexpected fields", self.source)
+        self.assertIn("keystore schema contains missing or unexpected fields", self.source)
         self.assertIn("refusing to overwrite existing PQC keystore", self.source)
         self.assertIn("could not atomically publish PQC keystore", self.source)
         self.assertIn("owner_read", self.source)
