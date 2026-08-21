@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "pqc_provider_policy.h"
+
 namespace omniguard {
 
 struct PqcKeyMaterial {
@@ -54,6 +56,7 @@ public:
     PqcKeyStoreMetadata inspect() const;
 
 private:
+    PqcProviderPolicyGuard provider_policy_guard_;
     std::filesystem::path path_;
     std::string wrapping_secret_;
     std::string identity_;
