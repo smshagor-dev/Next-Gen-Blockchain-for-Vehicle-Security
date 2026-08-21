@@ -44,13 +44,19 @@ class ReleaseVersionTests(unittest.TestCase):
         self.assertFalse(metadata["vehicle_safety_certified"])
         self.assertFalse(metadata["secret_values_exposed"])
 
-    def test_release_notes_and_changelog_are_present(self):
+    def test_release_docs_and_integrity_tooling_are_present(self):
         release_note = Path("docs/releases/v3.0.2.md")
+        checklist = Path("docs/releases/v3.0.2-checklist.md")
         changelog = Path("CHANGELOG.md")
-        self.assertTrue(release_note.exists())
-        self.assertTrue(changelog.exists())
-        self.assertIn("OmniGuard V2X v3.0.2", release_note.read_text(encoding="utf-8"))
+        integrity_tool = Path("release_integrity.py")
+        integrity_test = Path("tests/test_release_integrity.py")
+        for path in (release_note, checklist, changelog, integrity_tool, integrity_test):
+            self.assertTrue(path.exists(), str(path))
+        release_text = release_note.read_text(encoding="utf-8")
+        self.assertIn("OmniGuard V2X v3.0.2", release_text)
+        self.assertIn("Release Integrity Evidence", release_text)
         self.assertIn("v3.0.2", changelog.read_text(encoding="utf-8"))
+        self.assertIn("Expected tag: `v3.0.2`", checklist.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
