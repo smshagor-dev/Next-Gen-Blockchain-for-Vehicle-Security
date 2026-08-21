@@ -9,6 +9,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(SMARTCAR_BUILD_BLOCKCHAIN "Build the hardened native blockchain target" ON)
 option(SMARTCAR_BUILD_PQC_KEYSTORE_SELFTEST "Build the durable PQC keystore validation target" OFF)
+option(SMARTCAR_BUILD_PQC_KEY_ADMIN "Build the local guarded PQC key administration tool" OFF)
 option(SMARTCAR_BUILD_LEGACY_CPP_DEMO "Build historical blockchain.cpp as an explicitly legacy/lab-only target" OFF)
 option(SMARTCAR_BUILD_CAMERA_MODULE "Build camera_emergency_brake.cpp (OpenCV required)" OFF)
 option(SMARTCAR_ENABLE_WARNINGS "Enable extra compiler warnings" ON)
@@ -99,8 +100,8 @@ if(NOT nlohmann_json_FOUND)
 endif()
 
 # OpenSSL provides authenticated AES-256-GCM storage and digest implementations
-# used by the secure native core and durable PQC keystore.
-if(SMARTCAR_BUILD_BLOCKCHAIN OR SMARTCAR_BUILD_PQC_KEYSTORE_SELFTEST)
+# used by the secure native core, durable PQC keystore, and local key operator.
+if(SMARTCAR_BUILD_BLOCKCHAIN OR SMARTCAR_BUILD_PQC_KEYSTORE_SELFTEST OR SMARTCAR_BUILD_PQC_KEY_ADMIN)
     find_package(OpenSSL 3.0 REQUIRED COMPONENTS Crypto)
 endif()
 
@@ -196,6 +197,32 @@ if(SMARTCAR_BUILD_PQC_KEYSTORE_SELFTEST)
             ${SMARTCAR_LIBOQS_TARGET}
     )
     smartcar_apply_release_options(smartcar_pqc_keystore_selftest)
+endif()
+
+if(SMARTCAR_BUILD_PQC_KEY_ADMIN)
+    if(NOT SMARTCAR_LIBOQS_TARGET)
+        message(FATAL_ERROR
+            "Real liboqs is required for smartcar_pqc_key_admin. "
+            "Install liboqs ${SMARTCAR_LIBOQS_VERSION}, or set SMARTCAR_FETCH_PINNED_LIBOQS=ON."
+        )
+    endif()
+    add_executable(
+        smartcar_pqc_key_admin
+        native/pqc_key_store.cpp
+        native/pqc_key_admin.cpp
+    )
+    target_include_directories(smartcar_pqc_key_admin PRIVATE native)
+    target_link_libraries(
+        smartcar_pqc_key_admin
+        PRIVATE
+            nlohmann_json::nlohmann_json
+            OpenSSL::Crypto
+            ${SMARTCAR_LIBOQS_TARGET}
+    )
+    smartcar_apply_release_options(smartcar_pqc_key_admin)
+    message(STATUS
+        "Building local smartcar_pqc_key_admin: explicit operator rotation only; no remote key-rotation API; software provider metadata remains non-hardware-backed."
+    )
 endif()
 
 # Historical source remains available only as an explicitly named lab/demo
