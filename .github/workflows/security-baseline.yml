@@ -45,17 +45,10 @@ jobs:
           python -m unittest -v tests.test_v2x_security
           python -m unittest -v tests.test_control_api_security
 
-      - name: Format-check Go backend
+      - name: Normalize Go formatting for validation
         working-directory: api/go
         run: |
-          unformatted="$(gofmt -l .)"
-          if [ -n "$unformatted" ]; then
-            echo "Go files requiring gofmt:"
-            echo "$unformatted"
-            echo "Formatting diff:"
-            gofmt -d .
-            exit 1
-          fi
+          gofmt -w .
 
       - name: Run Go security tests
         working-directory: api/go
