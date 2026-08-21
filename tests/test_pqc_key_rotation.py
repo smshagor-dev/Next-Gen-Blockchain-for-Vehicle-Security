@@ -53,11 +53,12 @@ class PqcKeyRotationTests(unittest.TestCase):
         self.assertIn("SMARTCAR_CPP_PQC_HARDWARE_REQUIRED", self.policy)
         self.assertIn("hardware-backed PQC provider is required", self.policy)
         self.assertIn("TPM2/PKCS#11/HSM fallback is not simulated", self.policy)
+        self.assertIn('kSoftwarePqcProvider = "software_encrypted_file"', self.policy)
         self.assertIn("bool hardware_backed = false", self.policy)
         self.assertIn("bool non_exportable = false", self.policy)
         self.assertIn('#include "pqc_provider_policy.h"', self.keystore_header)
         self.assertIn("PqcProviderPolicyGuard provider_policy_guard_", self.keystore_header)
-        self.assertIn("static constexpr const char* kProvider = kSoftwarePqcProvider", self.keystore_header)
+        self.assertIn('static constexpr const char* kProvider = "software_encrypted_file"', self.keystore_header)
 
     def test_selftest_covers_rotation_backup_confirmation_and_policy(self):
         self.assertIn("wrong rotation confirmation changed active PQC identity", self.admin)
