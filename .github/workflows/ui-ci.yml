@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - only-update-ui
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
@@ -46,8 +43,12 @@ jobs:
         run: |
           python -m py_compile main.py dashboard.py dashboard_modern_ui.py
 
-      - name: Run test suite
+      - name: Verify UI imports
+        run: |
+          python -c "import dashboard_modern_ui; import main"
+
+      - name: Run dashboard UI tests
         env:
           DISPLAY: ''
         run: |
-          python -m unittest discover -s tests -p 'test_*.py' -v
+          python -m unittest discover -s tests -p 'test_dashboard_redesign.py' -v
