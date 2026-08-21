@@ -631,7 +631,7 @@ void PqcTrustKeyring::initialize_root(const PqcKeyMaterial& root_material) const
         {"format", kFormat},
         {"identity", identity_},
         {"max_generations", max_generations_},
-        {"active_generation", 1},
+        {"active_generation", std::uint64_t{1}},
         {"active_key_id", root.key_id},
         {"root", {
             {"identity", identity_},
