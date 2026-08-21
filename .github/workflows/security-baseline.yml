@@ -48,7 +48,14 @@ jobs:
       - name: Format-check Go backend
         working-directory: api/go
         run: |
-          test -z "$(gofmt -l .)"
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "Go files requiring gofmt:"
+            echo "$unformatted"
+            echo "Formatting diff:"
+            gofmt -d .
+            exit 1
+          fi
 
       - name: Run Go security tests
         working-directory: api/go
