@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -11,6 +12,7 @@ from incident_response import (
     IncidentResponseManager,
     build_operator_authorization,
 )
+from incident_response_runtime import create_runtime_incident_response_manager
 from key_provider import EnvironmentKeyProvider
 from runtime_security_monitor import RuntimeSecurityMonitor
 
@@ -92,6 +94,17 @@ class IncidentResponseTests(unittest.TestCase):
         path.write_text(json.dumps(entry, sort_keys=True) + "\n", encoding="utf-8")
         with self.assertRaisesRegex(IncidentResponseError, "EVIDENCE_JOURNAL_INVALID"):
             IncidentEvidenceJournal(self.temp.name, self.provider)
+
+    def test_post_open_disk_tamper_blocks_current_process_transition(self):
+        incident_id = self._open_critical_incident()
+        path = Path(self.journal.path)
+        entry = json.loads(path.read_text(encoding="utf-8").splitlines()[0])
+        entry["decision_action"] = "NONE"
+        path.write_text(json.dumps(entry, sort_keys=True) + "\n", encoding="utf-8")
+        self.assertFalse(self.journal.verify())
+        auth = build_operator_authorization(self.provider, "ACKNOWLEDGE", incident_id)
+        with self.assertRaisesRegex(IncidentResponseError, "EVIDENCE_JOURNAL_INVALID"):
+            self.manager.acknowledge(auth)
 
     def test_forged_operator_acknowledgement_is_rejected(self):
         incident_id = self._open_critical_incident()
@@ -185,6 +198,32 @@ class IncidentResponseTests(unittest.TestCase):
     def test_evidence_filename_path_traversal_is_rejected(self):
         with self.assertRaisesRegex(IncidentResponseError, "INVALID_EVIDENCE_FILENAME"):
             IncidentEvidenceJournal(self.temp.name, self.provider, filename="../outside.jsonl")
+
+    def test_runtime_factory_uses_policy_validated_environment_keys(self):
+        env = {
+            "SMARTCAR_KEY_PROVIDER": "environment",
+            "SMARTCAR_INCIDENT_EVIDENCE_KEY": EVIDENCE_KEY,
+            "SMARTCAR_INCIDENT_OPERATOR_KEY": OPERATOR_KEY,
+            "SMARTCAR_INCIDENT_EVIDENCE_DIR": self.temp.name,
+            "SMARTCAR_INCIDENT_EVIDENCE_FILENAME": "factory-evidence.jsonl",
+            "SMARTCAR_INCIDENT_RECOVERY_HEALTHY_OBSERVATIONS": "4",
+        }
+        monitor = RuntimeSecurityMonitor()
+        with patch.dict(os.environ, env, clear=True):
+            manager = create_runtime_incident_response_manager(monitor)
+        self.assertEqual(manager.required_healthy_observations, 4)
+        self.assertEqual(manager.journal.path.name, "factory-evidence.jsonl")
+        self.assertTrue(manager.journal.verify())
+
+    def test_runtime_factory_fails_closed_when_operator_key_missing(self):
+        env = {
+            "SMARTCAR_KEY_PROVIDER": "environment",
+            "SMARTCAR_INCIDENT_EVIDENCE_KEY": EVIDENCE_KEY,
+            "SMARTCAR_INCIDENT_EVIDENCE_DIR": self.temp.name,
+        }
+        with patch.dict(os.environ, env, clear=True):
+            with self.assertRaises(RuntimeError):
+                create_runtime_incident_response_manager(RuntimeSecurityMonitor())
 
 
 if __name__ == "__main__":
