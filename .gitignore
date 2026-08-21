@@ -1,0 +1,52 @@
+# Local secrets and environment overrides
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.pyright/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.venv/
+venv/
+
+# Native / compiled outputs
+build/
+dist/
+out/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+*.o
+*.obj
+*.a
+*.so
+*.dll
+*.dylib
+*.exe
+*.pdb
+
+# Go
+bin/
+*.test
+coverage.out
+
+# Runtime data and logs
+logs/
+*.log
+*.pid
+*.tmp
+*.temp
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

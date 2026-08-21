@@ -1,20 +1,40 @@
-﻿# OmniGuard V2X: A Privacy-Preserving Blockchain Framework for Smart Vehicle Security
+# OmniGuard V2X: A Privacy-Preserving Blockchain Framework for Smart Vehicle Security
 # Developer : Md Shahanur Islam Shagor
 # Role      : Project Architect & Lead Developer
 """
-Minimal .env loader and typed getters for SmartCar project.
-No external dependency required.
+Minimal .env loader and typed getters for OmniGuard V2X.
+
+Security properties:
+- preserves literal '#' characters inside unquoted secrets;
+- only treats '#' as an inline comment when it is preceded by whitespace;
+- validates environment variable names before loading them;
+- provides fail-closed helpers for required secrets.
 """
 
+import logging
 import os
 import re
 import sys
-import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 _LOADED = False
 _PROCESS_LOGGING_READY = False
+_ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_WEAK_SECRET_VALUES = {
+    "changeme",
+    "change-me",
+    "change_me",
+    "default",
+    "example",
+    "password",
+    "replace-me",
+    "replace_me",
+    "secret",
+    "token",
+    "your-secret-here",
+    "your_secret_here",
+}
 
 
 class _TeeStream:
@@ -41,26 +61,50 @@ class _TeeStream:
         return getattr(self._original, "encoding", "utf-8")
 
 
-def _strip_quotes(value: str) -> str:
-    """Remove symmetric single/double quotes around env value."""
-    if len(value) >= 2 and ((value[0] == '"' and value[-1] == '"') or (value[0] == "'" and value[-1] == "'")):
-        return value[1:-1]
+def _parse_env_value(raw_value: str) -> str:
+    """Parse a .env value without truncating literal '#' characters."""
+    value = raw_value.strip()
+    if not value:
+        return ""
+
+    if value[0] in {"'", '"'}:
+        quote = value[0]
+        escaped = False
+        for idx in range(1, len(value)):
+            ch = value[idx]
+            if quote == '"' and ch == "\\" and not escaped:
+                escaped = True
+                continue
+            if ch == quote and not escaped:
+                trailing = value[idx + 1 :].strip()
+                if trailing and not trailing.startswith("#"):
+                    raise ValueError("unexpected characters after quoted .env value")
+                return value[1:idx]
+            escaped = False
+        raise ValueError("unterminated quoted .env value")
+
+    for idx, ch in enumerate(value):
+        if ch == "#" and idx > 0 and value[idx - 1].isspace():
+            return value[:idx].rstrip()
     return value
 
 
-def _parse_env_line(line: str):
-    """Parse one .env line into key/value."""
+def _parse_env_line(line: str) -> Tuple[Optional[str], Optional[str]]:
+    """Parse one .env line into a validated key/value pair."""
     line = line.strip()
-    if not line or line.startswith("#"):
+    if not line or line.startswith("#") or "=" not in line:
         return None, None
-    if "=" not in line:
-        return None, None
-    key, value = line.split("=", 1)
+
+    key, raw_value = line.split("=", 1)
     key = key.strip()
-    value = value.strip()
-    if "#" in value and not (value.startswith('"') or value.startswith("'")):
-        value = value.split("#", 1)[0].strip()
-    return key, _strip_quotes(value)
+    if not _ENV_KEY_RE.fullmatch(key):
+        return None, None
+
+    try:
+        value = _parse_env_value(raw_value)
+    except ValueError:
+        return None, None
+    return key, value
 
 
 def find_project_root(start: Optional[Path] = None) -> Path:
@@ -109,13 +153,14 @@ def setup_process_logging():
 
 
 def load_env_file(path: Optional[str] = None, override: bool = False):
-    """Load .env into process environment."""
+    """Load a .env file into the process environment."""
     env_path = Path(path).resolve() if path else (find_project_root() / ".env")
     if not env_path.exists():
         return
+
     for raw in env_path.read_text(encoding="utf-8").splitlines():
         key, value = _parse_env_line(raw)
-        if not key:
+        if not key or value is None:
             continue
         if override:
             os.environ[key] = value
@@ -138,6 +183,27 @@ def get_env(name: str, default: str = "") -> str:
     return os.getenv(name, default)
 
 
+def get_required_env(name: str) -> str:
+    """Return a required non-empty environment value or fail closed."""
+    value = os.getenv(name)
+    if value is None or not value.strip():
+        raise RuntimeError(f"Required environment variable {name} is not configured")
+    return value.strip()
+
+
+def get_required_secret(name: str, min_length: int = 32) -> str:
+    """Return a required secret after basic weak/default-value rejection."""
+    value = get_required_env(name)
+    normalized = value.strip().lower()
+    if normalized in _WEAK_SECRET_VALUES or normalized.startswith(("example-", "changeme-", "replace-me-")):
+        raise RuntimeError(f"Environment variable {name} contains a placeholder secret")
+    if len(value) < max(1, int(min_length)):
+        raise RuntimeError(
+            f"Environment variable {name} must contain at least {max(1, int(min_length))} characters"
+        )
+    return value
+
+
 def get_bool(name: str, default: bool = False) -> bool:
     """Return boolean env value with fallback."""
     raw = os.getenv(name)
@@ -153,7 +219,7 @@ def get_int(name: str, default: int = 0) -> int:
         return default
     try:
         return int(raw)
-    except Exception:
+    except (TypeError, ValueError):
         return default
 
 
@@ -164,6 +230,5 @@ def get_float(name: str, default: float = 0.0) -> float:
         return default
     try:
         return float(raw)
-    except Exception:
+    except (TypeError, ValueError):
         return default
-
