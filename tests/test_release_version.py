@@ -50,7 +50,15 @@ class ReleaseVersionTests(unittest.TestCase):
         changelog = Path("CHANGELOG.md")
         integrity_tool = Path("release_integrity.py")
         integrity_test = Path("tests/test_release_integrity.py")
-        for path in (release_note, checklist, changelog, integrity_tool, integrity_test):
+        tag_operator = Path("scripts/create_v3_0_2_tag.sh")
+        for path in (
+            release_note,
+            checklist,
+            changelog,
+            integrity_tool,
+            integrity_test,
+            tag_operator,
+        ):
             self.assertTrue(path.exists(), str(path))
         release_text = release_note.read_text(encoding="utf-8")
         self.assertIn("OmniGuard V2X v3.0.2", release_text)
@@ -64,8 +72,11 @@ class ReleaseVersionTests(unittest.TestCase):
         text = path.read_text(encoding="utf-8")
         self.assertIn("- v3.0.2", text)
         self.assertIn('test "$GITHUB_REF_NAME" = "v3.0.2"', text)
-        self.assertIn('git merge-base --is-ancestor "$GITHUB_SHA" origin/main', text)
+        self.assertIn('main_sha="$(git rev-parse origin/main)"', text)
+        self.assertIn('test "$GITHUB_SHA" = "$main_sha"', text)
+        self.assertNotIn('git merge-base --is-ancestor "$GITHUB_SHA" origin/main', text)
         self.assertIn('test "$(git rev-parse HEAD)" = "$GITHUB_SHA"', text)
+        self.assertIn('test -f .github/workflows/release-v3.0.2.yml', text)
         self.assertIn('--commit-sha "$GITHUB_SHA"', text)
         self.assertIn('--verify security-reports/release-integrity-manifest.json', text)
         self.assertIn('sha256sum -c SHA256SUMS', text)
@@ -80,6 +91,22 @@ class ReleaseVersionTests(unittest.TestCase):
         self.assertIn('gh release create "$GITHUB_REF_NAME"', text)
         self.assertIn('--repo "$GITHUB_REPOSITORY"', text)
         self.assertIn('--verify-tag', text)
+
+    def test_tag_operator_is_explicit_and_exact_main_guarded(self):
+        text = Path("scripts/create_v3_0_2_tag.sh").read_text(encoding="utf-8")
+        self.assertIn('MODE="${1:-}"', text)
+        self.assertIn('"--check-only"', text)
+        self.assertIn('"--push"', text)
+        self.assertIn('branch="$(git branch --show-current)"', text)
+        self.assertIn('if [[ "$branch" != "main" ]]', text)
+        self.assertIn('git fetch origin main --tags', text)
+        self.assertIn('remote_main_sha="$(git rev-parse origin/main)"', text)
+        self.assertIn('if [[ "$local_sha" != "$remote_main_sha" ]]', text)
+        self.assertIn('git ls-remote --exit-code --tags origin "refs/tags/$TAG"', text)
+        self.assertIn('if [[ "$MODE" == "--check-only" ]]', text)
+        self.assertIn('git tag -a "$TAG" "$local_sha"', text)
+        self.assertIn('git push origin "refs/tags/$TAG"', text)
+        self.assertIn('git tag -d "$TAG"', text)
 
 
 if __name__ == "__main__":
