@@ -44,7 +44,7 @@ inline PqcProviderCapabilities enforce_pqc_provider_policy(bool hardware_require
     if (hardware_required && !capabilities.hardware_backed) {
         throw std::runtime_error(
             "hardware-backed PQC provider is required, but only " + capabilities.provider +
-            " is implemented; TPM2/PKCS11/HSM fallback is not simulated"
+            " is implemented; TPM2/PKCS#11/HSM fallback is not simulated"
         );
     }
     return capabilities;
