@@ -1,0 +1,39 @@
+name: Security Baseline
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - security/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  phase1-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile hardened modules
+        run: |
+          python -m py_compile env_config.py sync_protocol.py did_identity.py v2x_protocol.py
+
+      - name: Run security baseline tests
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest -v tests.test_security_baseline
+          python -m unittest -v tests.test_sync_protocol_security
+          python -m unittest -v tests.test_did_one_time_security
+          python -m unittest -v tests.test_v2x_security
