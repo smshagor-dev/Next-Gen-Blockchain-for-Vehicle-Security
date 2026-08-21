@@ -7,6 +7,7 @@ from release_integrity import (
     MANIFEST_SCHEMA,
     RELEASE_TAG,
     build_manifest,
+    current_commit,
     verify_manifest,
     write_manifest,
 )
@@ -54,11 +55,21 @@ class ReleaseIntegrityTests(unittest.TestCase):
         self.assertEqual(pins["nlohmann_json_version"], "3.11.3")
         self.assertRegex(pins["nlohmann_json_sha256"], r"^[0-9a-f]{64}$")
 
-    def test_manifest_round_trip_verification(self):
+    def test_manifest_round_trip_verification_binds_current_head(self):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "manifest.json"
-            write_manifest(target, commit_sha=TEST_COMMIT)
+            write_manifest(target)
             self.assertTrue(verify_manifest(target))
+            payload = json.loads(target.read_text(encoding="utf-8"))
+            payload["commit_sha"] = TEST_COMMIT
+            target.write_text(json.dumps(payload), encoding="utf-8")
+            self.assertNotEqual(TEST_COMMIT, current_commit())
+            self.assertFalse(verify_manifest(target))
+
+    def test_manifest_rejects_content_tamper(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "manifest.json"
+            write_manifest(target)
             payload = json.loads(target.read_text(encoding="utf-8"))
             payload["release_version"] = "0.0.0"
             target.write_text(json.dumps(payload), encoding="utf-8")
