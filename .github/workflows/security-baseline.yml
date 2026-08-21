@@ -14,7 +14,7 @@ permissions:
 jobs:
   security-validation:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
@@ -82,34 +82,55 @@ jobs:
           python incident_response_validation.py \
             --output security-reports/incident-response-validation.json
 
-      - name: Verify native build fails closed without liboqs
+      - name: Verify hardened native target fails closed without liboqs
         shell: bash
         run: |
           set +e
           cmake -S . -B build/native-strict \
             -DSMARTCAR_FORCE_PQC_UNAVAILABLE_FOR_TESTS=ON \
-            -DSMARTCAR_ALLOW_SIMULATED_PQC_BUILD=OFF \
+            -DSMARTCAR_FETCH_PINNED_LIBOQS=OFF \
+            -DSMARTCAR_BUILD_LEGACY_CPP_DEMO=OFF \
             -DSMARTCAR_BUILD_CAMERA_MODULE=OFF \
             > build/native-strict.log 2>&1
           status=$?
           set -e
           if [ "$status" -eq 0 ]; then
             cat build/native-strict.log
-            echo "Strict native configure unexpectedly succeeded without liboqs."
+            echo "Hardened native configure unexpectedly succeeded without liboqs."
             exit 1
           fi
-          grep -F "liboqs is required for the blockchain native target" build/native-strict.log
+          grep -F "Real liboqs is required for the hardened native blockchain target" build/native-strict.log
+          grep -F "Simulated PQC is not compiled into smartcar_blockchain" build/native-strict.log
 
-      - name: Build explicit lab-only simulated PQC native target
+      - name: Build isolated legacy C++ demo target
         run: |
-          cmake -S . -B build/native-lab \
+          cmake -S . -B build/native-legacy \
+            -DSMARTCAR_BUILD_BLOCKCHAIN=OFF \
+            -DSMARTCAR_BUILD_LEGACY_CPP_DEMO=ON \
             -DSMARTCAR_FORCE_PQC_UNAVAILABLE_FOR_TESTS=ON \
-            -DSMARTCAR_ALLOW_SIMULATED_PQC_BUILD=ON \
             -DSMARTCAR_ENABLE_NATIVE_OPT=OFF \
             -DSMARTCAR_ENABLE_UNSAFE_FAST_MATH=OFF \
             -DSMARTCAR_ENABLE_IPO=OFF \
             -DSMARTCAR_BUILD_CAMERA_MODULE=OFF
-          cmake --build build/native-lab --config Release --parallel 2
+          cmake --build build/native-legacy --config Release --target smartcar_blockchain_legacy_demo --parallel 2
+
+      - name: Build pinned real-PQC native target
+        run: |
+          cmake -S . -B build/native-real \
+            -DSMARTCAR_FETCH_PINNED_LIBOQS=ON \
+            -DSMARTCAR_BUILD_LEGACY_CPP_DEMO=OFF \
+            -DSMARTCAR_ENABLE_NATIVE_OPT=OFF \
+            -DSMARTCAR_ENABLE_UNSAFE_FAST_MATH=OFF \
+            -DSMARTCAR_ENABLE_IPO=OFF \
+            -DSMARTCAR_BUILD_CAMERA_MODULE=OFF
+          cmake --build build/native-real --config Release --target smartcar_blockchain --parallel 2
+
+      - name: Run secure native crypto self-test
+        shell: bash
+        run: |
+          export SMARTCAR_CPP_DATA_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          export SMARTCAR_AUTH_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          ./build/native-real/smartcar_blockchain --self-test
 
       - name: Normalize Go formatting for validation
         working-directory: api/go
