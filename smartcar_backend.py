@@ -1,12 +1,9 @@
 # OmniGuard V2X: A Privacy-Preserving Blockchain Framework for Smart Vehicle Security
-"""Backend adapter for keeping Python focused on GUI work.
-
-Default mode uses the Go HTTP backend for low-latency state/telemetry APIs.
-Set SMARTCAR_BACKEND=python to force the original in-process Python core.
-"""
+"""Backend adapter with authenticated loopback transport for the Go control service."""
 
 import json
 import os
+import secrets
 import subprocess
 import time
 import urllib.error
@@ -17,7 +14,8 @@ from typing import Any, Dict, List
 
 from blockchain import SmartCarBlockchain, TelemetryData
 from consensus_security import consensus_security_metadata
-from env_config import get_env
+from control_api_security import build_signed_headers, validate_loopback_base_url, verify_service_proof
+from env_config import get_env, get_required_secret
 from federated_learning import fl_validation_metadata
 from identity_security import identity_security_metadata
 from zkp_privacy import pedersen_privacy_metadata
@@ -79,17 +77,20 @@ class PythonBackend:
 
 class GoBackend:
     def __init__(self, vehicle_id: str, password: str, auth_token: str, chain_file: str):
-        self.vehicle_id = vehicle_id
-        self.password = password
-        self.auth_token = auth_token
-        self.chain_file = chain_file
+        self.vehicle_id = str(vehicle_id)
+        self.password = str(password)
+        self.auth_token = str(auth_token)
+        self.chain_file = str(chain_file)
+        self.api_secret = get_required_secret("SMARTCAR_GO_API_SECRET", min_length=32)
+        self.recovery_key = get_required_secret("SMARTCAR_RECOVERY_KEY", min_length=32)
+        self.base_url = validate_loopback_base_url(get_env("SMARTCAR_GO_API_URL", "http://127.0.0.1:8787"))
         self._init_payload = {
-            "vehicle_id": vehicle_id,
-            "password": password,
-            "auth_token": auth_token,
-            "chain_file": chain_file,
+            "vehicle_id": self.vehicle_id,
+            "password": self.password,
+            "auth_token": self.auth_token,
+            "recovery_key": self.recovery_key,
+            "chain_file": self.chain_file,
         }
-        self.base_url = get_env("SMARTCAR_GO_API_URL", "http://127.0.0.1:8787")
         self.chain: List[BackendBlock] = []
         self.car_unlocked = False
         self.engine_started = False
@@ -105,9 +106,16 @@ class GoBackend:
         self._pedersen_privacy: Dict[str, Any] = pedersen_privacy_metadata()
         self._reviewer_audit: Dict[str, Any] = reviewer_audit_metadata()
         self._proc = None
+        self._service_instance = ""
         self._ensure_service()
         self._initialize_remote_state()
         self._refresh()
+
+    def _spawn_environment(self, root: Path) -> Dict[str, str]:
+        env = os.environ.copy()
+        env["SMARTCAR_GO_API_SECRET"] = self.api_secret
+        env["SMARTCAR_GO_DATA_DIR"] = str((root / "logs").resolve())
+        return env
 
     def _ensure_service(self):
         if self._health():
@@ -121,63 +129,86 @@ class GoBackend:
         else:
             cmd = ["go", "run", "."]
             cwd = str(go_root)
-        flags = 0
-        if os.name == "nt":
-            flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
         self._proc = subprocess.Popen(
             cmd,
             cwd=cwd,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             creationflags=flags,
+            env=self._spawn_environment(root),
         )
         deadline = time.time() + 12.0
         while time.time() < deadline:
             if self._health():
                 return
+            if self._proc.poll() is not None:
+                raise RuntimeError("Go backend exited before authenticated health verification")
             time.sleep(0.25)
-        raise RuntimeError("Go backend did not become ready on http://127.0.0.1:8787")
+        raise RuntimeError("Authenticated Go backend did not become ready on loopback")
 
     def _health(self) -> bool:
+        challenge = secrets.token_hex(16)
+        req = urllib.request.Request(
+            f"{self.base_url}/health",
+            headers={"X-SmartCar-Challenge": challenge, "Cache-Control": "no-store"},
+            method="GET",
+        )
         try:
-            with urllib.request.urlopen(f"{self.base_url}/health", timeout=0.35) as resp:
-                return resp.status == 200
+            with urllib.request.urlopen(req, timeout=0.5) as resp:
+                if resp.status != 200:
+                    return False
+                payload = json.loads(resp.read().decode("utf-8") or "{}")
         except Exception:
             return False
+        proof = str(payload.get("service_proof", ""))
+        instance = str(payload.get("instance_id", ""))
+        if not instance or not verify_service_proof(self.api_secret, challenge, proof):
+            return False
+        self._service_instance = instance
+        return True
 
     def _initialize_remote_state(self):
         self._request("POST", "/init", self._init_payload, recover=False)
 
     def _recover_service(self):
-        was_healthy = self._health()
         self._ensure_service()
-        if not was_healthy:
-            self._initialize_remote_state()
+        self._initialize_remote_state()
+
+    @staticmethod
+    def _encode_payload(payload: Dict[str, Any] = None) -> bytes:
+        if payload is None:
+            return b""
+        return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+    def _build_request(self, method: str, path: str, payload: Dict[str, Any] = None) -> urllib.request.Request:
+        if not path.startswith("/"):
+            raise ValueError("backend API path must be absolute")
+        body = self._encode_payload(payload)
+        headers = build_signed_headers(self.api_secret, method, path, body)
+        headers["Cache-Control"] = "no-store"
+        data = body if method.upper() == "POST" else None
+        if method.upper() == "POST":
+            headers["Content-Type"] = "application/json"
+        return urllib.request.Request(f"{self.base_url}{path}", data=data, headers=headers, method=method.upper())
 
     def _request(self, method: str, path: str, payload: Dict[str, Any] = None, recover: bool = True) -> Dict[str, Any]:
-        data = None
-        headers = {}
-        if payload is not None:
-            data = json.dumps(payload).encode("utf-8")
-            headers["Content-Type"] = "application/json"
-        req = urllib.request.Request(f"{self.base_url}{path}", data=data, headers=headers, method=method)
-        last_error = None
         attempts = 2 if recover else 1
+        last_error = None
         for attempt in range(attempts):
+            req = self._build_request(method, path, payload)
             try:
                 with urllib.request.urlopen(req, timeout=2.5) as resp:
                     body = resp.read().decode("utf-8")
                     return json.loads(body) if body else {}
-            except urllib.error.HTTPError as e:
-                detail = e.read().decode("utf-8", errors="replace")
-                raise RuntimeError(f"Go backend HTTP {e.code}: {detail}") from e
-            except (ConnectionError, OSError, TimeoutError, urllib.error.URLError) as e:
-                last_error = e
+            except urllib.error.HTTPError as exc:
+                detail = exc.read().decode("utf-8", errors="replace")
+                raise RuntimeError(f"Go backend HTTP {exc.code}: {detail}") from exc
+            except (ConnectionError, OSError, TimeoutError, urllib.error.URLError) as exc:
+                last_error = exc
                 if not recover or attempt + 1 >= attempts:
                     break
                 self._recover_service()
-                data = json.dumps(payload).encode("utf-8") if payload is not None else None
-                req = urllib.request.Request(f"{self.base_url}{path}", data=data, headers=headers, method=method)
         raise RuntimeError(f"Go backend connection unavailable: {last_error}") from last_error
 
     def _get(self, path: str) -> Dict[str, Any]:
@@ -331,6 +362,6 @@ def create_backend(vehicle_id: str, password: str, auth_token: str, chain_file: 
     try:
         return GoBackend(vehicle_id, password, auth_token, chain_file)
     except Exception:
-        if get_env("SMARTCAR_BACKEND_STRICT", "0") == "1":
-            raise
-        return PythonBackend(vehicle_id, password, auth_token, chain_file)
+        if get_env("SMARTCAR_BACKEND_ALLOW_PYTHON_FALLBACK", "0") == "1":
+            return PythonBackend(vehicle_id, password, auth_token, chain_file)
+        raise
