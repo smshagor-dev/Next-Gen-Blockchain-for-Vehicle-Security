@@ -1,0 +1,54 @@
+name: UI CI
+
+on:
+  push:
+    branches:
+      - only-update-ui
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ui-validation:
+    name: UI Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install Tk runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Compile UI entry points
+        run: |
+          python -m py_compile main.py dashboard.py dashboard_modern_ui.py
+
+      - name: Verify UI imports
+        run: |
+          python -c "import dashboard_modern_ui; import main"
+
+      - name: Run dashboard UI tests
+        env:
+          DISPLAY: ''
+        run: |
+          python -m unittest discover -s tests -p 'test_dashboard_redesign.py' -v
