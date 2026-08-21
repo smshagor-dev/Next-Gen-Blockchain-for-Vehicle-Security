@@ -4,9 +4,9 @@
 #include <stdexcept>
 #include <string>
 
-#include "pqc_key_store.h"
-
 namespace omniguard {
+
+inline constexpr const char* kSoftwarePqcProvider = "software_encrypted_file";
 
 struct PqcProviderCapabilities {
     std::string provider;
@@ -32,7 +32,7 @@ inline bool parse_strict_env_bool(const char* name, bool default_value = false) 
 
 inline PqcProviderCapabilities software_pqc_provider_capabilities() {
     return {
-        PqcKeyStore::kProvider,
+        kSoftwarePqcProvider,
         false,
         false,
         true,
@@ -44,7 +44,7 @@ inline PqcProviderCapabilities enforce_pqc_provider_policy(bool hardware_require
     if (hardware_required && !capabilities.hardware_backed) {
         throw std::runtime_error(
             "hardware-backed PQC provider is required, but only " + capabilities.provider +
-            " is implemented; TPM2/PKCS#11/HSM fallback is not simulated"
+            " is implemented; TPM2/PKCS11/HSM fallback is not simulated"
         );
     }
     return capabilities;
@@ -55,5 +55,11 @@ inline PqcProviderCapabilities enforce_pqc_provider_policy_from_env() {
         parse_strict_env_bool("SMARTCAR_CPP_PQC_HARDWARE_REQUIRED", false)
     );
 }
+
+struct PqcProviderPolicyGuard {
+    PqcProviderPolicyGuard() {
+        (void)enforce_pqc_provider_policy_from_env();
+    }
+};
 
 }  // namespace omniguard
