@@ -94,6 +94,13 @@ def _cmake_dependency_pins(root: Path) -> Dict[str, str]:
     }
 
 
+def current_commit(root: Path = Path(".")) -> str:
+    value = _git(root.resolve(), "rev-parse", "HEAD").strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{40}", value):
+        raise RuntimeError("could not resolve a valid current Git commit SHA")
+    return value
+
+
 def build_manifest(
     root: Path = Path("."),
     *,
@@ -125,8 +132,8 @@ def build_manifest(
             }
         )
 
-    resolved_commit = str(commit_sha or _git(root, "rev-parse", "HEAD")).strip()
-    if not re.fullmatch(r"[0-9a-fA-F]{40}", resolved_commit):
+    resolved_commit = str(commit_sha or current_commit(root)).strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{40}", resolved_commit):
         raise RuntimeError("release commit SHA must be a 40-character hexadecimal value")
 
     return {
@@ -134,7 +141,7 @@ def build_manifest(
         "release_version": RELEASE_VERSION,
         "release_tag": RELEASE_TAG,
         "internal_hardening_phase": INTERNAL_HARDENING_PHASE,
-        "commit_sha": resolved_commit.lower(),
+        "commit_sha": resolved_commit,
         "source_tree": {
             "tracked_file_count": len(files),
             "tracked_total_bytes": total_bytes,
@@ -173,11 +180,14 @@ def write_manifest(
 
 
 def verify_manifest(path: Path, *, root: Path = Path(".")) -> bool:
+    root = root.resolve()
     received = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(received, Mapping):
         return False
-    commit_sha = str(received.get("commit_sha", ""))
-    expected = build_manifest(root, commit_sha=commit_sha)
+    actual_commit = current_commit(root)
+    if str(received.get("commit_sha", "")).strip().lower() != actual_commit:
+        return False
+    expected = build_manifest(root, commit_sha=actual_commit)
     return received == expected
 
 
