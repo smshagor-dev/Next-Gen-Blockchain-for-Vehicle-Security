@@ -242,8 +242,23 @@ class RuntimeSecurityMonitor:
                 expected_previous = event.event_hash
             return True
 
+    def refresh_decision(self, now: Optional[datetime] = None) -> RuntimeSecurityDecision:
+        """Recompute the rolling-window decision without adding evidence.
+
+        This allows transient detections to age out of the correlation window,
+        while higher-level incident/recovery state remains latched separately by
+        the incident-response manager.
+        """
+        with self._lock:
+            current = now or _utc_now()
+            if current.tzinfo is None:
+                current = current.replace(tzinfo=timezone.utc)
+            self._last_decision = self._decision_for(self._recent_events(current.astimezone(timezone.utc)))
+            return self._last_decision
+
     def snapshot(self) -> Dict[str, object]:
         with self._lock:
+            self.refresh_decision()
             return {
                 "version": RUNTIME_MONITOR_VERSION,
                 "capacity": self.capacity,
