@@ -58,7 +58,7 @@ class ReleaseVersionTests(unittest.TestCase):
         self.assertIn("v3.0.2", changelog.read_text(encoding="utf-8"))
         self.assertIn("Expected tag: `v3.0.2`", checklist.read_text(encoding="utf-8"))
 
-    def test_publication_workflow_is_tag_and_commit_guarded(self):
+    def test_publication_workflow_is_tag_commit_and_permission_guarded(self):
         path = Path(".github/workflows/release-v3.0.2.yml")
         self.assertTrue(path.exists())
         text = path.read_text(encoding="utf-8")
@@ -66,13 +66,20 @@ class ReleaseVersionTests(unittest.TestCase):
         self.assertIn('test "$GITHUB_REF_NAME" = "v3.0.2"', text)
         self.assertIn('git merge-base --is-ancestor "$GITHUB_SHA" origin/main', text)
         self.assertIn('test "$(git rev-parse HEAD)" = "$GITHUB_SHA"', text)
-        self.assertIn('gh release view "$GITHUB_REF_NAME"', text)
         self.assertIn('--commit-sha "$GITHUB_SHA"', text)
         self.assertIn('--verify security-reports/release-integrity-manifest.json', text)
         self.assertIn('sha256sum -c SHA256SUMS', text)
+        self.assertIn("permissions:\n  contents: read", text)
+        self.assertIn("validate-and-package:", text)
+        self.assertIn("publish:\n    needs: validate-and-package", text)
+        self.assertIn("    permissions:\n      contents: write\n      actions: read", text)
+        self.assertIn("actions/upload-artifact@v4", text)
+        self.assertIn("actions/download-artifact@v4", text)
+        self.assertIn('manifest.get("commit_sha") != sys.argv[2]', text)
+        self.assertIn('gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY"', text)
         self.assertIn('gh release create "$GITHUB_REF_NAME"', text)
+        self.assertIn('--repo "$GITHUB_REPOSITORY"', text)
         self.assertIn('--verify-tag', text)
-        self.assertIn('permissions:\n  contents: write', text)
 
 
 if __name__ == "__main__":
