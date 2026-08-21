@@ -34,13 +34,14 @@ jobs:
 
       - name: Compile hardened Python modules
         run: |
-          python -m py_compile release_metadata.py credential_policy.py key_provider.py runtime_isolation.py runtime_security_monitor.py runtime_backend_security.py runtime_backend_patch.py incident_response.py incident_response_runtime.py incident_response_validation.py env_config.py replay_security.py permissioned_consensus.py consensus_security.py identity_security.py sync_protocol_legacy.py sync_protocol.py did_identity.py v2x_protocol.py control_api_security.py ledger_integrity.py adversarial_validation.py hil_security_validation.py smartcar_backend.py main.py
+          python -m py_compile release_metadata.py release_integrity.py credential_policy.py key_provider.py runtime_isolation.py runtime_security_monitor.py runtime_backend_security.py runtime_backend_patch.py incident_response.py incident_response_runtime.py incident_response_validation.py env_config.py replay_security.py permissioned_consensus.py consensus_security.py identity_security.py sync_protocol_legacy.py sync_protocol.py did_identity.py v2x_protocol.py control_api_security.py ledger_integrity.py adversarial_validation.py hil_security_validation.py smartcar_backend.py main.py
 
       - name: Run Python security regression tests
         env:
           PYTHONPATH: .
         run: |
           python -m unittest -v tests.test_release_version
+          python -m unittest -v tests.test_release_integrity
           python -m unittest -v tests.test_security_baseline
           python -m unittest -v tests.test_credential_policy
           python -m unittest -v tests.test_key_runtime_security
@@ -72,6 +73,16 @@ jobs:
           assert release_metadata()["internal_hardening_phase"] == "v3.2"
           assert security_capability_output(False)["release_version"] == "3.0.2"
           PY
+
+      - name: Generate and verify release integrity manifest
+        env:
+          PYTHONPATH: .
+        run: |
+          python release_integrity.py \
+            --commit-sha "$GITHUB_SHA" \
+            --output security-reports/release-integrity-manifest.json
+          python release_integrity.py \
+            --verify security-reports/release-integrity-manifest.json
 
       - name: Run deterministic adversarial campaigns
         env:
@@ -165,10 +176,45 @@ jobs:
           go test -run=^$ -fuzz=FuzzHealthChallengeParser -fuzztime=2s -timeout=30s
           go test -run=^$ -fuzz=FuzzControlAPIUnsignedMutation -fuzztime=2s -timeout=30s
 
-      - name: Build Go backend
+      - name: Build Go backend validation binary
         working-directory: api/go
         run: |
           go build ./...
+          mkdir -p ../../security-reports/release-candidate-linux-amd64
+          go build -o ../../security-reports/release-candidate-linux-amd64/smartcar_go_backend .
+
+      - name: Package v3.0.2 Linux validation artifacts
+        shell: bash
+        run: |
+          package_dir="security-reports/release-candidate-linux-amd64"
+          mkdir -p "$package_dir"
+          cp build/native-real/smartcar_blockchain "$package_dir/smartcar_blockchain"
+          cp VERSION "$package_dir/VERSION"
+          cp docs/releases/v3.0.2.md "$package_dir/v3.0.2.md"
+          cp security-reports/release-integrity-manifest.json "$package_dir/release-integrity-manifest.json"
+          (
+            cd "$package_dir"
+            sha256sum smartcar_blockchain smartcar_go_backend VERSION v3.0.2.md release-integrity-manifest.json > SHA256SUMS
+            sha256sum -c SHA256SUMS
+          )
+
+      - name: Upload release integrity manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v3.0.2-release-integrity-manifest
+          path: security-reports/release-integrity-manifest.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload v3.0.2 Linux validation package
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: omniguard-v3.0.2-linux-amd64-validation
+          path: security-reports/release-candidate-linux-amd64/
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Upload adversarial validation report
         if: always()
