@@ -48,6 +48,7 @@ class ReleaseVersionTests(unittest.TestCase):
     def test_release_docs_and_integrity_tooling_are_present(self):
         release_note = Path("docs/releases/v3.0.2.md")
         checklist = Path("docs/releases/v3.0.2-checklist.md")
+        postmerge = Path("docs/releases/v3.0.2-postmerge-validation.md")
         changelog = Path("CHANGELOG.md")
         integrity_tool = Path("release_integrity.py")
         integrity_test = Path("tests/test_release_integrity.py")
@@ -55,6 +56,7 @@ class ReleaseVersionTests(unittest.TestCase):
         for path in (
             release_note,
             checklist,
+            postmerge,
             changelog,
             integrity_tool,
             integrity_test,
@@ -66,6 +68,20 @@ class ReleaseVersionTests(unittest.TestCase):
         self.assertIn("Release Integrity Evidence", release_text)
         self.assertIn("v3.0.2", changelog.read_text(encoding="utf-8"))
         self.assertIn("Expected tag: `v3.0.2`", checklist.read_text(encoding="utf-8"))
+        self.assertIn("exact merge commit", postmerge.read_text(encoding="utf-8"))
+
+    def test_security_baseline_validates_main_pushes(self):
+        text = Path(".github/workflows/security-baseline.yml").read_text(encoding="utf-8")
+        self.assertRegex(
+            text,
+            r"push:\s*\n\s*branches:\s*\n\s*- main\s*\n\s*- security/\*\*\s*\n\s*- release/\*\*",
+        )
+        self.assertIn("Generate and verify release integrity manifest", text)
+        self.assertIn('--commit-sha "$GITHUB_SHA"', text)
+        self.assertIn("Build pinned real-PQC native target", text)
+        self.assertIn("Run secure native crypto self-test", text)
+        self.assertIn("Run bounded Go fuzz campaigns", text)
+        self.assertIn("Package v3.0.2 Linux validation artifacts", text)
 
     def test_publication_workflow_is_tag_commit_and_permission_guarded(self):
         path = Path(".github/workflows/release-v3.0.2.yml")
