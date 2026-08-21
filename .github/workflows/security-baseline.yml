@@ -63,6 +63,7 @@ jobs:
           python -m unittest -v tests.test_native_build_security
           python -m unittest -v tests.test_pqc_keystore_foundation
           python -m unittest -v tests.test_pqc_keystore_integration
+          python -m unittest -v tests.test_pqc_key_rotation
 
       - name: Verify canonical release identity
         env:
@@ -119,6 +120,7 @@ jobs:
             -DSMARTCAR_FORCE_PQC_UNAVAILABLE_FOR_TESTS=ON \
             -DSMARTCAR_FETCH_PINNED_LIBOQS=OFF \
             -DSMARTCAR_BUILD_PQC_KEYSTORE_SELFTEST=OFF \
+            -DSMARTCAR_BUILD_PQC_KEY_ADMIN=OFF \
             -DSMARTCAR_BUILD_LEGACY_CPP_DEMO=OFF \
             -DSMARTCAR_BUILD_CAMERA_MODULE=OFF \
             > build/native-strict.log 2>&1
@@ -136,6 +138,7 @@ jobs:
           cmake -S . -B build/native-legacy \
             -DSMARTCAR_BUILD_BLOCKCHAIN=OFF \
             -DSMARTCAR_BUILD_PQC_KEYSTORE_SELFTEST=OFF \
+            -DSMARTCAR_BUILD_PQC_KEY_ADMIN=OFF \
             -DSMARTCAR_BUILD_LEGACY_CPP_DEMO=ON \
             -DSMARTCAR_FORCE_PQC_UNAVAILABLE_FOR_TESTS=ON \
             -DSMARTCAR_ENABLE_NATIVE_OPT=OFF \
@@ -144,18 +147,19 @@ jobs:
             -DSMARTCAR_BUILD_CAMERA_MODULE=OFF
           cmake --build build/native-legacy --config Release --target smartcar_blockchain_legacy_demo --parallel 2
 
-      - name: Build pinned real-PQC native target and keystore self-test
+      - name: Build pinned real-PQC native target, keystore self-test, and key admin
         run: |
           cmake -S . -B build/native-real \
             -DSMARTCAR_FETCH_PINNED_LIBOQS=ON \
             -DSMARTCAR_BUILD_PQC_KEYSTORE_SELFTEST=ON \
+            -DSMARTCAR_BUILD_PQC_KEY_ADMIN=ON \
             -DSMARTCAR_BUILD_LEGACY_CPP_DEMO=OFF \
             -DSMARTCAR_ENABLE_NATIVE_OPT=OFF \
             -DSMARTCAR_ENABLE_UNSAFE_FAST_MATH=OFF \
             -DSMARTCAR_ENABLE_IPO=OFF \
             -DSMARTCAR_BUILD_CAMERA_MODULE=OFF
           grep -F "CMAKE_PROJECT_VERSION:STATIC=3.0.2" build/native-real/CMakeCache.txt
-          cmake --build build/native-real --config Release --target smartcar_blockchain smartcar_pqc_keystore_selftest --parallel 2
+          cmake --build build/native-real --config Release --target smartcar_blockchain smartcar_pqc_keystore_selftest smartcar_pqc_key_admin --parallel 2
 
       - name: Run secure native crypto self-test
         shell: bash
@@ -174,6 +178,19 @@ jobs:
         run: |
           export SMARTCAR_CPP_PQC_KEYSTORE_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
           ./build/native-real/smartcar_pqc_keystore_selftest
+
+      - name: Run guarded PQC key administration self-test
+        shell: bash
+        run: |
+          ./build/native-real/smartcar_pqc_key_admin --self-test
+          set +e
+          SMARTCAR_CPP_PQC_HARDWARE_REQUIRED=1 ./build/native-real/smartcar_pqc_key_admin provider-status
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "Software PQC provider unexpectedly satisfied hardware-required policy."
+            exit 1
+          fi
 
       - name: Normalize Go formatting for validation
         working-directory: api/go
