@@ -32,6 +32,7 @@ _SECRET_POLICIES: Dict[str, SecretPolicy] = {
     "SMARTCAR_RECOVERY_KEY": SecretPolicy("go_recovery", 32),
     "SMARTCAR_OWNER_RECOVERY_KEY": SecretPolicy("owner_recovery", 32),
     "SMARTCAR_STORAGE_PASSPHRASE": SecretPolicy("storage_encryption", 32),
+    "SMARTCAR_CPP_DATA_KEY": SecretPolicy("native_cpp_data", 32),
     "SMARTCAR_FORENSIC_ACCESS_KEY": SecretPolicy("forensic_wrap", 32),
     "SMARTCAR_INSURANCE_ACCESS_KEY": SecretPolicy("insurance_wrap", 32),
     "SMARTCAR_INCIDENT_EVIDENCE_KEY": SecretPolicy("incident_evidence", 32),
@@ -251,7 +252,7 @@ def credential_policy_metadata(environ: Optional[Mapping[str, str]] = None) -> D
         if str(env.get(name, "")).strip() not in {"", "{}"}
     ]
     return {
-        "policy": "OMNIGUARD_CREDENTIAL_POLICY_V2_4",
+        "policy": "OMNIGUARD_CREDENTIAL_POLICY_V3_2",
         "strict_defaults": not insecure_secret_defaults_allowed(),
         "configured_secret_names": configured,
         "configured_previous_slots": previous_slots,

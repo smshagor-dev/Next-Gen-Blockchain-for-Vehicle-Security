@@ -7,14 +7,29 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(SMARTCAR_BUILD_BLOCKCHAIN "Build blockchain.cpp demo executable" ON)
+option(SMARTCAR_BUILD_BLOCKCHAIN "Build the hardened native blockchain target" ON)
+option(SMARTCAR_BUILD_LEGACY_CPP_DEMO "Build historical blockchain.cpp as an explicitly legacy/lab-only target" OFF)
 option(SMARTCAR_BUILD_CAMERA_MODULE "Build camera_emergency_brake.cpp (OpenCV required)" OFF)
 option(SMARTCAR_ENABLE_WARNINGS "Enable extra compiler warnings" ON)
 option(SMARTCAR_ENABLE_NATIVE_OPT "Enable host-specific -march=native Release optimizations" OFF)
 option(SMARTCAR_ENABLE_UNSAFE_FAST_MATH "Enable -ffast-math for controlled performance experiments only" OFF)
 option(SMARTCAR_ENABLE_IPO "Enable interprocedural optimization/LTO when supported" OFF)
-option(SMARTCAR_ALLOW_SIMULATED_PQC_BUILD "Allow blockchain.cpp to compile without liboqs for controlled lab/demo use" OFF)
+option(SMARTCAR_FETCH_PINNED_LIBOQS "Fetch pinned liboqs 0.16.0 when no system package is available" OFF)
 option(SMARTCAR_FORCE_PQC_UNAVAILABLE_FOR_TESTS "Pretend liboqs is unavailable to validate fail-closed CMake behavior" OFF)
+
+# Backward-compatible v3.1 lab flag. It no longer weakens the production target;
+# it only enables the explicitly named legacy demo target.
+option(SMARTCAR_ALLOW_SIMULATED_PQC_BUILD "Deprecated alias for SMARTCAR_BUILD_LEGACY_CPP_DEMO" OFF)
+if(SMARTCAR_ALLOW_SIMULATED_PQC_BUILD)
+    message(WARNING
+        "SMARTCAR_ALLOW_SIMULATED_PQC_BUILD is deprecated. "
+        "It now enables only smartcar_blockchain_legacy_demo; the production target remains real-PQC-only."
+    )
+    set(SMARTCAR_BUILD_LEGACY_CPP_DEMO ON)
+endif()
+
+set(SMARTCAR_LIBOQS_VERSION "0.16.0")
+set(SMARTCAR_LIBOQS_COMMIT "5a1a854b0dc9f2141bdc771c555ee60c37950183")
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
@@ -69,8 +84,7 @@ function(smartcar_apply_release_options target_name)
     endif()
 endfunction()
 
-# nlohmann_json is required by blockchain.cpp. The fallback archive is pinned
-# to the SHA-256 published for the v3.11.3 json.tar.xz release asset.
+# nlohmann/json fallback is checksum-pinned.
 find_package(nlohmann_json CONFIG QUIET)
 if(NOT nlohmann_json_FOUND)
     include(FetchContent)
@@ -83,47 +97,87 @@ if(NOT nlohmann_json_FOUND)
     FetchContent_MakeAvailable(nlohmann_json)
 endif()
 
-# The blockchain demo has a historical deterministic simulated-PQC path in the
-# source tree. Standard native builds must not silently compile that path when
-# liboqs is absent. Simulation therefore requires an explicit lab-only opt-in.
-find_package(liboqs CONFIG QUIET)
-if(SMARTCAR_FORCE_PQC_UNAVAILABLE_FOR_TESTS)
-    set(liboqs_FOUND FALSE)
+# OpenSSL provides the authenticated AES-256-GCM storage boundary and digest
+# implementations used by native/secure_blockchain.cpp.
+if(SMARTCAR_BUILD_BLOCKCHAIN)
+    find_package(OpenSSL 3.0 REQUIRED COMPONENTS Crypto)
+endif()
+
+# Prefer a system liboqs package. CI/reproducible source builds may explicitly
+# fetch the fully pinned 0.16.0 release commit. The minimal build contains only
+# ML-KEM-512 and ML-DSA-44, which are the algorithms used by the secure core.
+if(NOT SMARTCAR_FORCE_PQC_UNAVAILABLE_FOR_TESTS)
+    find_package(liboqs CONFIG QUIET)
 endif()
 
 set(SMARTCAR_LIBOQS_TARGET "")
-if(liboqs_FOUND)
+if(liboqs_FOUND AND NOT SMARTCAR_FORCE_PQC_UNAVAILABLE_FOR_TESTS)
     if(TARGET OQS::oqs)
         set(SMARTCAR_LIBOQS_TARGET OQS::oqs)
     elseif(TARGET oqs)
         set(SMARTCAR_LIBOQS_TARGET oqs)
-    else()
-        message(FATAL_ERROR "liboqs was reported as found but no supported CMake target (OQS::oqs or oqs) is available.")
+    endif()
+endif()
+
+if(NOT SMARTCAR_LIBOQS_TARGET AND SMARTCAR_FETCH_PINNED_LIBOQS AND NOT SMARTCAR_FORCE_PQC_UNAVAILABLE_FOR_TESTS)
+    include(FetchContent)
+    set(OQS_BUILD_ONLY_LIB ON CACHE BOOL "" FORCE)
+    set(OQS_DIST_BUILD OFF CACHE BOOL "" FORCE)
+    set(OQS_MINIMAL_BUILD "KEM_ml_kem_512;SIG_ml_dsa_44" CACHE STRING "" FORCE)
+    set(OQS_STRICT_WARNINGS OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(
+        liboqs
+        GIT_REPOSITORY https://github.com/open-quantum-safe/liboqs.git
+        GIT_TAG ${SMARTCAR_LIBOQS_COMMIT}
+        GIT_SHALLOW FALSE
+        GIT_PROGRESS FALSE
+    )
+    FetchContent_MakeAvailable(liboqs)
+    if(TARGET OQS::oqs)
+        set(SMARTCAR_LIBOQS_TARGET OQS::oqs)
+    elseif(TARGET oqs)
+        set(SMARTCAR_LIBOQS_TARGET oqs)
     endif()
 endif()
 
 if(SMARTCAR_BUILD_BLOCKCHAIN)
-    if(NOT SMARTCAR_LIBOQS_TARGET AND NOT SMARTCAR_ALLOW_SIMULATED_PQC_BUILD)
+    if(NOT SMARTCAR_LIBOQS_TARGET)
         message(FATAL_ERROR
-            "liboqs is required for the blockchain native target. "
-            "Install liboqs, or set SMARTCAR_ALLOW_SIMULATED_PQC_BUILD=ON only for controlled lab/demo validation. "
-            "The simulated source path is not a post-quantum security mechanism."
+            "Real liboqs is required for the hardened native blockchain target. "
+            "Install liboqs ${SMARTCAR_LIBOQS_VERSION}, or set SMARTCAR_FETCH_PINNED_LIBOQS=ON to fetch commit ${SMARTCAR_LIBOQS_COMMIT}. "
+            "Simulated PQC is not compiled into smartcar_blockchain."
         )
     endif()
 
-    add_executable(smartcar_blockchain blockchain.cpp)
-    target_link_libraries(smartcar_blockchain PRIVATE nlohmann_json::nlohmann_json)
+    add_executable(smartcar_blockchain native/secure_blockchain.cpp)
+    target_link_libraries(
+        smartcar_blockchain
+        PRIVATE
+            nlohmann_json::nlohmann_json
+            OpenSSL::Crypto
+            ${SMARTCAR_LIBOQS_TARGET}
+    )
+    target_compile_definitions(smartcar_blockchain PRIVATE SMARTCAR_SECURE_NATIVE_CORE=1)
     smartcar_apply_release_options(smartcar_blockchain)
+    message(STATUS
+        "Hardened native target: OpenSSL AES-256-GCM + liboqs ML-DSA-44/ML-KEM-512; simulated PQC excluded."
+    )
+endif()
 
+# Historical source remains available only as an explicitly named lab/demo
+# target. This target contains the legacy XOR storage helper and historical
+# simulated-PQC fallback and is outside the hardened production build profile.
+if(SMARTCAR_BUILD_LEGACY_CPP_DEMO)
+    add_executable(smartcar_blockchain_legacy_demo blockchain.cpp)
+    target_link_libraries(smartcar_blockchain_legacy_demo PRIVATE nlohmann_json::nlohmann_json)
     if(SMARTCAR_LIBOQS_TARGET)
-        target_link_libraries(smartcar_blockchain PRIVATE ${SMARTCAR_LIBOQS_TARGET})
-        message(STATUS "liboqs linked: native blockchain target may use the real PQC backend.")
-    else()
-        message(WARNING
-            "SMARTCAR_ALLOW_SIMULATED_PQC_BUILD=ON with liboqs unavailable. "
-            "This binary is LAB/DEMO ONLY and must not be described as post-quantum secure."
-        )
+        target_link_libraries(smartcar_blockchain_legacy_demo PRIVATE ${SMARTCAR_LIBOQS_TARGET})
     endif()
+    smartcar_apply_release_options(smartcar_blockchain_legacy_demo)
+    message(WARNING
+        "Building smartcar_blockchain_legacy_demo: LAB/COMPATIBILITY ONLY. "
+        "It is not the supported v3.2 security target."
+    )
 endif()
 
 if(SMARTCAR_BUILD_CAMERA_MODULE)
