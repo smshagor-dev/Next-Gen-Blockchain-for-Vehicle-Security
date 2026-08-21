@@ -9,7 +9,6 @@ var runtimeAllowedSmartCarEnvironment = map[string]struct{}{
 	"SMARTCAR_GO_API_SECRET":                    {},
 	"SMARTCAR_GO_DATA_DIR":                      {},
 	"SMARTCAR_GO_ALLOW_CLASSICAL_ECDH_FALLBACK": {},
-	"SMARTCAR_IDENTITY_ADMISSION_POLICY":        {},
 }
 
 var runtimeBlockedInjectionEnvironment = map[string]struct{}{
@@ -21,9 +20,9 @@ var runtimeBlockedInjectionEnvironment = map[string]struct{}{
 	"DYLD_LIBRARY_PATH":     {},
 }
 
-// sanitizeRuntimeEnvironment removes project credentials the Go backend does
-// not need and common loader/interpreter injection variables. It intentionally
-// preserves only the narrow SMARTCAR_* allow-list above.
+// sanitizeRuntimeEnvironment removes project credentials and network-policy
+// inputs the local Go control backend does not enforce. Consensus and identity
+// admission are enforced by the Python sync network, not this process.
 func sanitizeRuntimeEnvironment() int {
 	removed := 0
 	for _, entry := range os.Environ() {
