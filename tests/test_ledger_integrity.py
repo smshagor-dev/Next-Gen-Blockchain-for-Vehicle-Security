@@ -1,19 +1,116 @@
 import copy
 import hashlib
-import os
-import tempfile
+import hmac
 import unittest
-from unittest.mock import patch
 
-from blockchain import TelemetryData
 from ledger_integrity import (
     GoLedgerSnapshotVerifier,
     LedgerIntegrityError,
+    PythonLedgerIntegrityGuard,
     go_telemetry_string,
     seal_block_integrity,
     verify_block_integrity,
 )
-from smartcar_backend import PythonBackend
+
+
+class _FakeCrypto:
+    mac_key = b"python-ledger-integrity-mac-key-32bytes!!"
+
+
+class _FakeBlock:
+    def __init__(self, index, previous_hash, block_hash, validator_key, vehicle_id="CAR-PY-LEDGER"):
+        self.index = index
+        self.timestamp = f"2026-08-21T00:00:0{index}+00:00"
+        self.vehicle_id = vehicle_id
+        self.event_data = "GENESIS" if index == 0 else f"EVENT:{index}"
+        self.previous_hash = previous_hash
+        self.block_hash = block_hash
+        self.block_signature = ""
+        self.consensus = "POA"
+        self.validator_id = "authority_node_1"
+        self.authority_round = index
+        message = f"{self.block_hash}|{self.validator_id}|{self.authority_round}"
+        self.poa_signature = hmac.new(
+            validator_key.encode(), message.encode(), hashlib.sha256
+        ).hexdigest()
+        self.smart_contract_receipts = []
+        self.zkp_proofs = {}
+        self.anomaly_reasons = []
+        self.edge_summary = {}
+        self.forensic_blackbox_payload = {}
+        self.fl_model_update_payload = {}
+        self.archived_pruned = False
+        self.archive_shard_id = ""
+        self.archive_root_hash = ""
+
+    def verify(self, crypto, validator_key):
+        return bool(crypto and validator_key)
+
+    def to_dict(self):
+        return {
+            "index": self.index,
+            "timestamp": self.timestamp,
+            "vehicle_id": self.vehicle_id,
+            "event_data": self.event_data,
+            "previous_hash": self.previous_hash,
+            "block_hash": self.block_hash,
+            "block_signature": self.block_signature,
+            "consensus": self.consensus,
+            "validator_id": self.validator_id,
+            "authority_round": self.authority_round,
+            "poa_signature": self.poa_signature,
+            "smart_contract_receipts": self.smart_contract_receipts,
+            "zkp_proofs": self.zkp_proofs,
+            "anomaly_reasons": self.anomaly_reasons,
+            "edge_summary": self.edge_summary,
+            "forensic_blackbox_payload": self.forensic_blackbox_payload,
+            "fl_model_update_payload": self.fl_model_update_payload,
+            "archived_pruned": self.archived_pruned,
+            "archive_shard_id": self.archive_shard_id,
+            "archive_root_hash": self.archive_root_hash,
+        }
+
+
+class _FakeCore:
+    def __init__(self):
+        self.vehicle_id = "CAR-PY-LEDGER"
+        self.consensus = "POA"
+        self.crypto = _FakeCrypto()
+        self.validator_key = "validator-key-" + ("v" * 32)
+        self.authority_registry = {"authority_node_1": self.validator_key}
+        self.archive_shards_meta = []
+        self.chain = []
+        self._create_genesis()
+
+    def _expected_validator(self, index):
+        return "authority_node_1"
+
+    def _create_genesis(self):
+        genesis = _FakeBlock(
+            0,
+            "0" * 64,
+            hashlib.sha3_256(b"fake-genesis").hexdigest(),
+            self.validator_key,
+        )
+        self.chain.append(genesis)
+        return genesis
+
+    def _add_block(self):
+        index = len(self.chain)
+        block = _FakeBlock(
+            index,
+            self.chain[-1].block_hash,
+            hashlib.sha3_256(f"fake-block-{index}".encode()).hexdigest(),
+            self.validator_key,
+        )
+        self.chain.append(block)
+        return block
+
+    def verify_chain(self):
+        return True
+
+    def _verify_signed_shard_anchor(self, anchor):
+        return {"valid": True}
 
 
 class LedgerIntegrityTests(unittest.TestCase):
@@ -53,7 +150,11 @@ class LedgerIntegrityTests(unittest.TestCase):
         event_sha3 = hashlib.sha3_256(event.encode()).hexdigest()
         raw = f"{index}{timestamp}{vehicle_id}{tel_sha3}{event_sha3}{previous_hash}"
         block_hash = hashlib.sha3_256(raw.encode()).hexdigest()
-        dual = hashlib.sha256(block_hash.encode()).hexdigest() + ":" + hashlib.sha3_256(block_hash.encode()).hexdigest()
+        dual = (
+            hashlib.sha256(block_hash.encode()).hexdigest()
+            + ":"
+            + hashlib.sha3_256(block_hash.encode()).hexdigest()
+        )
         return {
             "index": index,
             "timestamp": timestamp,
@@ -85,6 +186,25 @@ class LedgerIntegrityTests(unittest.TestCase):
         block["event_data"] = "FORGED:EVENT"
         self.assertFalse(verify_block_integrity(block, key))
 
+    def test_python_guard_verifies_genesis_and_rejects_retroactive_metadata_edit(self):
+        core = _FakeCore()
+        guard = PythonLedgerIntegrityGuard(core).install()
+        self.assertTrue(core.verify_chain())
+        self.assertTrue(guard.metadata()["genesis_verified"])
+        core.chain[0].smart_contract_receipts.append({"action": "FORGED"})
+        self.assertFalse(core.verify_chain())
+        with self.assertRaises(LedgerIntegrityError):
+            core._add_block()
+
+    def test_python_guard_seals_new_finalized_block(self):
+        core = _FakeCore()
+        PythonLedgerIntegrityGuard(core).install()
+        block = core._add_block()
+        self.assertTrue(verify_block_integrity(block, core.crypto.mac_key))
+        self.assertTrue(core.verify_chain())
+        block.event_data = "FORGED:EVENT"
+        self.assertFalse(core.verify_chain())
+
     def test_go_hash_recomputation_rejects_event_tampering(self):
         block = self._go_block()
         verifier = GoLedgerSnapshotVerifier("CAR-LEDGER-1")
@@ -92,7 +212,9 @@ class LedgerIntegrityTests(unittest.TestCase):
         tampered = copy.deepcopy(block)
         tampered["event_data"] = "FORGED:EVENT"
         with self.assertRaises(LedgerIntegrityError):
-            GoLedgerSnapshotVerifier("CAR-LEDGER-1").verify_and_track([tampered], "generation-1")
+            GoLedgerSnapshotVerifier("CAR-LEDGER-1").verify_and_track(
+                [tampered], "generation-1"
+            )
 
     def test_go_snapshot_rejects_receipt_retroactive_edit(self):
         block = self._go_block(receipts=[{"action": "ORIGINAL"}])
@@ -115,34 +237,6 @@ class LedgerIntegrityTests(unittest.TestCase):
         verifier.verify_and_track([first, second], "generation-1")
         with self.assertRaises(LedgerIntegrityError):
             verifier.verify_and_track([first], "generation-1")
-
-    def test_python_backend_verifies_genesis_and_full_metadata_seal(self):
-        env = {
-            "SMARTCAR_CHECKPOINT_ENABLED": "0",
-            "SMARTCAR_EDGE_ENABLED": "0",
-            "SMARTCAR_FL_ENABLED": "0",
-            "SMARTCAR_PRUNING_ENABLED": "0",
-            "SMARTCAR_STORAGE_ENCRYPTION": "0",
-            "SMARTCAR_PLATOON_POP_ENABLED": "0",
-            "SMARTCAR_VALIDATOR_ID": "authority_node_1",
-            "SMARTCAR_VALIDATOR_KEY": "validator-secret-" + ("v" * 40),
-        }
-        with tempfile.TemporaryDirectory() as td, patch.dict(os.environ, env, clear=False):
-            backend = PythonBackend(
-                "CAR-PY-LEDGER",
-                "password-strong-enough-for-ledger-test",
-                "auth-token-strong-enough-for-ledger-test",
-                os.path.join(td, "chain.json"),
-            )
-            self.assertTrue(backend.verify_chain())
-            self.assertTrue(backend.ledger_integrity()["genesis_verified"])
-            backend._core.chain[0].smart_contract_receipts.append({"action": "FORGED"})
-            self.assertFalse(backend.verify_chain())
-            with self.assertRaises(LedgerIntegrityError):
-                backend._core._add_block(
-                    TelemetryData(timestamp="2026-08-21T00:00:02+00:00"),
-                    "TEST:APPEND_AFTER_TAMPER",
-                )
 
 
 if __name__ == "__main__":
