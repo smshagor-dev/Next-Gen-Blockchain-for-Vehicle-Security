@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - security/**
+      - release/**
   workflow_dispatch:
 
 permissions:
@@ -33,12 +34,13 @@ jobs:
 
       - name: Compile hardened Python modules
         run: |
-          python -m py_compile credential_policy.py key_provider.py runtime_isolation.py runtime_security_monitor.py runtime_backend_security.py runtime_backend_patch.py incident_response.py incident_response_runtime.py incident_response_validation.py env_config.py replay_security.py permissioned_consensus.py consensus_security.py identity_security.py sync_protocol_legacy.py sync_protocol.py did_identity.py v2x_protocol.py control_api_security.py ledger_integrity.py adversarial_validation.py hil_security_validation.py smartcar_backend.py main.py
+          python -m py_compile release_metadata.py credential_policy.py key_provider.py runtime_isolation.py runtime_security_monitor.py runtime_backend_security.py runtime_backend_patch.py incident_response.py incident_response_runtime.py incident_response_validation.py env_config.py replay_security.py permissioned_consensus.py consensus_security.py identity_security.py sync_protocol_legacy.py sync_protocol.py did_identity.py v2x_protocol.py control_api_security.py ledger_integrity.py adversarial_validation.py hil_security_validation.py smartcar_backend.py main.py
 
       - name: Run Python security regression tests
         env:
           PYTHONPATH: .
         run: |
+          python -m unittest -v tests.test_release_version
           python -m unittest -v tests.test_security_baseline
           python -m unittest -v tests.test_credential_policy
           python -m unittest -v tests.test_key_runtime_security
@@ -57,6 +59,19 @@ jobs:
           python -m unittest -v tests.test_adversarial_validation
           python -m unittest -v tests.test_hil_security_validation
           python -m unittest -v tests.test_native_build_security
+
+      - name: Verify canonical release identity
+        env:
+          PYTHONPATH: .
+        run: |
+          test "$(tr -d '\r\n' < VERSION)" = "3.0.2"
+          python - <<'PY'
+          from release_metadata import RELEASE_VERSION, release_metadata
+          from security_capabilities import security_capability_output
+          assert RELEASE_VERSION == "3.0.2"
+          assert release_metadata()["internal_hardening_phase"] == "v3.2"
+          assert security_capability_output(False)["release_version"] == "3.0.2"
+          PY
 
       - name: Run deterministic adversarial campaigns
         env:
@@ -122,6 +137,7 @@ jobs:
             -DSMARTCAR_ENABLE_UNSAFE_FAST_MATH=OFF \
             -DSMARTCAR_ENABLE_IPO=OFF \
             -DSMARTCAR_BUILD_CAMERA_MODULE=OFF
+          grep -F "CMAKE_PROJECT_VERSION:STATIC=3.0.2" build/native-real/CMakeCache.txt
           cmake --build build/native-real --config Release --target smartcar_blockchain --parallel 2
 
       - name: Run secure native crypto self-test
