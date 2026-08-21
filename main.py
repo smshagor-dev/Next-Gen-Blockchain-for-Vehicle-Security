@@ -7,6 +7,12 @@ from env_config import load_project_env_once
 
 load_project_env_once()
 
+# Install the runtime-isolated Go backend spawn policy before the dashboard
+# imports and constructs backend instances.
+from runtime_backend_patch import install_runtime_backend_hardening
+
+install_runtime_backend_hardening()
+
 # UI-only branch: keep the existing runtime/backend and launch the modern skin.
 from dashboard_modern_ui import SmartCarDashboard
 

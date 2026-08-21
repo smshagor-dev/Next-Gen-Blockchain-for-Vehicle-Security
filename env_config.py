@@ -10,6 +10,7 @@ Security properties:
 - validates environment variable names before loading them;
 - rejects silent defaults for security-sensitive credentials;
 - validates secret quality, cross-domain separation, registries, and rotation slots;
+- routes sensitive secret access through the configured key-provider boundary;
 - provides fail-closed helpers for required secrets.
 """
 
@@ -30,9 +31,11 @@ from credential_policy import (
     validate_secret_separation,
     validate_secret_value,
 )
+from key_provider import get_key_provider
 
 _LOADED = False
 _PROCESS_LOGGING_READY = False
+_PROCESS_KEY_PROVIDER = None
 _ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
@@ -177,6 +180,24 @@ def load_project_env_once():
     _LOADED = True
 
 
+def _process_key_provider():
+    """Return the process key-provider singleton without exposing key material."""
+    global _PROCESS_KEY_PROVIDER
+    if _PROCESS_KEY_PROVIDER is None:
+        _PROCESS_KEY_PROVIDER = get_key_provider()
+    return _PROCESS_KEY_PROVIDER
+
+
+def _provider_secret(name: str, purpose: str, min_length: Optional[int] = None) -> str:
+    """Resolve one exportable secret through the provider and zeroize its owned buffer."""
+    provider = _process_key_provider()
+    with provider.export_secret(name, purpose=purpose) as secret:
+        value = secret.text_copy()
+    if min_length is not None:
+        validate_secret_value(name, value, min_length=min_length)
+    return value
+
+
 def get_env(name: str, default: str = "") -> str:
     """Return an env value while refusing unsafe secret fallbacks by default."""
     raw = os.getenv(name)
@@ -190,13 +211,11 @@ def get_env(name: str, default: str = "") -> str:
             )
         return default
 
-    value = raw
     if is_sensitive_secret(name):
-        value = validate_secret_value(name, value)
-        validate_secret_separation(name, value)
-    elif is_secret_registry(name):
-        validate_secret_registry_json(name, value)
-    return value
+        return _provider_secret(name, purpose="env_config.get_env")
+    if is_secret_registry(name):
+        validate_secret_registry_json(name, raw)
+    return raw
 
 
 def get_required_env(name: str) -> str:
@@ -208,11 +227,8 @@ def get_required_env(name: str) -> str:
 
 
 def get_required_secret(name: str, min_length: int = 32) -> str:
-    """Return a required secret after quality and domain-separation checks."""
-    value = get_required_env(name)
-    value = validate_secret_value(name, value, min_length=min_length)
-    validate_secret_separation(name, value)
-    return value
+    """Return a required secret through the configured key-provider boundary."""
+    return _provider_secret(name, purpose="env_config.get_required_secret", min_length=min_length)
 
 
 def get_secret_ring(name: str, min_length: Optional[int] = None) -> Tuple[str, ...]:
@@ -223,12 +239,20 @@ def get_secret_ring(name: str, min_length: Optional[int] = None) -> Tuple[str, .
     with ring[0].
     """
     current = get_required_secret(name, min_length=min_length or 32)
-    previous = os.getenv(name + "_PREVIOUS")
+    previous_name = name + "_PREVIOUS"
+    previous_raw = os.getenv(previous_name)
+    previous = None
+    if previous_raw is not None and previous_raw.strip():
+        previous = _provider_secret(
+            previous_name,
+            purpose="env_config.get_secret_ring.previous",
+            min_length=min_length or 32,
+        )
     ring = validate_rotation_pair(name, current, previous)
     if min_length is not None:
         for slot, value in enumerate(ring):
             validate_secret_value(
-                name if slot == 0 else name + "_PREVIOUS",
+                name if slot == 0 else previous_name,
                 value,
                 min_length=min_length,
             )
@@ -236,8 +260,17 @@ def get_secret_ring(name: str, min_length: Optional[int] = None) -> Tuple[str, .
 
 
 def get_credential_policy_metadata():
-    """Return non-secret credential-policy diagnostics."""
-    return credential_policy_metadata()
+    """Return non-secret credential and provider diagnostics."""
+    result = credential_policy_metadata()
+    try:
+        result["key_provider"] = _process_key_provider().metadata()
+    except Exception as exc:
+        result["key_provider"] = {
+            "available": False,
+            "error_type": type(exc).__name__,
+            "secret_values_exposed": False,
+        }
+    return result
 
 
 def get_bool(name: str, default: bool = False) -> bool:
