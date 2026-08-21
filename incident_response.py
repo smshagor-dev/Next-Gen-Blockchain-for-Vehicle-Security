@@ -1,9 +1,9 @@
 """Tamper-evident incident response and explicit recovery gates for OmniGuard V2X.
 
-The module consumes the normalized, value-free runtime security monitor output.
-It intentionally does not actuate CAN, serial, brakes, throttle, ignition, or
-network interfaces.  It persists only normalized incident state and evidence
-hashes in an append-mode HMAC-authenticated JSONL journal.
+The module consumes normalized, value-free runtime security monitor output. It
+never actuates CAN, serial, brakes, throttle, ignition, or network interfaces.
+It persists only normalized incident state and evidence hashes in an append-mode
+HMAC-authenticated JSONL journal.
 
 Local journal protection is tamper-evident, not tamper-proof: an attacker with
 both filesystem-write access and the journal signing key remains outside this
@@ -23,7 +23,7 @@ import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Iterable, List, Mapping, Optional
+from typing import Dict, List, Mapping, Optional
 
 from key_provider import KeyProvider
 from replay_security import BoundedReplayCache
@@ -38,19 +38,14 @@ _EVIDENCE_DOMAIN = (INCIDENT_EVIDENCE_VERSION + "\0").encode("utf-8")
 _OPERATOR_DOMAIN = (INCIDENT_OPERATOR_AUTH_VERSION + "\0").encode("utf-8")
 _HEX_RE = re.compile(r"^[0-9a-fA-F]+$")
 _ALLOWED_ACTIONS = {"ACKNOWLEDGE", "RECOVER"}
-_STATE_ORDER = {
-    "CLEAR": 0,
-    "OPEN": 1,
-    "ACKNOWLEDGED": 2,
-    "RECOVERY_PENDING": 3,
-    "RECOVERED": 4,
-}
 _ACTION_ORDER = {
     "NONE": 0,
     "AUDIT_ONLY": 1,
     "ISOLATE_NETWORK": 2,
     "SAFE_MODE_REQUEST": 3,
 }
+_LEVEL_ORDER = {"NORMAL": 0, "WATCH": 1, "CONTAIN": 2, "CRITICAL": 3}
+_VALID_STATES = {"CLEAR", "OPEN", "ACKNOWLEDGED", "RECOVERY_PENDING", "RECOVERED"}
 
 
 class IncidentResponseError(RuntimeError):
@@ -94,9 +89,7 @@ def _parse_utc(value: str) -> Optional[datetime]:
 
 def _safe_evidence_filename(filename: str) -> str:
     name = str(filename or "incident-evidence.jsonl").strip()
-    if not name or name in {".", ".."} or Path(name).name != name:
-        raise IncidentResponseError("INVALID_EVIDENCE_FILENAME")
-    if not name.endswith(".jsonl"):
+    if not name or name in {".", ".."} or Path(name).name != name or not name.endswith(".jsonl"):
         raise IncidentResponseError("INVALID_EVIDENCE_FILENAME")
     return name
 
@@ -150,7 +143,12 @@ class IncidentStatus:
 
 
 class IncidentEvidenceJournal:
-    """Append-mode, hash-chained, HMAC-authenticated incident evidence journal."""
+    """Append-mode, hash-chained, HMAC-authenticated incident evidence journal.
+
+    The current implementation is intentionally single-writer. Each verification
+    re-reads persisted bytes so post-open disk tampering blocks later transitions
+    and recovery rather than trusting only an in-memory copy.
+    """
 
     def __init__(
         self,
@@ -191,10 +189,7 @@ class IncidentEvidenceJournal:
         return hashlib.sha3_256(_canonical_bytes(unsigned)).hexdigest()
 
     def _signature(self, unsigned: Mapping[str, object], entry_hash: str, purpose: str) -> str:
-        signed = {
-            "entry": dict(unsigned),
-            "entry_hash": str(entry_hash).lower(),
-        }
+        signed = {"entry": dict(unsigned), "entry_hash": str(entry_hash).lower()}
         return self.provider.hmac_sha256(
             self.key_name,
             _EVIDENCE_DOMAIN + _canonical_bytes(signed),
@@ -225,55 +220,63 @@ class IncidentEvidenceJournal:
         except Exception:
             return False
 
+    def _read_verified_disk(self) -> tuple[List[Dict[str, object]], str]:
+        if not self.path.exists():
+            return [], "0" * 64
+        if self.path.is_symlink():
+            raise IncidentResponseError("EVIDENCE_JOURNAL_SYMLINK_REJECTED")
+        try:
+            size = self.path.stat().st_size
+        except OSError as exc:
+            raise IncidentResponseError("EVIDENCE_JOURNAL_STAT_FAILED") from exc
+        if size > self.max_file_bytes:
+            raise IncidentResponseError("EVIDENCE_JOURNAL_CAPACITY_EXCEEDED")
+
+        entries: List[Dict[str, object]] = []
+        expected_previous = "0" * 64
+        expected_sequence = 1
+        try:
+            with self.path.open("rb") as handle:
+                for raw_line in handle:
+                    if len(raw_line) > self.max_record_bytes:
+                        raise IncidentResponseError("EVIDENCE_RECORD_TOO_LARGE")
+                    if not raw_line.strip():
+                        continue
+                    try:
+                        entry = json.loads(raw_line.decode("utf-8"))
+                    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                        raise IncidentResponseError("EVIDENCE_JOURNAL_MALFORMED") from exc
+                    if not isinstance(entry, dict):
+                        raise IncidentResponseError("EVIDENCE_JOURNAL_MALFORMED")
+                    if not self._verify_entry(entry, expected_sequence, expected_previous):
+                        raise IncidentResponseError("EVIDENCE_JOURNAL_INVALID")
+                    entries.append(dict(entry))
+                    expected_previous = str(entry["entry_hash"]).lower()
+                    expected_sequence += 1
+        except IncidentResponseError:
+            raise
+        except OSError as exc:
+            raise IncidentResponseError("EVIDENCE_JOURNAL_READ_FAILED") from exc
+        return entries, expected_previous
+
     def _load_and_verify(self) -> None:
         with self._lock:
-            if not self.path.exists():
-                return
-            try:
-                size = self.path.stat().st_size
-            except OSError as exc:
-                raise IncidentResponseError("EVIDENCE_JOURNAL_STAT_FAILED") from exc
-            if size > self.max_file_bytes:
-                raise IncidentResponseError("EVIDENCE_JOURNAL_CAPACITY_EXCEEDED")
-
-            entries: List[Dict[str, object]] = []
-            expected_previous = "0" * 64
-            expected_sequence = 1
-            try:
-                with self.path.open("rb") as handle:
-                    for raw_line in handle:
-                        if len(raw_line) > self.max_record_bytes:
-                            raise IncidentResponseError("EVIDENCE_RECORD_TOO_LARGE")
-                        if not raw_line.strip():
-                            continue
-                        try:
-                            entry = json.loads(raw_line.decode("utf-8"))
-                        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-                            raise IncidentResponseError("EVIDENCE_JOURNAL_MALFORMED") from exc
-                        if not isinstance(entry, dict):
-                            raise IncidentResponseError("EVIDENCE_JOURNAL_MALFORMED")
-                        if not self._verify_entry(entry, expected_sequence, expected_previous):
-                            raise IncidentResponseError("EVIDENCE_JOURNAL_INVALID")
-                        entries.append(dict(entry))
-                        expected_previous = str(entry["entry_hash"]).lower()
-                        expected_sequence += 1
-            except IncidentResponseError:
-                raise
-            except OSError as exc:
-                raise IncidentResponseError("EVIDENCE_JOURNAL_READ_FAILED") from exc
-
+            entries, tail_hash = self._read_verified_disk()
             self._entries = entries
             self._sequence = len(entries)
-            self._tail_hash = expected_previous
+            self._tail_hash = tail_hash
 
     def verify(self) -> bool:
         with self._lock:
-            expected_previous = "0" * 64
-            for expected_sequence, entry in enumerate(self._entries, start=1):
-                if not self._verify_entry(entry, expected_sequence, expected_previous):
-                    return False
-                expected_previous = str(entry["entry_hash"]).lower()
-            return expected_previous == self._tail_hash
+            try:
+                persisted_entries, persisted_tail = self._read_verified_disk()
+            except IncidentResponseError:
+                return False
+            return (
+                persisted_entries == self._entries
+                and persisted_tail == self._tail_hash
+                and len(persisted_entries) == self._sequence
+            )
 
     def _append_bytes(self, payload: bytes) -> None:
         if len(payload) > self.max_record_bytes:
@@ -299,10 +302,11 @@ class IncidentEvidenceJournal:
                     raise IncidentResponseError("EVIDENCE_JOURNAL_WRITE_FAILED")
                 view = view[written:]
             os.fsync(fd)
-            try:
-                os.fchmod(fd, 0o600)
-            except OSError:
-                pass
+            if hasattr(os, "fchmod"):
+                try:
+                    os.fchmod(fd, 0o600)
+                except OSError:
+                    pass
         finally:
             os.close(fd)
 
@@ -318,6 +322,13 @@ class IncidentEvidenceJournal:
             decision = monitor_snapshot.get("last_decision")
             if not isinstance(decision, Mapping):
                 decision = {}
+            recent_sources = decision.get("recent_sources", [])
+            recent_categories = decision.get("recent_categories", [])
+            if not isinstance(recent_sources, (list, tuple)):
+                recent_sources = []
+            if not isinstance(recent_categories, (list, tuple)):
+                recent_categories = []
+
             unsigned: Dict[str, object] = {
                 "version": INCIDENT_EVIDENCE_VERSION,
                 "sequence": self._sequence + 1,
@@ -328,6 +339,9 @@ class IncidentEvidenceJournal:
                 "strongest_action": status.strongest_action,
                 "highest_incident_level": status.highest_incident_level,
                 "safety_critical": bool(status.safety_critical),
+                "opened_at": status.opened_at,
+                "acknowledged_at": status.acknowledged_at,
+                "recovered_at": status.recovered_at,
                 "healthy_observations": int(status.healthy_observations),
                 "required_healthy_observations": int(status.required_healthy_observations),
                 "monitor_event_count": int(monitor_snapshot.get("retained_events", 0)),
@@ -336,8 +350,16 @@ class IncidentEvidenceJournal:
                 "decision_score": int(decision.get("score", 0)),
                 "decision_action": _normalize_code(str(decision.get("recommended_action", "NONE")), "NONE"),
                 "decision_level": _normalize_code(str(decision.get("incident_level", "NORMAL")), "NORMAL"),
-                "recent_sources": sorted(_normalize_code(str(v), "UNKNOWN_SOURCE") for v in decision.get("recent_sources", []) if str(v)),
-                "recent_categories": sorted(_normalize_code(str(v), "SECURITY_POLICY") for v in decision.get("recent_categories", []) if str(v)),
+                "recent_sources": sorted(
+                    _normalize_code(str(value), "UNKNOWN_SOURCE")
+                    for value in recent_sources
+                    if str(value)
+                ),
+                "recent_categories": sorted(
+                    _normalize_code(str(value), "SECURITY_POLICY")
+                    for value in recent_categories
+                    if str(value)
+                ),
                 "previous_entry_hash": self._tail_hash,
             }
             entry_hash = self._entry_hash(unsigned)
@@ -345,11 +367,12 @@ class IncidentEvidenceJournal:
             entry = dict(unsigned)
             entry["entry_hash"] = entry_hash
             entry["signature"] = signature
-            line = _canonical_bytes(entry) + b"\n"
-            self._append_bytes(line)
+            self._append_bytes(_canonical_bytes(entry) + b"\n")
             self._entries.append(entry)
             self._sequence += 1
             self._tail_hash = entry_hash
+            if not self.verify():
+                raise IncidentResponseError("EVIDENCE_JOURNAL_INVALID_AFTER_APPEND")
             return dict(entry)
 
     def entries(self) -> List[Dict[str, object]]:
@@ -366,13 +389,14 @@ class IncidentEvidenceJournal:
                 "max_file_bytes": self.max_file_bytes,
                 "max_record_bytes": self.max_record_bytes,
                 "append_mode": True,
+                "single_writer": True,
+                "persisted_bytes_revalidated": True,
                 "fsync_each_entry": True,
                 "secret_values_stored": False,
                 "raw_payloads_stored": False,
                 "raw_subjects_stored": False,
                 "tamper_proof_storage_claim": False,
             }
-
 
 
 def _operator_message(action: str, incident_id: str, timestamp: str, nonce: str) -> bytes:
@@ -423,7 +447,7 @@ def build_operator_authorization(
 
 
 class IncidentResponseManager:
-    """Explicit acknowledgement and recovery gate over a runtime monitor."""
+    """Latched incident lifecycle with signed acknowledgement and recovery."""
 
     def __init__(
         self,
@@ -448,29 +472,35 @@ class IncidentResponseManager:
         self._restore_from_journal()
 
     def _restore_from_journal(self) -> None:
+        if not self.journal.verify():
+            raise IncidentResponseError("EVIDENCE_JOURNAL_INVALID")
         entries = self.journal.entries()
         if not entries:
             return
         last = entries[-1]
         state = str(last.get("incident_state", "CLEAR"))
-        if state not in _STATE_ORDER:
+        if state not in _VALID_STATES:
             raise IncidentResponseError("EVIDENCE_JOURNAL_STATE_INVALID")
+        recorded_required = max(2, int(last.get("required_healthy_observations", 2)))
+        self.required_healthy_observations = max(self.required_healthy_observations, recorded_required)
         self.status = IncidentStatus(
             incident_id=str(last.get("incident_id", "")),
             state=state,
             strongest_action=str(last.get("strongest_action", "NONE")),
             highest_incident_level=str(last.get("highest_incident_level", "NORMAL")),
             safety_critical=bool(last.get("safety_critical", False)),
-            healthy_observations=int(last.get("healthy_observations", 0)),
-            required_healthy_observations=int(last.get("required_healthy_observations", self.required_healthy_observations)),
+            opened_at=str(last.get("opened_at", "")),
+            acknowledged_at=str(last.get("acknowledged_at", "")),
+            recovered_at=str(last.get("recovered_at", "")),
+            healthy_observations=min(
+                self.required_healthy_observations,
+                max(0, int(last.get("healthy_observations", 0))),
+            ),
+            required_healthy_observations=self.required_healthy_observations,
             last_monitor_event_count=int(last.get("monitor_event_count", 0)),
             last_monitor_tail_hash=str(last.get("monitor_tail_hash", "0" * 64)),
             last_monitor_chain_valid=bool(last.get("monitor_chain_valid", False)),
         )
-        # Timestamps are intentionally state-transition timestamps.  They are
-        # not security decisions and are safe to reconstruct approximately.
-        if self.status.state != "CLEAR":
-            self.status.opened_at = str(last.get("timestamp", ""))
 
     @staticmethod
     def _stronger_action(current: str, candidate: str) -> str:
@@ -478,8 +508,7 @@ class IncidentResponseManager:
 
     @staticmethod
     def _higher_level(current: str, candidate: str) -> str:
-        order = {"NORMAL": 0, "WATCH": 1, "CONTAIN": 2, "CRITICAL": 3}
-        return candidate if order.get(candidate, -1) > order.get(current, -1) else current
+        return candidate if _LEVEL_ORDER.get(candidate, -1) > _LEVEL_ORDER.get(current, -1) else current
 
     def _new_incident(self, snapshot: Mapping[str, object], decision: Mapping[str, object]) -> None:
         now = _utc_now().isoformat()
@@ -507,8 +536,10 @@ class IncidentResponseManager:
         self.journal.append_transition(record_type, self.status, snapshot)
 
     def evaluate(self) -> Dict[str, object]:
-        """Evaluate the current monitor state and advance only safe transitions."""
+        """Evaluate current monitor state and advance only safe transitions."""
         with self._lock:
+            if not self.journal.verify():
+                raise IncidentResponseError("EVIDENCE_JOURNAL_INVALID")
             snapshot = self.monitor.snapshot()
             decision = snapshot.get("last_decision")
             if not isinstance(decision, Mapping):
@@ -580,7 +611,11 @@ class IncidentResponseManager:
             return self.metadata()
 
     def _prune_operator_nonces(self, now_mono: float) -> None:
-        stale = [nonce for nonce, expiry in dict.items(self._operator_nonces) if float(expiry) <= now_mono]
+        stale = [
+            nonce
+            for nonce, expiry in dict.items(self._operator_nonces)
+            if float(expiry) <= now_mono
+        ]
         for nonce in stale:
             dict.pop(self._operator_nonces, nonce, None)
 
@@ -598,8 +633,7 @@ class IncidentResponseManager:
         parsed = _parse_utc(timestamp)
         if parsed is None:
             raise IncidentResponseError("OPERATOR_TIMESTAMP_INVALID")
-        skew = abs((_utc_now() - parsed).total_seconds())
-        if skew > self.auth_window_sec:
+        if abs((_utc_now() - parsed).total_seconds()) > self.auth_window_sec:
             raise IncidentResponseError("OPERATOR_AUTH_STALE")
         nonce = str(authorization.get("nonce", "")).lower()
         if not _valid_hex(nonce, 16, 64):
@@ -618,14 +652,19 @@ class IncidentResponseManager:
 
         now_mono = time.monotonic()
         self._prune_operator_nonces(now_mono)
-        if nonce in self._operator_nonces:
+        if dict.__contains__(self._operator_nonces, nonce):
             raise IncidentResponseError("OPERATOR_AUTH_REPLAY")
+        if len(self._operator_nonces) >= self._operator_nonces.max_entries:
+            self._operator_nonces.saturation_rejections += 1
+            raise IncidentResponseError("OPERATOR_NONCE_CACHE_SATURATED")
         self._operator_nonces[nonce] = now_mono + self.auth_window_sec
 
     def acknowledge(self, authorization: Mapping[str, str]) -> Dict[str, object]:
         with self._lock:
             if not self.status.active:
                 raise IncidentResponseError("NO_ACTIVE_INCIDENT")
+            if not self.journal.verify():
+                raise IncidentResponseError("EVIDENCE_JOURNAL_INVALID")
             self._verify_operator_authorization(authorization, "ACKNOWLEDGE")
             if self.status.state not in {"OPEN", "ACKNOWLEDGED"}:
                 raise IncidentResponseError("INCIDENT_NOT_ACKNOWLEDGEABLE")
@@ -638,8 +677,11 @@ class IncidentResponseManager:
 
     def recovery_gate(self) -> Dict[str, object]:
         snapshot = self.monitor.snapshot()
-        decision = snapshot.get("last_decision") if isinstance(snapshot.get("last_decision"), Mapping) else {}
-        normal = (
+        decision = snapshot.get("last_decision")
+        if not isinstance(decision, Mapping):
+            decision = {}
+        journal_valid = self.journal.verify()
+        monitor_normal = (
             bool(snapshot.get("evidence_chain_valid", False))
             and str(decision.get("incident_level", "")) == "NORMAL"
             and str(decision.get("recommended_action", "")) == "NONE"
@@ -647,8 +689,9 @@ class IncidentResponseManager:
         return {
             "incident_id": self.status.incident_id,
             "state": self.status.state,
-            "monitor_normal": normal,
+            "monitor_normal": monitor_normal,
             "monitor_chain_valid": bool(snapshot.get("evidence_chain_valid", False)),
+            "journal_valid": journal_valid,
             "healthy_observations": self.status.healthy_observations,
             "required_healthy_observations": self.required_healthy_observations,
             "healthy_window_satisfied": self.status.healthy_observations >= self.required_healthy_observations,
@@ -666,10 +709,14 @@ class IncidentResponseManager:
         with self._lock:
             if not self.status.active:
                 raise IncidentResponseError("NO_ACTIVE_INCIDENT")
+            if not self.journal.verify():
+                raise IncidentResponseError("EVIDENCE_JOURNAL_INVALID")
             self._verify_operator_authorization(authorization, "RECOVER")
             gate = self.recovery_gate()
             if self.status.state != "RECOVERY_PENDING":
                 raise IncidentResponseError("RECOVERY_STATE_NOT_READY")
+            if not bool(gate["journal_valid"]):
+                raise IncidentResponseError("EVIDENCE_JOURNAL_INVALID")
             if not bool(gate["monitor_normal"]):
                 raise IncidentResponseError("RUNTIME_MONITOR_NOT_HEALTHY")
             if not bool(gate["healthy_window_satisfied"]):
