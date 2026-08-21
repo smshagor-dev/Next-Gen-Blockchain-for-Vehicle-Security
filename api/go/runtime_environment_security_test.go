@@ -42,13 +42,13 @@ func TestRuntimeEnvironmentRemovesInjectionVariables(t *testing.T) {
 	}
 }
 
-func TestRuntimeEnvironmentKeepsExplicitNonSecretPolicy(t *testing.T) {
-	t.Setenv("SMARTCAR_IDENTITY_ADMISSION_POLICY", "CERTIFICATE_AUTHORITY")
+func TestRuntimeEnvironmentDoesNotRetainNetworkAdmissionPolicy(t *testing.T) {
+	t.Setenv("SMARTCAR_IDENTITY_ADMISSION_POLICY", "VEHICLE_MANUFACTURER_REGISTRY")
 	t.Setenv("SMARTCAR_GO_ALLOW_CLASSICAL_ECDH_FALLBACK", "0")
 
 	sanitizeRuntimeEnvironment()
-	if os.Getenv("SMARTCAR_IDENTITY_ADMISSION_POLICY") != "CERTIFICATE_AUTHORITY" {
-		t.Fatal("identity admission policy should remain available")
+	if os.Getenv("SMARTCAR_IDENTITY_ADMISSION_POLICY") != "" {
+		t.Fatal("identity admission policy must not be inherited by the non-consensus Go control runtime")
 	}
 	if os.Getenv("SMARTCAR_GO_ALLOW_CLASSICAL_ECDH_FALLBACK") != "0" {
 		t.Fatal("ECDH fallback policy should remain available")
