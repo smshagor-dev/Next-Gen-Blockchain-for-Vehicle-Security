@@ -7,6 +7,7 @@ from typing import Dict, List, Optional
 
 from permissioned_consensus import ConsensusError, PermissionedConsensusEngine, sign_vote
 from replay_security import BoundedReplayCache
+from runtime_security_monitor import RuntimeSecurityMonitor, get_runtime_security_monitor
 from sync_protocol_legacy import *
 from sync_protocol_legacy import (
     SyncClient as _LegacySyncClient,
@@ -34,7 +35,7 @@ def _bool_env(name: str, default: bool = False) -> bool:
 
 
 class SyncServer(_LegacySyncServer):
-    """Sync server with fail-closed admission, voting, and bounded replay state."""
+    """Sync server with fail-closed admission, voting, replay, and runtime detection."""
 
     def __init__(
         self,
@@ -44,7 +45,9 @@ class SyncServer(_LegacySyncServer):
         authority_registry: Optional[Dict[str, str]] = None,
         vehicle_key_registry: Optional[Dict[str, str]] = None,
         validator_ids: Optional[List[str]] = None,
+        runtime_monitor: Optional[RuntimeSecurityMonitor] = None,
     ):
+        self._runtime_security_monitor = runtime_monitor or get_runtime_security_monitor()
         super().__init__(
             host=host,
             port=port,
@@ -68,16 +71,32 @@ class SyncServer(_LegacySyncServer):
         )
         self._permissioned_consensus = None
 
+    def _record_runtime_security(self, reason: str, subject: str = ""):
+        return self._runtime_security_monitor.observe(
+            "sync",
+            reason,
+            subject=subject,
+        )
+
+    def _error(self, reason: str, session_key: str):
+        self._record_runtime_security(reason)
+        return super()._error(reason, session_key)
+
+    def runtime_security_metadata(self) -> Dict[str, object]:
+        return self._runtime_security_monitor.metadata()
+
     def _vehicle_secret(self, vehicle_id: str) -> str:
         # v2.6 requires explicit per-identity enrollment by default. A single
         # global PSK is retained only as an explicit lab migration mode.
         if self.vehicle_key_registry:
             secret = self.vehicle_key_registry.get(vehicle_id, "")
             if not secret:
+                self._record_runtime_security("UNREGISTERED_VEHICLE", vehicle_id)
                 raise RuntimeError("UNREGISTERED_VEHICLE")
             return secret
         if _bool_env("SMARTCAR_SYNC_ALLOW_GLOBAL_PSK_ADMISSION", False):
             return self.shared_key
+        self._record_runtime_security("IDENTITY_ADMISSION_REGISTRY_REQUIRED", vehicle_id)
         raise RuntimeError("IDENTITY_ADMISSION_REGISTRY_REQUIRED")
 
     def _consensus_engine(self) -> PermissionedConsensusEngine:
@@ -159,9 +178,13 @@ class SyncServer(_LegacySyncServer):
                             state.get("replay_cache", {}),
                             max_entries=self.replay_cache_max_entries,
                         )
+            elif mtype == MessageType.HANDSHAKE and response is None:
+                vehicle_id = str(payload.get("vehicle_id", "")) if isinstance(payload, dict) else ""
+                self._record_runtime_security("HANDSHAKE_REJECTED", vehicle_id)
             return response
 
         if not session_key or not self._bound_vehicle(client_id):
+            self._record_runtime_security("UNAUTHENTICATED_VOTE_CHANNEL")
             return None
         bound_vehicle = self._bound_vehicle(client_id)
 

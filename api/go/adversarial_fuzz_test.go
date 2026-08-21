@@ -90,6 +90,7 @@ func FuzzSafeChainPathConfined(f *testing.F) {
 	f.Add("C:\\Windows\\System32\\drivers\\etc\\hosts.json")
 	f.Add("../outside/../../escape.json")
 	f.Add("chain.json")
+	f.Add("chain.jsOn")
 
 	f.Fuzz(func(t *testing.T, candidate string) {
 		if len(candidate) > 4096 {
@@ -107,8 +108,8 @@ func FuzzSafeChainPathConfined(f *testing.F) {
 		if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
 			t.Fatalf("chain path escaped data dir: candidate=%q target=%q dataDir=%q", candidate, target, s.dataDir)
 		}
-		if filepath.Ext(target) != ".json" {
-			t.Fatalf("accepted chain path without .json extension: %q", target)
+		if strings.ToLower(filepath.Ext(target)) != ".json" {
+			t.Fatalf("accepted chain path without JSON extension: %q", target)
 		}
 	})
 }

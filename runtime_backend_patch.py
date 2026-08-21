@@ -1,9 +1,9 @@
-"""Install isolated Go spawning and v2.6 network-security metadata adapters.
+"""Install isolated Go spawning, policy metadata, and runtime security detection.
 
 The Go process is a local control backend, not a consensus participant. Identity
-admission and permissioned quorum are enforced by the Python sync network, so
-normal dashboard metadata is sourced from those enforcement modules instead of
-allowing the Go process to infer stronger claims from a policy string.
+admission and permissioned quorum are enforced by the Python sync network. The
+runtime monitor records normalized failure reason codes only; HTTP bodies,
+exception text, credentials, and request payloads are never retained.
 """
 
 from __future__ import annotations
@@ -16,14 +16,19 @@ from typing import Any, Dict
 
 from consensus_security import consensus_security_metadata
 from identity_security import identity_security_metadata
+from ledger_integrity import LedgerIntegrityError
+from runtime_backend_security import classify_backend_runtime_error
 from runtime_isolation import (
     build_isolated_child_environment,
     runtime_isolation_metadata,
     subprocess_isolation_kwargs,
 )
+from runtime_security_monitor import get_runtime_security_monitor
 from smartcar_backend import GoBackend
 
 _INSTALLED = False
+_ORIGINAL_REQUEST = GoBackend._request
+_ORIGINAL_REFRESH = GoBackend._refresh
 
 
 def _isolated_spawn_environment(self: GoBackend, root: Path) -> Dict[str, str]:
@@ -72,13 +77,57 @@ def _isolated_ensure_service(self: GoBackend):
         if self._health():
             return
         if self._proc.poll() is not None:
+            get_runtime_security_monitor().observe(
+                "control_api",
+                "BACKEND_PROCESS_EXITED_BEFORE_AUTHENTICATED_HEALTH",
+                subject=getattr(self, "vehicle_id", ""),
+            )
             raise RuntimeError("Go backend exited before authenticated health verification")
         time.sleep(0.25)
+    get_runtime_security_monitor().observe(
+        "control_api",
+        "BACKEND_CONNECTION_UNAVAILABLE",
+        subject=getattr(self, "vehicle_id", ""),
+    )
     raise RuntimeError("Authenticated Go backend did not become ready on isolated loopback runtime")
+
+
+def _monitored_request(
+    self: GoBackend,
+    method: str,
+    path: str,
+    payload: Dict[str, Any] = None,
+    recover: bool = True,
+) -> Dict[str, Any]:
+    try:
+        return _ORIGINAL_REQUEST(self, method, path, payload, recover)
+    except Exception as exc:
+        get_runtime_security_monitor().observe(
+            "control_api",
+            classify_backend_runtime_error(exc),
+            subject=getattr(self, "vehicle_id", ""),
+        )
+        raise
+
+
+def _monitored_refresh(self: GoBackend):
+    try:
+        return _ORIGINAL_REFRESH(self)
+    except LedgerIntegrityError:
+        get_runtime_security_monitor().observe(
+            "ledger",
+            "LEDGER_INTEGRITY_FAILURE",
+            subject=getattr(self, "vehicle_id", ""),
+        )
+        raise
 
 
 def _runtime_isolation(self: GoBackend) -> Dict[str, object]:
     return runtime_isolation_metadata(getattr(self, "_runtime_isolation_audit", None))
+
+
+def _runtime_security(self: GoBackend) -> Dict[str, object]:
+    return get_runtime_security_monitor().metadata()
 
 
 def _network_identity_security(self: GoBackend) -> Dict[str, object]:
@@ -90,13 +139,16 @@ def _network_consensus_security(self: GoBackend) -> Dict[str, object]:
 
 
 def install_runtime_backend_hardening() -> bool:
-    """Install the isolated spawn and metadata policy exactly once."""
+    """Install isolated spawn, metadata, and monitoring policy exactly once."""
     global _INSTALLED
     if _INSTALLED:
         return False
     GoBackend._spawn_environment = _isolated_spawn_environment
     GoBackend._ensure_service = _isolated_ensure_service
+    GoBackend._request = _monitored_request
+    GoBackend._refresh = _monitored_refresh
     GoBackend.runtime_isolation = _runtime_isolation
+    GoBackend.runtime_security = _runtime_security
     GoBackend.identity_security = _network_identity_security
     GoBackend.consensus_security = _network_consensus_security
     _INSTALLED = True
