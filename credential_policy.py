@@ -33,6 +33,8 @@ _SECRET_POLICIES: Dict[str, SecretPolicy] = {
     "SMARTCAR_STORAGE_PASSPHRASE": SecretPolicy("storage_encryption", 32),
     "SMARTCAR_FORENSIC_ACCESS_KEY": SecretPolicy("forensic_wrap", 32),
     "SMARTCAR_INSURANCE_ACCESS_KEY": SecretPolicy("insurance_wrap", 32),
+    "SMARTCAR_INCIDENT_EVIDENCE_KEY": SecretPolicy("incident_evidence", 32),
+    "SMARTCAR_INCIDENT_OPERATOR_KEY": SecretPolicy("incident_operator", 32),
 }
 
 _SECRET_REGISTRY_POLICIES: Dict[str, SecretPolicy] = {
