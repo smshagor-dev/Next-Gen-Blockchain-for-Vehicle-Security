@@ -6,10 +6,14 @@ on:
       - v3.0.2
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: omniguard-v3.0.2-publication
+  cancel-in-progress: false
 
 jobs:
-  validate-and-publish:
+  validate-and-package:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -29,17 +33,6 @@ jobs:
           git fetch origin main --no-tags
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-
-      - name: Refuse duplicate GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            echo "GitHub Release $GITHUB_REF_NAME already exists; refusing overwrite."
-            exit 1
-          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -188,6 +181,66 @@ jobs:
             sha256sum -c SHA256SUMS
           )
 
+      - name: Upload validated publication payload
+        uses: actions/upload-artifact@v4
+        with:
+          name: omniguard-v3.0.2-publication-payload
+          path: dist/omniguard-v3.0.2-linux-amd64-validation/
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    needs: validate-and-package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+
+    steps:
+      - name: Download validated publication payload
+        uses: actions/download-artifact@v4
+        with:
+          name: omniguard-v3.0.2-publication-payload
+          path: dist/omniguard-v3.0.2-linux-amd64-validation
+
+      - name: Re-verify publication payload and tag binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_TYPE" = "tag"
+          test "$GITHUB_REF_NAME" = "v3.0.2"
+          package_dir="dist/omniguard-v3.0.2-linux-amd64-validation"
+          test "$(tr -d '\r\n' < "$package_dir/VERSION")" = "3.0.2"
+          (
+            cd "$package_dir"
+            sha256sum -c SHA256SUMS
+          )
+          python3 - "$package_dir/release-integrity-manifest.json" "$GITHUB_SHA" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          manifest = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          if manifest.get("release_version") != "3.0.2":
+              raise SystemExit("release manifest version mismatch")
+          if manifest.get("release_tag") != "v3.0.2":
+              raise SystemExit("release manifest tag mismatch")
+          if manifest.get("commit_sha") != sys.argv[2]:
+              raise SystemExit("release manifest commit mismatch")
+          PY
+
+      - name: Refuse duplicate GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "GitHub Release $GITHUB_REF_NAME already exists; refusing overwrite."
+            exit 1
+          fi
+
       - name: Publish GitHub Release from validated tag
         env:
           GH_TOKEN: ${{ github.token }}
@@ -196,9 +249,10 @@ jobs:
           set -euo pipefail
           package_dir="dist/omniguard-v3.0.2-linux-amd64-validation"
           gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
             --verify-tag \
             --title "OmniGuard V2X v3.0.2" \
-            --notes-file docs/releases/v3.0.2.md \
+            --notes-file "$package_dir/RELEASE_NOTES.md" \
             "$package_dir/smartcar_blockchain-v3.0.2-linux-amd64#Hardened native C++ validation binary (Linux amd64)" \
             "$package_dir/smartcar_go_backend-v3.0.2-linux-amd64#Go control backend validation binary (Linux amd64)" \
             "$package_dir/SHA256SUMS#SHA-256 checksums" \
