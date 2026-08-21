@@ -39,10 +39,8 @@ inline PqcProviderCapabilities software_pqc_provider_capabilities() {
     };
 }
 
-inline PqcProviderCapabilities enforce_pqc_provider_policy_from_env() {
+inline PqcProviderCapabilities enforce_pqc_provider_policy(bool hardware_required) {
     const PqcProviderCapabilities capabilities = software_pqc_provider_capabilities();
-    const bool hardware_required =
-        parse_strict_env_bool("SMARTCAR_CPP_PQC_HARDWARE_REQUIRED", false);
     if (hardware_required && !capabilities.hardware_backed) {
         throw std::runtime_error(
             "hardware-backed PQC provider is required, but only " + capabilities.provider +
@@ -50,6 +48,12 @@ inline PqcProviderCapabilities enforce_pqc_provider_policy_from_env() {
         );
     }
     return capabilities;
+}
+
+inline PqcProviderCapabilities enforce_pqc_provider_policy_from_env() {
+    return enforce_pqc_provider_policy(
+        parse_strict_env_bool("SMARTCAR_CPP_PQC_HARDWARE_REQUIRED", false)
+    );
 }
 
 }  // namespace omniguard
