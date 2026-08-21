@@ -74,25 +74,24 @@ def _subject_token(subject: str) -> str:
 def classify_security_reason(reason: str) -> tuple[str, str]:
     code = _normalize_code(reason, "UNSPECIFIED_SECURITY_EVENT")
 
-    critical = {
-        "CHAIN_COMPROMISED",
-        "CHAIN_FAIL",
-        "LEDGER_TAMPER",
-        "LEDGER_INTEGRITY_FAILURE",
-        "BLOCK_SIGNATURE_INVALID",
-        "SERVICE_PROOF_INVALID",
-        "BACKEND_SERVICE_SPOOF",
-        "TELEMETRY_INTEGRITY_FAILURE",
-        "ACTUATOR_COMMAND_TAMPER",
-    }
-    if code in critical or "LEDGER" in code or "CHAIN_COMPROM" in code:
-        return "LEDGER_INTEGRITY", "CRITICAL"
     if "SERVICE_PROOF" in code or "SERVICE_SPOOF" in code:
         return "SERVICE_AUTHENTICITY", "CRITICAL"
     if "TELEMETRY_INTEGRITY" in code or "SENSOR_SPOOF" in code:
         return "TELEMETRY_INTEGRITY", "CRITICAL"
     if "ACTUATOR" in code and ("TAMPER" in code or "UNAUTHORIZED" in code):
         return "ACTUATOR_INTEGRITY", "CRITICAL"
+    if (
+        code in {
+            "CHAIN_COMPROMISED",
+            "CHAIN_FAIL",
+            "LEDGER_TAMPER",
+            "LEDGER_INTEGRITY_FAILURE",
+            "BLOCK_SIGNATURE_INVALID",
+        }
+        or "LEDGER" in code
+        or "CHAIN_COMPROM" in code
+    ):
+        return "LEDGER_INTEGRITY", "CRITICAL"
 
     if "REPLAY" in code or "NONCE" in code:
         return "REPLAY_DEFENSE", "HIGH"
