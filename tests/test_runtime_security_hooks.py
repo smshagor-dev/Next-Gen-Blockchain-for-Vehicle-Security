@@ -1,6 +1,9 @@
 import unittest
 
-import runtime_backend_patch as backend_patch
+from runtime_backend_security import (
+    backend_runtime_error_metadata,
+    classify_backend_runtime_error,
+)
 import sync_protocol as sp
 from runtime_security_monitor import RuntimeSecurityMonitor, reset_runtime_security_monitor
 
@@ -58,17 +61,29 @@ class RuntimeSecurityHookTests(unittest.TestCase):
 
     def test_backend_error_classifier_never_returns_exception_body(self):
         marker = "TOP-SECRET-SERVER-BODY"
-        reason = backend_patch._runtime_reason_from_exception(
+        reason = classify_backend_runtime_error(
             RuntimeError(f"Go backend HTTP 401: {marker}")
         )
         self.assertEqual(reason, "CONTROL_API_HTTP_401")
         self.assertNotIn(marker, reason)
 
     def test_backend_http_conflict_classifies_replay_or_conflict(self):
-        reason = backend_patch._runtime_reason_from_exception(
+        reason = classify_backend_runtime_error(
             RuntimeError("Go backend HTTP 409: replay")
         )
         self.assertEqual(reason, "CONTROL_API_HTTP_409")
+
+    def test_backend_service_proof_error_is_safety_critical_code(self):
+        reason = classify_backend_runtime_error(
+            RuntimeError("authenticated service proof invalid")
+        )
+        self.assertEqual(reason, "SERVICE_PROOF_INVALID")
+
+    def test_backend_error_metadata_is_value_free(self):
+        metadata = backend_runtime_error_metadata()
+        self.assertFalse(metadata["exception_text_exposed"])
+        self.assertFalse(metadata["response_body_exposed"])
+        self.assertFalse(metadata["secret_values_exposed"])
 
 
 if __name__ == "__main__":
