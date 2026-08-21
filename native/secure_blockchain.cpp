@@ -14,7 +14,10 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
+
+#include "pqc_key_store.h"
 
 #include <nlohmann/json.hpp>
 #include <openssl/crypto.h>
@@ -42,6 +45,18 @@ std::string require_env_secret(const char* name) {
     std::string value(raw);
     if (value.size() < kMinSecretLength) {
         throw std::runtime_error(std::string("credential must contain at least 32 characters: ") + name);
+    }
+    return value;
+}
+
+std::string require_env_value(const char* name) {
+    const char* raw = std::getenv(name);
+    if (raw == nullptr) {
+        throw std::runtime_error(std::string("required configuration is not set: ") + name);
+    }
+    std::string value(raw);
+    if (value.empty()) {
+        throw std::runtime_error(std::string("required configuration is empty: ") + name);
     }
     return value;
 }
@@ -242,6 +257,7 @@ private:
 
 struct PqcArtifact {
     std::string algorithm = "ML-DSA-44+ML-KEM-512";
+    std::string key_id;
     std::vector<uint8_t> signature;
     std::vector<uint8_t> signature_public_key;
     std::vector<uint8_t> kem_ciphertext;
@@ -252,21 +268,25 @@ struct PqcArtifact {
 
 class RealPqcEngine {
 public:
-    RealPqcEngine() {
+    explicit RealPqcEngine(omniguard::PqcKeyMaterial material) {
         sig_.reset(OQS_SIG_new(OQS_SIG_alg_ml_dsa_44));
         kem_.reset(OQS_KEM_new(OQS_KEM_alg_ml_kem_512));
         if (!sig_ || !kem_) {
             throw std::runtime_error("required liboqs ML-DSA-44/ML-KEM-512 algorithms are unavailable");
         }
-
-        sig_pk_.resize(sig_->length_public_key);
-        sig_sk_.resize(sig_->length_secret_key);
-        kem_pk_.resize(kem_->length_public_key);
-        kem_sk_.resize(kem_->length_secret_key);
-        if (OQS_SIG_keypair(sig_.get(), sig_pk_.data(), sig_sk_.data()) != OQS_SUCCESS ||
-            OQS_KEM_keypair(kem_.get(), kem_pk_.data(), kem_sk_.data()) != OQS_SUCCESS) {
-            throw std::runtime_error("liboqs key generation failed");
+        if (material.identity.empty() || material.key_id.empty() ||
+            material.signature_public_key.size() != sig_->length_public_key ||
+            material.signature_secret_key.size() != sig_->length_secret_key ||
+            material.kem_public_key.size() != kem_->length_public_key ||
+            material.kem_secret_key.size() != kem_->length_secret_key) {
+            throw std::runtime_error("durable PQC keystore material is incomplete or incompatible");
         }
+        identity_ = std::move(material.identity);
+        key_id_ = std::move(material.key_id);
+        sig_pk_ = std::move(material.signature_public_key);
+        sig_sk_ = std::move(material.signature_secret_key);
+        kem_pk_ = std::move(material.kem_public_key);
+        kem_sk_ = std::move(material.kem_secret_key);
     }
 
     ~RealPqcEngine() {
@@ -278,8 +298,12 @@ public:
         }
     }
 
+    const std::string& key_id() const { return key_id_; }
+    const std::string& identity() const { return identity_; }
+
     PqcArtifact create(const std::string& message) const {
         PqcArtifact artifact;
+        artifact.key_id = key_id_;
         artifact.signature.resize(sig_->length_signature);
         size_t signature_len = 0;
         if (OQS_SIG_sign(
@@ -309,14 +333,14 @@ public:
         }
 
         artifact.shared_secret_hash = sha3_256_hex(
-            std::string(kPqcDomain) + "\n" +
+            std::string(kPqcDomain) + "\n" + key_id_ + "\n" +
             bytes_to_hex(receiver_secret.data(), receiver_secret.size())
         );
         OPENSSL_cleanse(sender_secret.data(), sender_secret.size());
         OPENSSL_cleanse(receiver_secret.data(), receiver_secret.size());
 
         artifact.binding_hash = sha3_256_hex(
-            std::string(kPqcDomain) + "\n" + message + "\n" +
+            std::string(kPqcDomain) + "\n" + key_id_ + "\n" + message + "\n" +
             bytes_to_hex(artifact.signature.data(), artifact.signature.size()) + "\n" +
             bytes_to_hex(artifact.kem_ciphertext.data(), artifact.kem_ciphertext.size()) + "\n" +
             artifact.shared_secret_hash
@@ -326,6 +350,7 @@ public:
 
     bool verify(const std::string& message, const PqcArtifact& artifact) const {
         if (artifact.algorithm != "ML-DSA-44+ML-KEM-512" ||
+            artifact.key_id != key_id_ ||
             artifact.signature_public_key != sig_pk_ ||
             artifact.kem_public_key != kem_pk_) {
             return false;
@@ -345,7 +370,7 @@ public:
             return false;
         }
         const std::string expected_secret_hash = sha3_256_hex(
-            std::string(kPqcDomain) + "\n" +
+            std::string(kPqcDomain) + "\n" + key_id_ + "\n" +
             bytes_to_hex(receiver_secret.data(), receiver_secret.size())
         );
         OPENSSL_cleanse(receiver_secret.data(), receiver_secret.size());
@@ -353,7 +378,7 @@ public:
             return false;
         }
         const std::string expected_binding = sha3_256_hex(
-            std::string(kPqcDomain) + "\n" + message + "\n" +
+            std::string(kPqcDomain) + "\n" + key_id_ + "\n" + message + "\n" +
             bytes_to_hex(artifact.signature.data(), artifact.signature.size()) + "\n" +
             bytes_to_hex(artifact.kem_ciphertext.data(), artifact.kem_ciphertext.size()) + "\n" +
             artifact.shared_secret_hash
@@ -371,6 +396,8 @@ private:
 
     std::unique_ptr<OQS_SIG, SigDeleter> sig_;
     std::unique_ptr<OQS_KEM, KemDeleter> kem_;
+    std::string identity_;
+    std::string key_id_;
     std::vector<uint8_t> sig_pk_;
     std::vector<uint8_t> sig_sk_;
     std::vector<uint8_t> kem_pk_;
@@ -412,12 +439,22 @@ public:
     SecureBlockchain(
         std::string vehicle_id,
         const std::string& data_key,
-        const std::string& auth_token
+        const std::string& auth_token,
+        const std::filesystem::path& pqc_keystore_path,
+        const std::string& pqc_keystore_key
     ) : vehicle_id_(std::move(vehicle_id)),
         cipher_(data_key),
-        auth_digest_(digest(EVP_sha3_256(), std::string("OMNIGUARD_AUTH_V1\n") + auth_token)) {
+        auth_digest_(digest(EVP_sha3_256(), std::string("OMNIGUARD_AUTH_V1\n") + auth_token)),
+        pqc_(omniguard::PqcKeyStore(
+                 pqc_keystore_path,
+                 pqc_keystore_key,
+                 vehicle_id_
+             ).load_or_create()) {
         if (vehicle_id_.empty() || auth_token.size() < kMinSecretLength) {
             throw std::runtime_error("vehicle identity/authentication configuration is invalid");
+        }
+        if (pqc_.identity() != vehicle_id_) {
+            throw std::runtime_error("durable PQC identity is not bound to the configured vehicle identity");
         }
         create_genesis();
     }
@@ -493,7 +530,8 @@ public:
                 return false;
             }
             const std::string expected_pqc_digest = sha3_256_hex(
-                std::string(kPqcDomain) + "\n" + block.pqc.binding_hash + "\n" + block.dual_hash
+                std::string(kPqcDomain) + "\n" + block.pqc.key_id + "\n" +
+                block.pqc.binding_hash + "\n" + block.dual_hash
             );
             if (block.pqc_digest != expected_pqc_digest) {
                 return false;
@@ -525,6 +563,7 @@ public:
                 {"block_hash", block.block_hash},
                 {"dual_hash_encrypted", encrypted_dual.to_json()},
                 {"pqc_algorithm", block.pqc.algorithm},
+                {"pqc_key_id", block.pqc.key_id},
                 {"pqc_signature_hex", bytes_to_hex(block.pqc.signature.data(), block.pqc.signature.size())},
                 {"pqc_signature_public_key_hex", bytes_to_hex(block.pqc.signature_public_key.data(), block.pqc.signature_public_key.size())},
                 {"pqc_kem_ciphertext_hex", bytes_to_hex(block.pqc.kem_ciphertext.data(), block.pqc.kem_ciphertext.size())},
@@ -589,6 +628,7 @@ public:
     }
 
     size_t size() const { return chain_.size(); }
+    const std::string& pqc_key_id() const { return pqc_.key_id(); }
 
 private:
     std::string serialize_telemetry(const TelemetryData& value) const {
@@ -617,8 +657,9 @@ private:
     }
 
     std::string pqc_message(const Block& block) const {
-        return std::string(kPqcDomain) + "\n" + block.block_hash + "\n" +
-               block.dual_hash + "\n" + block.previous_hash + "\n" + block.timestamp;
+        return std::string(kPqcDomain) + "\n" + pqc_.key_id() + "\n" +
+               block.block_hash + "\n" + block.dual_hash + "\n" +
+               block.previous_hash + "\n" + block.timestamp;
     }
 
     void finalize_block(Block& block) {
@@ -631,7 +672,8 @@ private:
         block.dual_hash = sha256_hex(block.block_hash) + ":" + sha3_256_hex(block.block_hash);
         block.pqc = pqc_.create(pqc_message(block));
         block.pqc_digest = sha3_256_hex(
-            std::string(kPqcDomain) + "\n" + block.pqc.binding_hash + "\n" + block.dual_hash
+            std::string(kPqcDomain) + "\n" + block.pqc.key_id + "\n" +
+            block.pqc.binding_hash + "\n" + block.dual_hash
         );
     }
 
@@ -656,35 +698,86 @@ private:
     bool engine_started_ = false;
 };
 
-int run_self_test(const std::string& vehicle_id, const std::string& data_key, const std::string& auth_token) {
-    SecureBlockchain blockchain(vehicle_id, data_key, auth_token);
-    if (!blockchain.aead_self_test()) {
-        std::cerr << "[SELF-TEST] AES-256-GCM tamper test failed\n";
-        return 2;
-    }
-    if (blockchain.authenticate("definitely-wrong-token")) {
-        std::cerr << "[SELF-TEST] invalid authentication token accepted\n";
-        return 3;
-    }
-    if (!blockchain.authenticate(auth_token) || !blockchain.start_engine()) {
-        std::cerr << "[SELF-TEST] valid authentication/engine gate failed\n";
-        return 4;
+int run_self_test(
+    const std::string& vehicle_id,
+    const std::string& data_key,
+    const std::string& auth_token,
+    const std::filesystem::path& pqc_keystore_path,
+    const std::string& pqc_keystore_key
+) {
+    std::string first_key_id;
+    {
+        SecureBlockchain blockchain(
+            vehicle_id,
+            data_key,
+            auth_token,
+            pqc_keystore_path,
+            pqc_keystore_key
+        );
+        if (!blockchain.aead_self_test()) {
+            std::cerr << "[SELF-TEST] AES-256-GCM tamper test failed\n";
+            return 2;
+        }
+        if (blockchain.authenticate("definitely-wrong-token")) {
+            std::cerr << "[SELF-TEST] invalid authentication token accepted\n";
+            return 3;
+        }
+        if (!blockchain.authenticate(auth_token) || !blockchain.start_engine()) {
+            std::cerr << "[SELF-TEST] valid authentication/engine gate failed\n";
+            return 4;
+        }
+
+        TelemetryData telemetry;
+        telemetry.speed = 64.5;
+        telemetry.acceleration = 1.2;
+        telemetry.engine_temp = 88.0;
+        telemetry.gps_lat = 23.8103;
+        telemetry.gps_lon = 90.4125;
+        telemetry.obstacle_distance = 250.0;
+        telemetry.timestamp = now_iso();
+        blockchain.append(telemetry, "SELFTEST:TELEMETRY");
+        if (!blockchain.verify_chain() || blockchain.size() != 2) {
+            std::cerr << "[SELF-TEST] native ledger verification failed\n";
+            return 5;
+        }
+        first_key_id = blockchain.pqc_key_id();
     }
 
-    TelemetryData telemetry;
-    telemetry.speed = 64.5;
-    telemetry.acceleration = 1.2;
-    telemetry.engine_temp = 88.0;
-    telemetry.gps_lat = 23.8103;
-    telemetry.gps_lon = 90.4125;
-    telemetry.obstacle_distance = 250.0;
-    telemetry.timestamp = now_iso();
-    blockchain.append(telemetry, "SELFTEST:TELEMETRY");
-    if (!blockchain.verify_chain() || blockchain.size() != 2) {
-        std::cerr << "[SELF-TEST] native ledger verification failed\n";
-        return 5;
+    {
+        SecureBlockchain reloaded(
+            vehicle_id,
+            data_key,
+            auth_token,
+            pqc_keystore_path,
+            pqc_keystore_key
+        );
+        if (reloaded.pqc_key_id() != first_key_id || !reloaded.verify_chain()) {
+            std::cerr << "[SELF-TEST] durable PQC identity changed across native restart\n";
+            return 6;
+        }
     }
-    std::cout << "[SELF-TEST] PASS: AES-256-GCM + ML-DSA-44 + ML-KEM-512 + full-chain verification\n";
+
+    bool wrong_key_rejected = false;
+    try {
+        std::string wrong_key = pqc_keystore_key;
+        wrong_key[0] = wrong_key[0] == 'X' ? 'Y' : 'X';
+        SecureBlockchain rejected(
+            vehicle_id,
+            data_key,
+            auth_token,
+            pqc_keystore_path,
+            wrong_key
+        );
+        (void)rejected;
+    } catch (const std::exception&) {
+        wrong_key_rejected = true;
+    }
+    if (!wrong_key_rejected) {
+        std::cerr << "[SELF-TEST] native core accepted a wrong PQC keystore wrapping key\n";
+        return 7;
+    }
+
+    std::cout << "[SELF-TEST] PASS: AES-256-GCM + durable ML-DSA-44 + ML-KEM-512 + full-chain verification\n";
     return 0;
 }
 
@@ -694,13 +787,29 @@ int main(int argc, char** argv) {
     try {
         const std::string data_key = require_env_secret("SMARTCAR_CPP_DATA_KEY");
         const std::string auth_token = require_env_secret("SMARTCAR_AUTH_TOKEN");
+        const std::string pqc_keystore_key = require_env_secret("SMARTCAR_CPP_PQC_KEYSTORE_KEY");
+        const std::filesystem::path pqc_keystore_path(
+            require_env_value("SMARTCAR_CPP_PQC_KEYSTORE_PATH")
+        );
         const std::string vehicle_id = argc > 1 ? argv[1] : "SMARTCAR_CPP_VEHICLE_001";
 
         if (argc > 1 && std::string(argv[1]) == "--self-test") {
-            return run_self_test("SMARTCAR_CPP_SELFTEST", data_key, auth_token);
+            return run_self_test(
+                "SMARTCAR_CPP_SELFTEST",
+                data_key,
+                auth_token,
+                pqc_keystore_path,
+                pqc_keystore_key
+            );
         }
 
-        SecureBlockchain blockchain(vehicle_id, data_key, auth_token);
+        SecureBlockchain blockchain(
+            vehicle_id,
+            data_key,
+            auth_token,
+            pqc_keystore_path,
+            pqc_keystore_key
+        );
         if (!blockchain.authenticate(auth_token)) {
             throw std::runtime_error("native authentication failed");
         }
@@ -709,7 +818,7 @@ int main(int argc, char** argv) {
                      : std::filesystem::path("logs/blockchain_cpp_secure.json");
         blockchain.save(output);
         std::cout << "[NATIVE] Secure ledger initialized and persisted. blocks=" << blockchain.size() << "\n";
-        std::cout << "[NATIVE] PQC=ML-DSA-44+ML-KEM-512, data-at-rest=AES-256-GCM\n";
+        std::cout << "[NATIVE] PQC=durable ML-DSA-44+ML-KEM-512, data-at-rest=AES-256-GCM\n";
         return 0;
     } catch (const std::exception& exc) {
         std::cerr << "[NATIVE] fail-closed: " << exc.what() << "\n";

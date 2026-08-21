@@ -2,180 +2,52 @@
 
 ## Scope
 
-This phase hardens the supported native C++ blockchain build after v3.1 made
-missing-liboqs builds fail closed. The goal is to remove legacy cryptographic
-fallbacks from the production executable rather than merely hiding them behind
-runtime labels.
+v3.2 removes legacy cryptographic fallbacks from the supported native C++ executable rather than merely labeling them as compatibility behavior. This remains research hardening, not production cryptographic certification, formal verification, or vehicle-safety certification.
 
-This is research hardening. It is not production cryptographic certification,
-formal verification, penetration-test certification, or vehicle-safety
-certification.
+## Supported native target
 
-## Threats addressed
+`smartcar_blockchain` compiles only `native/secure_blockchain.cpp` and requires OpenSSL 3 Crypto plus real liboqs. The supported source contains neither the historical XOR `SimpleEncrypt` helper nor simulated PQC. If real liboqs is unavailable, CMake fails before producing the supported executable.
 
-The historical `blockchain.cpp` contained two compatibility mechanisms that are
-not appropriate for the supported security target:
+Historical `blockchain.cpp` remains available only through the explicitly named, default-off `smartcar_blockchain_legacy_demo` target for controlled compatibility/research comparison. That target is outside the hardened build profile.
 
-- XOR plus Base64 for persisted `dual_hash` data, which provides no modern
-  authenticated-encryption guarantee.
-- A deterministic simulated-PQC fallback that could generate artifacts without
-  real ML-KEM/ML-DSA cryptography when liboqs was unavailable.
+## Authenticated data protection
 
-The historical demo also embedded sample credentials in `main()`.
+The secure native core requires an independent high-entropy `SMARTCAR_CPP_DATA_KEY`, registered as the separate `native_cpp_data` credential domain. Exact key reuse with other configured security domains is rejected by the shared credential policy.
 
-v3.2 isolates that source from the supported native target and introduces a new
-security core with explicit credentials, authenticated encryption, standardized
-PQC algorithms, full-chain verification, and executable-level CI validation.
+Persisted `dual_hash` values use AES-256-GCM with a 96-bit random nonce, 128-bit tag, and associated data binding vehicle ID, block index, and block hash. The native self-test verifies normal decryption and rejection after tag tampering. This protects that selected field; it does not make the full ledger confidential.
 
-## Build boundary
+## Real post-quantum path
 
-### Supported target
+The supported target uses only liboqs `ML-DSA-44` and `ML-KEM-512`. Per block it signs a domain-separated block message, performs KEM encapsulation/decapsulation, verifies shared-secret agreement, stores a hash rather than the shared secret, and binds the signature/KEM evidence to the block metadata.
 
-`smartcar_blockchain` now compiles only:
+No simulated signature/KEM artifact is accepted or compiled into `smartcar_blockchain`.
 
-`native/secure_blockchain.cpp`
+## Pinned liboqs validation
 
-The target requires:
+Normal builds may use an installed liboqs package. CI/source validation can explicitly enable `-DSMARTCAR_FETCH_PINNED_LIBOQS=ON`, which pins liboqs 0.16.0 to full commit `5a1a854b0dc9f2141bdc771c555ee60c37950183` and limits the fetched algorithm set to `KEM_ml_kem_512;SIG_ml_dsa_44`.
 
-- OpenSSL 3 `Crypto`
-- real liboqs
-- nlohmann/json
-
-There is no simulated-PQC code and no `SimpleEncrypt` XOR helper in this source.
-If real liboqs is unavailable, CMake stops before producing the supported binary.
-
-### Legacy compatibility target
-
-Historical `blockchain.cpp` remains in the repository for controlled research
-comparison and compatibility work, but it can only be compiled through the
-explicitly named target:
-
-`smartcar_blockchain_legacy_demo`
-
-That target is disabled by default and remains outside the hardened production
-build profile. It must not be described as a post-quantum-secure or production
-vehicle-security executable.
-
-## Native data protection
-
-The secure native core requires an independent environment credential:
-
-`SMARTCAR_CPP_DATA_KEY`
-
-The credential policy treats this as the separate `native_cpp_data` security
-domain. Exact reuse with authentication, API, validator, recovery, V2X,
-hardware-device, storage, forensic, insurance, or incident-response credentials
-is rejected by the shared Python credential policy.
-
-The native source requires at least 32 characters and derives a fixed 256-bit
-AES key using SHA-256 with the domain string `OMNIGUARD_CPP_DATA_KEY_V1`.
-This input is expected to be a generated high-entropy secret; this derivation is
-not represented as a password KDF.
-
-Persisted `dual_hash` values use AES-256-GCM with:
-
-- 96-bit random nonce from `RAND_bytes`
-- 128-bit authentication tag
-- associated data binding vehicle identity, block index, and block hash
-- explicit algorithm/version metadata in the JSON envelope
-
-The self-test proves a valid envelope decrypts and a modified GCM tag is
-rejected.
-
-This does not make the entire ledger confidential. Event, telemetry, block,
-and PQC metadata remain visible in the persisted research ledger.
-
-## Real PQC path
-
-The secure core uses only standardized identifiers:
-
-- `ML-DSA-44`
-- `ML-KEM-512`
-
-For each block it:
-
-1. signs the domain-separated block/PQC message with ML-DSA-44;
-2. encapsulates to the process ML-KEM-512 keypair;
-3. decapsulates and checks sender/receiver shared-secret equality;
-4. immediately hashes the shared secret into a domain-separated digest;
-5. wipes temporary shared-secret and private-key buffers on the implemented
-   software path;
-6. binds signature, KEM ciphertext, shared-secret hash, block hash, dual hash,
-   previous hash, and timestamp into the committed PQC metadata.
-
-No simulated signature/KEM artifact is accepted by `smartcar_blockchain`.
-
-## Pinned liboqs source build
-
-The normal build prefers an installed liboqs package. Reproducible CI/source
-validation may explicitly enable:
-
-`-DSMARTCAR_FETCH_PINNED_LIBOQS=ON`
-
-The repository pins liboqs 0.16.0 to the full commit:
-
-`5a1a854b0dc9f2141bdc771c555ee60c37950183`
-
-The fetched build is minimized to:
-
-`KEM_ml_kem_512;SIG_ml_dsa_44`
-
-A commit pin improves source reproducibility but is not a complete software
-supply-chain attestation mechanism.
+A commit pin improves source reproducibility but is not complete supply-chain attestation.
 
 ## Ledger verification
 
-The secure native verifier checks every block including genesis:
+The native verifier checks every block, including genesis: contiguous index, vehicle identity, previous-hash linkage, telemetry SHA-256/SHA3-256, event SHA-256/SHA3-256, block hash, dual hash, ML-DSA signature, ML-KEM decapsulation/shared-secret hash, and PQC binding/digest. Append and save operations refuse to proceed if verification fails.
 
-- contiguous index
-- vehicle identity
-- genesis/linkage previous hash
-- telemetry SHA-256 and SHA3-256 recomputation
-- event SHA-256 and SHA3-256 recomputation
-- block hash recomputation
-- dual-hash recomputation
-- ML-DSA signature verification
-- ML-KEM decapsulation and shared-secret hash validation
-- PQC binding/digest validation
+## CI contract
 
-Appending or saving refuses to continue if the existing chain fails validation.
+The Security Baseline must prove all of the following before v3.2 is considered validated:
 
-## Authentication boundary
+- existing Python security regression suites pass;
+- deterministic adversarial, software-HIL, and incident-response scenarios pass;
+- forcing liboqs unavailable makes the hardened CMake target fail closed;
+- the historical source builds only through the isolated legacy target;
+- pinned real liboqs builds `smartcar_blockchain`;
+- the secure native self-test passes AES-GCM tamper rejection, authentication, real ML-DSA/ML-KEM block creation, and full-chain verification;
+- existing Go security tests, bounded fuzz campaigns, and Go build remain green.
 
-The executable requires `SMARTCAR_AUTH_TOKEN`; there is no hardcoded valid token
-in the secure source. Authentication compares a domain-separated SHA3-256 digest
-using a constant-time byte comparison and requires the chain to validate before
-unlocking the local demo state.
+## Remaining boundaries
 
-This remains a research/demo authentication boundary and is not a substitute for
-hardware-backed vehicle identity, production PKI, or ECU authorization.
-
-## CI validation
-
-The Security Baseline now verifies all of the following:
-
-- existing Python security regression suites
-- v3.2 source/build-policy regression tests
-- hardened target fails closed when liboqs is forced unavailable
-- legacy `blockchain.cpp` builds only as the isolated legacy target
-- pinned real liboqs source builds the supported native target
-- native crypto self-test exercises AES-GCM tamper rejection, authentication,
-  ML-DSA/ML-KEM block creation, and full-chain verification
-- existing deterministic adversarial, software-HIL, incident-response, Go
-  security/fuzz, and Go build gates remain active
-
-## Remaining limitations
-
-- `SMARTCAR_CPP_DATA_KEY` is currently process-provided software key material;
-  TPM/HSM/non-exportable native data-key operations remain future work.
-- The legacy C++ demo still exists in the repository for controlled comparison.
-  It is intentionally not deleted in this phase, but is excluded from the
-  supported executable.
-- The secure target currently generates ephemeral ML-DSA/ML-KEM keypairs at
-  process startup; durable protected PQC identity/key provisioning is future work.
-- The persisted ledger format introduced by the secure native target is a new
-  research format and does not silently migrate historical legacy C++ files.
-- AES-GCM protects the selected encrypted field; it is not a full-ledger
-  confidentiality layer.
-- A sufficiently privileged local process/OS attacker remains outside this
-  software-only trust boundary.
+- `SMARTCAR_CPP_DATA_KEY` is currently process-provided software key material; TPM/HSM/non-exportable native key operations remain future work.
+- ML-DSA/ML-KEM keys are currently generated per process; durable protected PQC identity provisioning is future work.
+- The secure native ledger format does not silently migrate historical legacy C++ files.
+- The legacy demo remains in the repository for controlled comparison and must not be represented as the supported security executable.
+- A sufficiently privileged local OS/process attacker remains outside this software-only trust boundary.

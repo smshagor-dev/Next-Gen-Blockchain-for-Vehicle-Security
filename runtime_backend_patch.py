@@ -1,4 +1,4 @@
-"""Install isolated Go spawning, policy metadata, and runtime security detection.
+"""Install isolated Go spawning, policy metadata, runtime detection, and release identity.
 
 The Go process is a local control backend, not a consensus participant. Identity
 admission and permissioned quorum are enforced by the Python sync network. The
@@ -17,6 +17,7 @@ from typing import Any, Dict
 from consensus_security import consensus_security_metadata
 from identity_security import identity_security_metadata
 from ledger_integrity import LedgerIntegrityError
+from release_metadata import release_metadata
 from runtime_backend_security import classify_backend_runtime_error
 from runtime_isolation import (
     build_isolated_child_environment,
@@ -29,6 +30,7 @@ from smartcar_backend import GoBackend
 _INSTALLED = False
 _ORIGINAL_REQUEST = GoBackend._request
 _ORIGINAL_REFRESH = GoBackend._refresh
+_ORIGINAL_SECURITY_CAPABILITIES = GoBackend.security_capabilities
 
 
 def _isolated_spawn_environment(self: GoBackend, root: Path) -> Dict[str, str]:
@@ -138,8 +140,22 @@ def _network_consensus_security(self: GoBackend) -> Dict[str, object]:
     return consensus_security_metadata()
 
 
+def _release_metadata(self: GoBackend) -> Dict[str, object]:
+    return release_metadata()
+
+
+def _versioned_security_capabilities(self: GoBackend) -> Dict[str, object]:
+    """Merge local canonical release identity into authenticated Go metadata."""
+    metadata = dict(_ORIGINAL_SECURITY_CAPABILITIES(self))
+    release = release_metadata()
+    metadata["release_version"] = release["release_version"]
+    metadata["release_channel"] = release["release_channel"]
+    metadata["internal_hardening_phase"] = release["internal_hardening_phase"]
+    return metadata
+
+
 def install_runtime_backend_hardening() -> bool:
-    """Install isolated spawn, metadata, and monitoring policy exactly once."""
+    """Install isolated spawn, metadata, monitoring, and release policy exactly once."""
     global _INSTALLED
     if _INSTALLED:
         return False
@@ -151,5 +167,7 @@ def install_runtime_backend_hardening() -> bool:
     GoBackend.runtime_security = _runtime_security
     GoBackend.identity_security = _network_identity_security
     GoBackend.consensus_security = _network_consensus_security
+    GoBackend.release_metadata = _release_metadata
+    GoBackend.security_capabilities = _versioned_security_capabilities
     _INSTALLED = True
     return True

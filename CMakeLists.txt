@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(SmartCarBlockchain LANGUAGES CXX)
+project(SmartCarBlockchain VERSION 3.0.2 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -8,6 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(SMARTCAR_BUILD_BLOCKCHAIN "Build the hardened native blockchain target" ON)
+option(SMARTCAR_BUILD_PQC_KEYSTORE_SELFTEST "Build the durable PQC keystore validation target" OFF)
 option(SMARTCAR_BUILD_LEGACY_CPP_DEMO "Build historical blockchain.cpp as an explicitly legacy/lab-only target" OFF)
 option(SMARTCAR_BUILD_CAMERA_MODULE "Build camera_emergency_brake.cpp (OpenCV required)" OFF)
 option(SMARTCAR_ENABLE_WARNINGS "Enable extra compiler warnings" ON)
@@ -97,9 +98,9 @@ if(NOT nlohmann_json_FOUND)
     FetchContent_MakeAvailable(nlohmann_json)
 endif()
 
-# OpenSSL provides the authenticated AES-256-GCM storage boundary and digest
-# implementations used by native/secure_blockchain.cpp.
-if(SMARTCAR_BUILD_BLOCKCHAIN)
+# OpenSSL provides authenticated AES-256-GCM storage and digest implementations
+# used by the secure native core and durable PQC keystore.
+if(SMARTCAR_BUILD_BLOCKCHAIN OR SMARTCAR_BUILD_PQC_KEYSTORE_SELFTEST)
     find_package(OpenSSL 3.0 REQUIRED COMPONENTS Crypto)
 endif()
 
@@ -149,7 +150,12 @@ if(SMARTCAR_BUILD_BLOCKCHAIN)
         )
     endif()
 
-    add_executable(smartcar_blockchain native/secure_blockchain.cpp)
+    add_executable(
+        smartcar_blockchain
+        native/secure_blockchain.cpp
+        native/pqc_key_store.cpp
+    )
+    target_include_directories(smartcar_blockchain PRIVATE native)
     target_link_libraries(
         smartcar_blockchain
         PRIVATE
@@ -157,11 +163,39 @@ if(SMARTCAR_BUILD_BLOCKCHAIN)
             OpenSSL::Crypto
             ${SMARTCAR_LIBOQS_TARGET}
     )
-    target_compile_definitions(smartcar_blockchain PRIVATE SMARTCAR_SECURE_NATIVE_CORE=1)
+    target_compile_definitions(
+        smartcar_blockchain
+        PRIVATE
+            SMARTCAR_SECURE_NATIVE_CORE=1
+            SMARTCAR_RELEASE_VERSION="${PROJECT_VERSION}"
+    )
     smartcar_apply_release_options(smartcar_blockchain)
     message(STATUS
-        "Hardened native target: OpenSSL AES-256-GCM + liboqs ML-DSA-44/ML-KEM-512; simulated PQC excluded."
+        "Hardened native target ${PROJECT_VERSION}: OpenSSL AES-256-GCM + liboqs ML-DSA-44/ML-KEM-512; durable PQC keystore module compiled; simulated PQC excluded."
     )
+endif()
+
+if(SMARTCAR_BUILD_PQC_KEYSTORE_SELFTEST)
+    if(NOT SMARTCAR_LIBOQS_TARGET)
+        message(FATAL_ERROR
+            "Real liboqs is required for smartcar_pqc_keystore_selftest. "
+            "Install liboqs ${SMARTCAR_LIBOQS_VERSION}, or set SMARTCAR_FETCH_PINNED_LIBOQS=ON."
+        )
+    endif()
+    add_executable(
+        smartcar_pqc_keystore_selftest
+        native/pqc_key_store.cpp
+        native/pqc_key_store_selftest.cpp
+    )
+    target_include_directories(smartcar_pqc_keystore_selftest PRIVATE native)
+    target_link_libraries(
+        smartcar_pqc_keystore_selftest
+        PRIVATE
+            nlohmann_json::nlohmann_json
+            OpenSSL::Crypto
+            ${SMARTCAR_LIBOQS_TARGET}
+    )
+    smartcar_apply_release_options(smartcar_pqc_keystore_selftest)
 endif()
 
 # Historical source remains available only as an explicitly named lab/demo
