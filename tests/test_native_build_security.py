@@ -59,12 +59,15 @@ class NativeBuildSecurityTests(unittest.TestCase):
 
     def test_hardened_target_never_compiles_legacy_source(self):
         target = re.search(
-            r"if\(SMARTCAR_BUILD_BLOCKCHAIN\).*?endif\(\)",
+            r"add_executable\(\s*smartcar_blockchain\s+(.*?)\)",
             self.cmake,
             re.DOTALL,
         )
         self.assertIsNotNone(target)
-        self.assertIn("add_executable(smartcar_blockchain native/secure_blockchain.cpp)", self.cmake)
+        sources = target.group(1)
+        self.assertIn("native/secure_blockchain.cpp", sources)
+        self.assertIn("native/pqc_key_store.cpp", sources)
+        self.assertNotRegex(sources, r"(^|\s)blockchain\.cpp($|\s)")
         self.assertNotIn("add_executable(smartcar_blockchain blockchain.cpp)", self.cmake)
         self.assertIn("OpenSSL::Crypto", self.cmake)
 
