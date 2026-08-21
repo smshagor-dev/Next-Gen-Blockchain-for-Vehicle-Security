@@ -4,6 +4,7 @@ from pathlib import Path
 
 ADMIN = Path("native/pqc_key_admin.cpp")
 POLICY = Path("native/pqc_provider_policy.h")
+KEYSTORE_HEADER = Path("native/pqc_key_store.h")
 CMAKE = Path("CMakeLists.txt")
 WORKFLOW = Path(".github/workflows/security-baseline.yml")
 ENV_EXAMPLE = Path(".env.example")
@@ -14,6 +15,7 @@ class PqcKeyRotationTests(unittest.TestCase):
     def setUpClass(cls):
         cls.admin = ADMIN.read_text(encoding="utf-8")
         cls.policy = POLICY.read_text(encoding="utf-8")
+        cls.keystore_header = KEYSTORE_HEADER.read_text(encoding="utf-8")
         cls.cmake = CMAKE.read_text(encoding="utf-8")
         cls.workflow = WORKFLOW.read_text(encoding="utf-8")
         cls.env_example = ENV_EXAMPLE.read_text(encoding="utf-8")
@@ -53,6 +55,9 @@ class PqcKeyRotationTests(unittest.TestCase):
         self.assertIn("TPM2/PKCS#11/HSM fallback is not simulated", self.policy)
         self.assertIn("bool hardware_backed = false", self.policy)
         self.assertIn("bool non_exportable = false", self.policy)
+        self.assertIn('#include "pqc_provider_policy.h"', self.keystore_header)
+        self.assertIn("PqcProviderPolicyGuard provider_policy_guard_", self.keystore_header)
+        self.assertIn("static constexpr const char* kProvider = kSoftwarePqcProvider", self.keystore_header)
 
     def test_selftest_covers_rotation_backup_confirmation_and_policy(self):
         self.assertIn("wrong rotation confirmation changed active PQC identity", self.admin)
@@ -66,6 +71,7 @@ class PqcKeyRotationTests(unittest.TestCase):
         self.assertIn("smartcar_pqc_key_admin", self.cmake)
         self.assertIn("tests.test_pqc_key_rotation", self.workflow)
         self.assertIn("Run guarded PQC key administration self-test", self.workflow)
+        self.assertIn("Verify supported native runtime rejects hardware-required software PQC", self.workflow)
         self.assertIn("SMARTCAR_CPP_PQC_HARDWARE_REQUIRED=1", self.workflow)
 
     def test_configuration_defaults_are_conservative(self):
