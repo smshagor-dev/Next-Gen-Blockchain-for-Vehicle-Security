@@ -7,7 +7,8 @@ from env_config import load_project_env_once
 
 load_project_env_once()
 
-from dashboard import SmartCarDashboard
+# UI-only branch: keep the existing runtime/backend and launch the modern skin.
+from dashboard_modern_ui import SmartCarDashboard
 
 
 def main():
@@ -18,21 +19,21 @@ def main():
     style.theme_use('clam')
     style.configure(
         "Horizontal.TProgressbar",
-        background='#10b981',
-        troughcolor='#111827',
-        bordercolor='#1f3a5f'
+        background='#24d18b',
+        troughcolor='#07121e',
+        bordercolor='#1c3048'
     )
     for name in ["FUEL", "THROTTLE", "BRAKE", "BATTERY"]:
         colors = {
-            'FUEL': '#10b981',
+            'FUEL': '#24d18b',
             'THROTTLE': '#f59e0b',
-            'BRAKE': '#ef4444',
-            'BATTERY': '#00d4ff'
+            'BRAKE': '#ff5c6c',
+            'BATTERY': '#4f7cff'
         }
         style.configure(
             f"{name}.Horizontal.TProgressbar",
-            background=colors.get(name, '#00d4ff'),
-            troughcolor='#111827'
+            background=colors.get(name, '#4f7cff'),
+            troughcolor='#07121e'
         )
 
     app.mainloop()
@@ -40,4 +41,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
