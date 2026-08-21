@@ -52,6 +52,12 @@ METHOD\nPATH\nTIMESTAMP\nNONCE\nBODY_SHA256
 
 using HMAC-SHA256 with `SMARTCAR_GO_API_SECRET`.
 
+## OS/process trust boundary
+
+This layer is designed to stop unauthenticated local HTTP callers and a rogue process that only pre-binds the backend TCP port. It is not a substitute for operating-system privilege separation.
+
+A process running with sufficient privileges under the same account may still be able to inspect process memory, inherited environment variables, or other local resources. Production-oriented follow-up should move long-lived keys into TPM 2.0 / secure-element / OS credential storage and prefer an authenticated local IPC transport with operating-system peer identity where available.
+
 ## Go SHA3 portability fix
 
 The previous Go backend imported `crypto/sha3`, which is not available in the declared Go 1.22 toolchain. The backend now contains a compact FIPS 202 SHA3-256 implementation and validates it against the standard `SHA3-256("abc")` test vector in CI. No unpinned Go crypto dependency is introduced.
