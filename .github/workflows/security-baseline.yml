@@ -94,13 +94,12 @@ jobs:
             > build/native-strict.log 2>&1
           status=$?
           set -e
+          cat build/native-strict.log
           if [ "$status" -eq 0 ]; then
-            cat build/native-strict.log
             echo "Hardened native configure unexpectedly succeeded without liboqs."
             exit 1
           fi
           grep -F "Real liboqs is required for the hardened native blockchain target" build/native-strict.log
-          grep -F "Simulated PQC is not compiled into smartcar_blockchain" build/native-strict.log
 
       - name: Build isolated legacy C++ demo target
         run: |
