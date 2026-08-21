@@ -1,0 +1,14 @@
+[
+  "{",
+  "[]",
+  "null",
+  "true",
+  "123",
+  "{\"type\":null,\"payload\":{}}",
+  "{\"type\":\"PING\",\"payload\":null}",
+  "{\"type\":\"PING\",\"payload\":{},\"timestamp\":\"not-a-time\",\"nonce\":\"abababababababababababababababab\",\"mac\":\"0000000000000000000000000000000000000000000000000000000000000000\"}",
+  "{\"type\":\"PING\",\"payload\":{},\"timestamp\":\"2026-08-21T00:00:00+00:00\",\"nonce\":\"short\",\"mac\":\"0000000000000000000000000000000000000000000000000000000000000000\"}",
+  "{\"type\":\"SYNC_REQUEST\",\"payload\":{\"chain\":\"not-a-list\"},\"timestamp\":\"2026-08-21T00:00:00+00:00\",\"nonce\":\"abababababababababababababababab\"}",
+  "{\"type\":\"VOTE_SUBMIT\",\"payload\":{\"proposal_id\":[],\"vote\":{}},\"timestamp\":\"2026-08-21T00:00:00+00:00\",\"nonce\":\"abababababababababababababababab\",\"mac\":\"zzzz\"}",
+  "{\"type\":\"PING\",\"payload\":{},\"timestamp\":\"2026-08-21T00:00:00+00:00\",\"nonce\":\"abababababababababababababababab\",\"mac\":\"\"}"
+]
