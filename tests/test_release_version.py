@@ -92,7 +92,7 @@ class ReleaseVersionTests(unittest.TestCase):
         self.assertIn("workflow_dispatch:", trigger_block)
         self.assertNotIn("\n  push:\n", trigger_block)
         self.assertIn('test "${{ inputs.confirm }}" = "CREATE-v3.0.2"', text)
-        self.assertIn("permissions:\n  contents: write\n  actions: read", text)
+        self.assertIn("permissions:\n  contents: write\n  actions: write", text)
         self.assertIn("ref: main", text)
         self.assertIn("git fetch origin main --tags", text)
         self.assertIn('main_sha="$(git rev-parse origin/main)"', text)
@@ -108,12 +108,17 @@ class ReleaseVersionTests(unittest.TestCase):
         self.assertIn('git tag -a "$TAG" "$main_sha"', text)
         self.assertIn('git push origin "refs/tags/$TAG"', text)
         self.assertIn('test "$(git rev-list -n 1 "$TAG")" = "$main_sha"', text)
+        self.assertIn("Dispatch guarded publication workflow on the tag ref", text)
+        self.assertIn("gh workflow run release-v3.0.2.yml", text)
+        self.assertIn('--ref "$TAG"', text)
 
     def test_publication_workflow_is_tag_commit_and_permission_guarded(self):
         path = Path(".github/workflows/release-v3.0.2.yml")
         self.assertTrue(path.exists())
         text = path.read_text(encoding="utf-8")
-        self.assertIn("- v3.0.2", text)
+        trigger_block = text.split("permissions:", 1)[0]
+        self.assertIn("- v3.0.2", trigger_block)
+        self.assertIn("workflow_dispatch:", trigger_block)
         self.assertIn('test "$GITHUB_REF_NAME" = "v3.0.2"', text)
         self.assertIn('main_sha="$(git rev-parse origin/main)"', text)
         self.assertIn('test "$GITHUB_SHA" = "$main_sha"', text)

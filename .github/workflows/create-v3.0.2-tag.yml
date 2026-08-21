@@ -10,7 +10,7 @@ on:
 
 permissions:
   contents: write
-  actions: read
+  actions: write
 
 concurrency:
   group: omniguard-v3.0.2-tag-operator
@@ -45,6 +45,7 @@ jobs:
           test -f .github/workflows/security-baseline.yml
           test -f .github/workflows/release-v3.0.2.yml
           grep -Fq 'test "$GITHUB_SHA" = "$main_sha"' .github/workflows/release-v3.0.2.yml
+          grep -Fq 'workflow_dispatch:' .github/workflows/release-v3.0.2.yml
           printf '%s\n' "$main_sha" > "$RUNNER_TEMP/v3.0.2-main-sha"
 
       - name: Require successful Security Baseline on exact main commit
@@ -119,4 +120,15 @@ jobs:
           git push origin "refs/tags/$TAG"
           test "$(git rev-list -n 1 "$TAG")" = "$main_sha"
           echo "tag creation: PASS ($TAG -> $main_sha)"
-          echo "The tag-triggered Publish OmniGuard V2X v3.0.2 workflow should now validate and publish the release."
+
+      - name: Dispatch guarded publication workflow on the tag ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="v3.0.2"
+          gh workflow run release-v3.0.2.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref "$TAG"
+          echo "publication dispatch: PASS ($TAG)"
