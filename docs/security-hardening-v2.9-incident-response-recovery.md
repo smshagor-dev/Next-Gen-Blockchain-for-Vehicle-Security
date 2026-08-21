@@ -30,6 +30,10 @@ Each JSONL transition contains only normalized incident metadata:
 
 Journal writes use append mode, `fsync()` per entry, and `0600` permissions where supported. The configured evidence directory is created with restrictive permissions where supported. Symlinked journal targets and filename path traversal are rejected.
 
+The completion hardening treats the journal as a single-writer resource and re-reads the persisted journal on every verification. ACKNOWLEDGE, RECOVER, evaluation, and append transitions fail closed if the current persisted entries no longer match the verified in-memory state. This closes the post-open edit gap where a file modified after process startup could otherwise remain unnoticed until restart.
+
+Verification is semantic/cryptographic over canonical entry fields; it is not a claim that every harmless byte-level formatting change is independently preserved as WORM evidence.
+
 The journal is **tamper-evident, not tamper-proof**. A privileged attacker able to modify both the journal and its signing key can rewrite valid history. WORM storage, remote transparency logs, TPM/HSM-backed signatures, and remote attestation remain future work.
 
 ### 2. Separate operator authorization domain
@@ -87,12 +91,13 @@ A recovery transition requires all of the following:
 
 1. the incident was explicitly acknowledged with a valid signed operator action;
 2. the runtime evidence chain is valid;
-3. the current runtime decision is exactly `NORMAL` / `NONE`;
-4. the configured number of consecutive healthy evaluations has completed;
-5. a fresh signed `RECOVER` authorization is supplied;
-6. if the incident was safety-critical, an external safety-interlock confirmation is explicitly supplied.
+3. the persisted incident journal is still valid and matches the verified process view;
+4. the current runtime decision is exactly `NORMAL` / `NONE`;
+5. the configured number of consecutive healthy evaluations has completed;
+6. a fresh signed `RECOVER` authorization is supplied;
+7. if the incident was safety-critical, an external safety-interlock confirmation is explicitly supplied.
 
-The default healthy-observation requirement is 3.
+The default healthy-observation requirement is 3. If an active incident is restored after restart, lowering the configuration cannot reduce the already-recorded healthy-observation requirement.
 
 A `WATCH` / `AUDIT_ONLY` decision is not considered healthy enough for recovery.
 
@@ -114,6 +119,8 @@ manager.evaluate()
 ```
 
 Importing the factory does not open a journal or require credentials. Construction is explicit so a process that does not own the runtime monitor cannot accidentally claim to manage its incidents.
+
+At manager construction, the factory performs value-free HMAC capability probes through the configured key provider for both `SMARTCAR_INCIDENT_EVIDENCE_KEY` and `SMARTCAR_INCIDENT_OPERATOR_KEY`. The probe MACs are discarded. This means an empty journal cannot let a missing incident key remain undetected until the first security event or operator action.
 
 ## Operator playbook
 
@@ -190,12 +197,14 @@ Unit tests additionally cover:
 
 - raw subject/secret redaction;
 - journal reopen verification;
+- persisted journal tampering detected both after restart and by the current process;
 - operator nonce replay rejection;
 - healthy-window gating;
 - safety-critical versus network-only recovery policy;
 - runtime decision ageing without evidence deletion;
 - cross-domain incident-key reuse rejection;
-- evidence filename traversal rejection.
+- evidence filename traversal rejection;
+- factory startup failure when either required incident credential is absent.
 
 ## Security claims intentionally not made
 
