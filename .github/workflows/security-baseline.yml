@@ -56,6 +56,7 @@ jobs:
           python -m unittest -v tests.test_ledger_integrity
           python -m unittest -v tests.test_adversarial_validation
           python -m unittest -v tests.test_hil_security_validation
+          python -m unittest -v tests.test_native_build_security
 
       - name: Run deterministic adversarial campaigns
         env:
@@ -80,6 +81,35 @@ jobs:
         run: |
           python incident_response_validation.py \
             --output security-reports/incident-response-validation.json
+
+      - name: Verify native build fails closed without liboqs
+        shell: bash
+        run: |
+          set +e
+          cmake -S . -B build/native-strict \
+            -DSMARTCAR_FORCE_PQC_UNAVAILABLE_FOR_TESTS=ON \
+            -DSMARTCAR_ALLOW_SIMULATED_PQC_BUILD=OFF \
+            -DSMARTCAR_BUILD_CAMERA_MODULE=OFF \
+            > build/native-strict.log 2>&1
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            cat build/native-strict.log
+            echo "Strict native configure unexpectedly succeeded without liboqs."
+            exit 1
+          fi
+          grep -F "liboqs is required for the blockchain native target" build/native-strict.log
+
+      - name: Build explicit lab-only simulated PQC native target
+        run: |
+          cmake -S . -B build/native-lab \
+            -DSMARTCAR_FORCE_PQC_UNAVAILABLE_FOR_TESTS=ON \
+            -DSMARTCAR_ALLOW_SIMULATED_PQC_BUILD=ON \
+            -DSMARTCAR_ENABLE_NATIVE_OPT=OFF \
+            -DSMARTCAR_ENABLE_UNSAFE_FAST_MATH=OFF \
+            -DSMARTCAR_ENABLE_IPO=OFF \
+            -DSMARTCAR_BUILD_CAMERA_MODULE=OFF
+          cmake --build build/native-lab --config Release --parallel 2
 
       - name: Normalize Go formatting for validation
         working-directory: api/go

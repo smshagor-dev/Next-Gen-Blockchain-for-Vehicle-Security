@@ -215,6 +215,16 @@ class IncidentResponseTests(unittest.TestCase):
         self.assertEqual(manager.journal.path.name, "factory-evidence.jsonl")
         self.assertTrue(manager.journal.verify())
 
+    def test_runtime_factory_fails_closed_when_operator_key_missing(self):
+        env = {
+            "SMARTCAR_KEY_PROVIDER": "environment",
+            "SMARTCAR_INCIDENT_EVIDENCE_KEY": EVIDENCE_KEY,
+            "SMARTCAR_INCIDENT_EVIDENCE_DIR": self.temp.name,
+        }
+        with patch.dict(os.environ, env, clear=True):
+            with self.assertRaises(RuntimeError):
+                create_runtime_incident_response_manager(RuntimeSecurityMonitor())
+
 
 if __name__ == "__main__":
     unittest.main()

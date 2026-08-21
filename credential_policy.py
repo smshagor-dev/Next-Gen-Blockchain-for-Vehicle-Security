@@ -27,6 +27,7 @@ _SECRET_POLICIES: Dict[str, SecretPolicy] = {
     "SMARTCAR_SYNC_SHARED_KEY": SecretPolicy("sync_global", 32),
     "SMARTCAR_V2X_SHARED_SECRET": SecretPolicy("v2x_global", 32),
     "SMARTCAR_V2X_NODE_SECRET": SecretPolicy("v2x_node", 32),
+    "SMARTCAR_HW_DEVICE_SECRET": SecretPolicy("hardware_device", 32),
     "SMARTCAR_GO_API_SECRET": SecretPolicy("control_api", 32),
     "SMARTCAR_RECOVERY_KEY": SecretPolicy("go_recovery", 32),
     "SMARTCAR_OWNER_RECOVERY_KEY": SecretPolicy("owner_recovery", 32),
@@ -41,6 +42,7 @@ _SECRET_REGISTRY_POLICIES: Dict[str, SecretPolicy] = {
     "SMARTCAR_POA_AUTHORITY_REGISTRY_JSON": SecretPolicy("consensus_validator", 32),
     "SMARTCAR_SYNC_VEHICLE_KEYS_JSON": SecretPolicy("sync_vehicle_registry", 32),
     "SMARTCAR_V2X_NODE_KEYS_JSON": SecretPolicy("v2x_node", 32),
+    "SMARTCAR_HW_DEVICE_KEYS_JSON": SecretPolicy("hardware_device", 32),
 }
 
 _ROTATION_SUFFIX = "_PREVIOUS"
