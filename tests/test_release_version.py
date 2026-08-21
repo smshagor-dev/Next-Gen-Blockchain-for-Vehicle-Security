@@ -1,4 +1,5 @@
 import re
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -93,7 +94,8 @@ class ReleaseVersionTests(unittest.TestCase):
         self.assertIn('--verify-tag', text)
 
     def test_tag_operator_is_explicit_and_exact_main_guarded(self):
-        text = Path("scripts/create_v3_0_2_tag.sh").read_text(encoding="utf-8")
+        path = Path("scripts/create_v3_0_2_tag.sh")
+        text = path.read_text(encoding="utf-8")
         self.assertIn('MODE="${1:-}"', text)
         self.assertIn('"--check-only"', text)
         self.assertIn('"--push"', text)
@@ -107,6 +109,7 @@ class ReleaseVersionTests(unittest.TestCase):
         self.assertIn('git tag -a "$TAG" "$local_sha"', text)
         self.assertIn('git push origin "refs/tags/$TAG"', text)
         self.assertIn('git tag -d "$TAG"', text)
+        subprocess.run(["bash", "-n", str(path)], check=True)
 
 
 if __name__ == "__main__":
