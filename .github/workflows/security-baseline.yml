@@ -33,7 +33,7 @@ jobs:
 
       - name: Compile hardened Python modules
         run: |
-          python -m py_compile credential_policy.py key_provider.py runtime_isolation.py runtime_security_monitor.py runtime_backend_security.py runtime_backend_patch.py env_config.py replay_security.py permissioned_consensus.py consensus_security.py identity_security.py sync_protocol_legacy.py sync_protocol.py did_identity.py v2x_protocol.py control_api_security.py ledger_integrity.py adversarial_validation.py hil_security_validation.py smartcar_backend.py main.py
+          python -m py_compile credential_policy.py key_provider.py runtime_isolation.py runtime_security_monitor.py runtime_backend_security.py runtime_backend_patch.py incident_response.py incident_response_validation.py env_config.py replay_security.py permissioned_consensus.py consensus_security.py identity_security.py sync_protocol_legacy.py sync_protocol.py did_identity.py v2x_protocol.py control_api_security.py ledger_integrity.py adversarial_validation.py hil_security_validation.py smartcar_backend.py main.py
 
       - name: Run Python security regression tests
         env:
@@ -49,6 +49,7 @@ jobs:
           python -m unittest -v tests.test_replay_flood_security
           python -m unittest -v tests.test_runtime_security_monitor
           python -m unittest -v tests.test_runtime_security_hooks
+          python -m unittest -v tests.test_incident_response
           python -m unittest -v tests.test_did_one_time_security
           python -m unittest -v tests.test_v2x_security
           python -m unittest -v tests.test_control_api_security
@@ -72,6 +73,13 @@ jobs:
         run: |
           python hil_security_validation.py \
             --output security-reports/hil-security-validation.json
+
+      - name: Run deterministic incident-response scenarios
+        env:
+          PYTHONPATH: .
+        run: |
+          python incident_response_validation.py \
+            --output security-reports/incident-response-validation.json
 
       - name: Normalize Go formatting for validation
         working-directory: api/go
@@ -111,5 +119,14 @@ jobs:
         with:
           name: hil-security-validation-report
           path: security-reports/hil-security-validation.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload incident-response validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: incident-response-validation-report
+          path: security-reports/incident-response-validation.json
           if-no-files-found: warn
           retention-days: 14
