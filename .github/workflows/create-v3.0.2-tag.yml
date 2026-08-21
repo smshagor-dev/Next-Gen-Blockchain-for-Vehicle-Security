@@ -1,0 +1,122 @@
+name: Create OmniGuard V2X v3.0.2 Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type CREATE-v3.0.2 to create the release tag from the exact current main commit"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: omniguard-v3.0.2-tag-operator
+  cancel-in-progress: false
+
+jobs:
+  create-tag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout current main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Verify explicit operator confirmation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ inputs.confirm }}" = "CREATE-v3.0.2"
+
+      - name: Resolve exact release target
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --tags
+          main_sha="$(git rev-parse origin/main)"
+          test "$(git rev-parse HEAD)" = "$main_sha"
+          test "$(tr -d '\r\n' < VERSION)" = "3.0.2"
+          test -f .github/workflows/security-baseline.yml
+          test -f .github/workflows/release-v3.0.2.yml
+          grep -Fq 'test "$GITHUB_SHA" = "$main_sha"' .github/workflows/release-v3.0.2.yml
+          printf '%s\n' "$main_sha" > "$RUNNER_TEMP/v3.0.2-main-sha"
+
+      - name: Require successful Security Baseline on exact main commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          main_sha="$(cat "$RUNNER_TEMP/v3.0.2-main-sha")"
+          gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow "Security Baseline" \
+            --branch main \
+            --event push \
+            --limit 20 \
+            --json headSha,status,conclusion,url \
+            > "$RUNNER_TEMP/security-baseline-main-runs.json"
+          python3 - "$RUNNER_TEMP/security-baseline-main-runs.json" "$main_sha" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          runs = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          target = sys.argv[2]
+          matches = [run for run in runs if run.get("headSha") == target]
+          if not matches:
+              raise SystemExit("no Security Baseline push run found for exact current main commit")
+          run = matches[0]
+          if run.get("status") != "completed" or run.get("conclusion") != "success":
+              raise SystemExit(
+                  "Security Baseline for exact current main commit is not completed successfully"
+              )
+          print(f"exact-main Security Baseline: PASS {run.get('url', '')}")
+          PY
+
+      - name: Refuse existing tag or GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="v3.0.2"
+          if git show-ref --verify --quiet "refs/tags/$TAG"; then
+            echo "local tag $TAG already exists; refusing duplicate" >&2
+            exit 1
+          fi
+          set +e
+          git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1
+          remote_tag_status=$?
+          set -e
+          if [ "$remote_tag_status" -eq 0 ]; then
+            echo "remote tag $TAG already exists; refusing duplicate" >&2
+            exit 1
+          elif [ "$remote_tag_status" -ne 2 ]; then
+            echo "could not determine remote tag state" >&2
+            exit 1
+          fi
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "GitHub Release $TAG already exists; refusing duplicate" >&2
+            exit 1
+          fi
+
+      - name: Create and push annotated v3.0.2 tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="v3.0.2"
+          main_sha="$(cat "$RUNNER_TEMP/v3.0.2-main-sha")"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" "$main_sha" -m "OmniGuard V2X $TAG"
+          git push origin "refs/tags/$TAG"
+          test "$(git rev-list -n 1 "$TAG")" = "$main_sha"
+          echo "tag creation: PASS ($TAG -> $main_sha)"
+          echo "The tag-triggered Publish OmniGuard V2X v3.0.2 workflow should now validate and publish the release."
