@@ -1,16 +1,25 @@
 package main
 
 import (
+	"bytes"
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
-	"crypto/sha3"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log"
+	"math"
+	"math/bits"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -26,6 +35,9 @@ const (
 	consensusModelSimpleMajority        = "simple_majority"
 	majorityAttackNote                  = "A voting majority can approve syntactically valid malicious blocks without finding hash collisions."
 	prototypeFLWarning                  = "WARNING: This FL experiment is too small for Byzantine-robustness claims."
+
+	defaultReplayWindow = 15 * time.Second
+	defaultMaxBodyBytes = int64(1 << 20)
 )
 
 type TelemetryData struct {
@@ -70,7 +82,9 @@ type State struct {
 	VehicleID            string  `json:"vehicle_id"`
 	AuthToken            string  `json:"-"`
 	Password             string  `json:"-"`
+	RecoveryKey          string  `json:"-"`
 	ChainFile            string  `json:"-"`
+	Initialized          bool    `json:"-"`
 	CarUnlocked          bool    `json:"car_unlocked"`
 	EngineStarted        bool    `json:"engine_started"`
 	EmergencyBrakeActive bool    `json:"emergency_brake_active"`
@@ -78,11 +92,16 @@ type State struct {
 	Chain                []Block `json:"chain"`
 }
 
-var state = &State{
-	VehicleID: "SMARTCAR_VIN_2024_BD_XYZ789",
-	AuthToken: "SECURE_AUTH_TOKEN_SHA3_2024",
-	Password:  "SmartCarSecretKey2024!@#",
-	ChainFile: "logs/blockchain_gui_go.json",
+type apiServer struct {
+	state        *State
+	secret       []byte
+	dataDir      string
+	replayWindow time.Duration
+	maxBodyBytes int64
+	instanceID   string
+
+	nonceMu sync.Mutex
+	nonces  map[string]time.Time
 }
 
 func ecdhFallbackEnabled() bool {
@@ -106,6 +125,7 @@ func securityCapabilityOutput() map[string]any {
 		"commitment_binding":    "Pedersen - classical discrete-log assumption",
 		"range_proof_soundness": "Schnorr/classical assumption",
 		"fallback_ecdh_p256":    fallback,
+		"local_control_api":     "HMAC-SHA256 + timestamp/nonce replay defense on loopback",
 	}
 }
 
@@ -148,7 +168,7 @@ func consensusSecurityOutput() map[string]any {
 		"hash_collision_resistance":                 true,
 		"retroactive_tamper_evidence":               true,
 		"protects_against_forward_majority_control": false,
-		"notes": majorityAttackNote,
+		"notes":                                     majorityAttackNote,
 	}
 }
 
@@ -186,7 +206,7 @@ func contributionBoundaryOutput() map[string]any {
 			"Pedersen commitments",
 			"Lamport OTS/DID",
 			"SHA2/SHA3 hashing",
-			"mTLS/API security",
+			"HMAC-authenticated local API security",
 			"majority blockchain logic",
 			"robust aggregation concepts",
 		},
@@ -241,8 +261,86 @@ func sha2s(s string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+func sha3Sum256(data []byte) [32]byte {
+	const rate = 136
+	var state [25]uint64
+
+	for len(data) >= rate {
+		for i := 0; i < rate/8; i++ {
+			state[i] ^= binary.LittleEndian.Uint64(data[i*8 : i*8+8])
+		}
+		keccakF1600(&state)
+		data = data[rate:]
+	}
+
+	var block [rate]byte
+	copy(block[:], data)
+	block[len(data)] = 0x06
+	block[rate-1] |= 0x80
+	for i := 0; i < rate/8; i++ {
+		state[i] ^= binary.LittleEndian.Uint64(block[i*8 : i*8+8])
+	}
+	keccakF1600(&state)
+
+	var out [32]byte
+	for i := 0; i < len(out)/8; i++ {
+		binary.LittleEndian.PutUint64(out[i*8:i*8+8], state[i])
+	}
+	return out
+}
+
+func keccakF1600(a *[25]uint64) {
+	roundConstants := [24]uint64{
+		0x0000000000000001, 0x0000000000008082, 0x800000000000808a,
+		0x8000000080008000, 0x000000000000808b, 0x0000000080000001,
+		0x8000000080008081, 0x8000000000008009, 0x000000000000008a,
+		0x0000000000000088, 0x0000000080008009, 0x000000008000000a,
+		0x000000008000808b, 0x800000000000008b, 0x8000000000008089,
+		0x8000000000008003, 0x8000000000008002, 0x8000000000000080,
+		0x000000000000800a, 0x800000008000000a, 0x8000000080008081,
+		0x8000000000008080, 0x0000000080000001, 0x8000000080008008,
+	}
+	rotations := [25]int{
+		0, 1, 62, 28, 27,
+		36, 44, 6, 55, 20,
+		3, 10, 43, 25, 39,
+		41, 45, 15, 21, 8,
+		18, 2, 61, 56, 14,
+	}
+
+	for _, rc := range roundConstants {
+		var c, d [5]uint64
+		for x := 0; x < 5; x++ {
+			c[x] = a[x] ^ a[x+5] ^ a[x+10] ^ a[x+15] ^ a[x+20]
+		}
+		for x := 0; x < 5; x++ {
+			d[x] = c[(x+4)%5] ^ bits.RotateLeft64(c[(x+1)%5], 1)
+		}
+		for y := 0; y < 5; y++ {
+			for x := 0; x < 5; x++ {
+				a[x+5*y] ^= d[x]
+			}
+		}
+
+		var b [25]uint64
+		for y := 0; y < 5; y++ {
+			for x := 0; x < 5; x++ {
+				nx := y
+				ny := (2*x + 3*y) % 5
+				b[nx+5*ny] = bits.RotateLeft64(a[x+5*y], rotations[x+5*y])
+			}
+		}
+		for y := 0; y < 5; y++ {
+			for x := 0; x < 5; x++ {
+				a[x+5*y] = b[x+5*y] ^ ((^b[(x+1)%5+5*y]) & b[(x+2)%5+5*y])
+			}
+		}
+		a[0] ^= rc
+	}
+}
+
 func sha3s(s string) string {
-	sum := sha3.Sum256([]byte(s))
+	sum := sha3Sum256([]byte(s))
 	return hex.EncodeToString(sum[:])
 }
 
@@ -292,6 +390,9 @@ func (s *State) addBlock(t TelemetryData, event string) Block {
 }
 
 func (s *State) verifyLocked() bool {
+	if len(s.Chain) == 0 {
+		return false
+	}
 	for i := range s.Chain {
 		b := s.Chain[i]
 		if i == 0 && b.PreviousHash != "0" {
@@ -314,74 +415,336 @@ func (s *State) verifyLocked() bool {
 	return true
 }
 
-func writeJSON(w http.ResponseWriter, value any) {
+func newAPIServer(secret []byte, dataDir string) (*apiServer, error) {
+	if len(secret) < 32 {
+		return nil, errors.New("SMARTCAR_GO_API_SECRET must contain at least 32 bytes")
+	}
+	if strings.Contains(strings.ToLower(string(secret)), "change_me") || strings.Contains(strings.ToLower(string(secret)), "changeme") {
+		return nil, errors.New("SMARTCAR_GO_API_SECRET must not use a placeholder value")
+	}
+	if strings.TrimSpace(dataDir) == "" {
+		dataDir = "logs"
+	}
+	absDir, err := filepath.Abs(dataDir)
+	if err != nil {
+		return nil, fmt.Errorf("resolve data dir: %w", err)
+	}
+	instanceRaw := make([]byte, 16)
+	if _, err := rand.Read(instanceRaw); err != nil {
+		return nil, fmt.Errorf("generate service instance id: %w", err)
+	}
+	return &apiServer{
+		state:        &State{},
+		secret:       append([]byte(nil), secret...),
+		dataDir:      absDir,
+		replayWindow: defaultReplayWindow,
+		maxBodyBytes: defaultMaxBodyBytes,
+		instanceID:   hex.EncodeToString(instanceRaw),
+		nonces:       make(map[string]time.Time),
+	}, nil
+}
+
+func loadAPISecret() ([]byte, error) {
+	raw := strings.TrimSpace(os.Getenv("SMARTCAR_GO_API_SECRET"))
+	if len(raw) < 32 {
+		return nil, errors.New("SMARTCAR_GO_API_SECRET is required and must be at least 32 characters")
+	}
+	lower := strings.ToLower(raw)
+	if strings.Contains(lower, "change_me") || strings.Contains(lower, "changeme") || strings.Contains(lower, "replace-me") {
+		return nil, errors.New("SMARTCAR_GO_API_SECRET contains a placeholder value")
+	}
+	return []byte(raw), nil
+}
+
+func writeJSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(value)
 }
 
-func readJSON(r *http.Request, dst any) bool {
-	defer r.Body.Close()
-	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
+func readJSON(r *http.Request, dst any) error {
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(dst); err != nil {
+		return err
+	}
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return errors.New("multiple JSON values are not allowed")
+		}
+		return err
+	}
+	return nil
+}
+
+func isLoopbackRemote(remoteAddr string) bool {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		host = remoteAddr
+	}
+	ip := net.ParseIP(strings.Trim(host, "[]"))
+	return ip != nil && ip.IsLoopback()
+}
+
+func (s *apiServer) healthProof(challenge string) string {
+	mac := hmac.New(sha256.New, s.secret)
+	_, _ = mac.Write([]byte("health:" + challenge))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+func (s *apiServer) handleHealth(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", http.MethodGet)
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !isLoopbackRemote(r.RemoteAddr) {
+		http.Error(w, "loopback only", http.StatusForbidden)
+		return
+	}
+	challenge := strings.TrimSpace(r.Header.Get("X-SmartCar-Challenge"))
+	if len(challenge) < 32 || len(challenge) > 128 {
+		http.Error(w, "valid challenge required", http.StatusBadRequest)
+		return
+	}
+	if _, err := hex.DecodeString(challenge); err != nil {
+		http.Error(w, "challenge must be hexadecimal", http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":            true,
+		"backend":       "go",
+		"instance_id":   s.instanceID,
+		"service_proof": s.healthProof(challenge),
+	})
+}
+
+func canonicalAPIMessage(method, path, timestamp, nonce, bodyHash string) string {
+	return strings.Join([]string{strings.ToUpper(method), path, timestamp, nonce, bodyHash}, "\n")
+}
+
+func (s *apiServer) expectedSignature(method, path, timestamp, nonce, bodyHash string) string {
+	mac := hmac.New(sha256.New, s.secret)
+	_, _ = mac.Write([]byte(canonicalAPIMessage(method, path, timestamp, nonce, bodyHash)))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+func (s *apiServer) consumeNonce(nonce string, now time.Time) bool {
+	s.nonceMu.Lock()
+	defer s.nonceMu.Unlock()
+
+	cutoff := now.Add(-2 * s.replayWindow)
+	for key, seen := range s.nonces {
+		if seen.Before(cutoff) {
+			delete(s.nonces, key)
+		}
+	}
+	if _, exists := s.nonces[nonce]; exists {
+		return false
+	}
+	s.nonces[nonce] = now
+	return true
+}
+
+func (s *apiServer) secure(method string, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != method {
+			w.Header().Set("Allow", method)
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if !isLoopbackRemote(r.RemoteAddr) {
+			http.Error(w, "loopback only", http.StatusForbidden)
+			return
+		}
+
+		r.Body = http.MaxBytesReader(w, r.Body, s.maxBodyBytes)
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "request body too large or unreadable", http.StatusRequestEntityTooLarge)
+			return
+		}
+		_ = r.Body.Close()
+		r.Body = io.NopCloser(bytes.NewReader(body))
+
+		if method == http.MethodPost && len(body) > 0 {
+			contentType := strings.ToLower(r.Header.Get("Content-Type"))
+			if !strings.HasPrefix(contentType, "application/json") {
+				http.Error(w, "application/json required", http.StatusUnsupportedMediaType)
+				return
+			}
+		}
+
+		timestamp := strings.TrimSpace(r.Header.Get("X-SmartCar-Timestamp"))
+		nonce := strings.TrimSpace(r.Header.Get("X-SmartCar-Nonce"))
+		bodyHash := strings.TrimSpace(r.Header.Get("X-SmartCar-Content-SHA256"))
+		signature := strings.TrimSpace(r.Header.Get("X-SmartCar-Signature"))
+		if timestamp == "" || nonce == "" || bodyHash == "" || signature == "" {
+			http.Error(w, "authenticated request headers required", http.StatusUnauthorized)
+			return
+		}
+
+		unixSec, err := strconv.ParseInt(timestamp, 10, 64)
+		if err != nil {
+			http.Error(w, "invalid timestamp", http.StatusUnauthorized)
+			return
+		}
+		now := time.Now().UTC()
+		requestTime := time.Unix(unixSec, 0).UTC()
+		delta := now.Sub(requestTime)
+		if delta < 0 {
+			delta = -delta
+		}
+		if delta > s.replayWindow {
+			http.Error(w, "stale request", http.StatusUnauthorized)
+			return
+		}
+
+		nonceBytes, err := hex.DecodeString(nonce)
+		if err != nil || len(nonceBytes) < 16 || len(nonceBytes) > 64 {
+			http.Error(w, "invalid nonce", http.StatusUnauthorized)
+			return
+		}
+		expectedBodyHashRaw := sha256.Sum256(body)
+		expectedBodyHash := hex.EncodeToString(expectedBodyHashRaw[:])
+		if !hmac.Equal([]byte(strings.ToLower(bodyHash)), []byte(expectedBodyHash)) {
+			http.Error(w, "body hash mismatch", http.StatusUnauthorized)
+			return
+		}
+		expectedSig := s.expectedSignature(method, r.URL.EscapedPath(), timestamp, nonce, expectedBodyHash)
+		if !hmac.Equal([]byte(strings.ToLower(signature)), []byte(expectedSig)) {
+			http.Error(w, "invalid request signature", http.StatusUnauthorized)
+			return
+		}
+		if !s.consumeNonce(nonce, now) {
+			http.Error(w, "replayed request", http.StatusConflict)
+			return
+		}
+
+		next(w, r)
+	}
+}
+
+func safeText(value string, maxLen int) bool {
+	value = strings.TrimSpace(value)
+	if value == "" || len(value) > maxLen {
+		return false
+	}
+	for _, r := range value {
+		if r < 0x20 || r == 0x7f {
+			return false
+		}
+	}
+	return true
+}
+
+func (s *apiServer) safeChainPath(requested, vehicleID string) (string, error) {
+	requested = strings.TrimSpace(requested)
+	if requested == "" {
+		requested = fmt.Sprintf("blockchain_%s.json", strings.ReplaceAll(vehicleID, string(filepath.Separator), "_"))
+	}
+	cleaned := filepath.Clean(requested)
+	base := filepath.Base(cleaned)
+	if base == "." || base == string(filepath.Separator) || base == "" {
+		return "", errors.New("invalid chain file")
+	}
+	lower := strings.ToLower(base)
+	if !strings.HasSuffix(lower, ".json") {
+		return "", errors.New("chain file must use .json extension")
+	}
+	target := filepath.Join(s.dataDir, base)
+	rel, err := filepath.Rel(s.dataDir, target)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+		return "", errors.New("chain file escapes configured data directory")
+	}
+	return target, nil
+}
+
+func (s *apiServer) handleInit(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		VehicleID   string `json:"vehicle_id"`
+		Password    string `json:"password"`
+		AuthToken   string `json:"auth_token"`
+		RecoveryKey string `json:"recovery_key"`
+		ChainFile   string `json:"chain_file"`
+	}
+	if err := readJSON(r, &req); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	if !safeText(req.VehicleID, 128) || len(req.Password) < 16 || len(req.AuthToken) < 16 || len(req.RecoveryKey) < 32 {
+		http.Error(w, "invalid initialization parameters", http.StatusBadRequest)
+		return
+	}
+	target, err := s.safeChainPath(req.ChainFile, req.VehicleID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	s.state.mu.Lock()
+	defer s.state.mu.Unlock()
+	if s.state.Initialized {
+		sameIdentity := s.state.VehicleID == req.VehicleID && s.state.ChainFile == target
+		sameSecrets := hmac.Equal([]byte(s.state.Password), []byte(req.Password)) &&
+			hmac.Equal([]byte(s.state.AuthToken), []byte(req.AuthToken)) &&
+			hmac.Equal([]byte(s.state.RecoveryKey), []byte(req.RecoveryKey))
+		if !sameIdentity || !sameSecrets {
+			http.Error(w, "backend is already initialized; runtime reconfiguration is denied", http.StatusConflict)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "backend": "go", "initialized": true})
+		return
+	}
+
+	s.state.VehicleID = req.VehicleID
+	s.state.Password = req.Password
+	s.state.AuthToken = req.AuthToken
+	s.state.RecoveryKey = req.RecoveryKey
+	s.state.ChainFile = target
+	s.state.Initialized = true
+	s.state.CarUnlocked = false
+	s.state.EngineStarted = false
+	s.state.EmergencyBrakeActive = false
+	s.state.SafeModeActive = false
+	s.state.Chain = nil
+
+	genesis := TelemetryData{Timestamp: nowISO(), ObstacleDistance: 999, FuelLevel: 100}
+	b := s.state.addBlock(genesis, "GENESIS:GO_BACKEND")
+	b.PreviousHash = "0"
+	b.BlockHash = computeBlockHash(b)
+	b.DualHashCombined = sha2s(b.BlockHash) + ":" + sha3s(b.BlockHash)
+	s.state.Chain[0] = b
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "backend": "go", "initialized": true})
+}
+
+func (s *apiServer) requireInitialized(w http.ResponseWriter) bool {
+	s.state.mu.RLock()
+	initialized := s.state.Initialized
+	s.state.mu.RUnlock()
+	if !initialized {
+		http.Error(w, "backend not initialized", http.StatusPreconditionFailed)
 		return false
 	}
 	return true
 }
 
-func handleInit(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		VehicleID string `json:"vehicle_id"`
-		Password  string `json:"password"`
-		AuthToken string `json:"auth_token"`
-		ChainFile string `json:"chain_file"`
-	}
-	if !readJSON(r, &req) {
-		http.Error(w, "invalid json", http.StatusBadRequest)
+func (s *apiServer) handleStatus(w http.ResponseWriter, r *http.Request) {
+	if !s.requireInitialized(w) {
 		return
 	}
-	state.mu.Lock()
-	defer state.mu.Unlock()
-	oldVehicleID := state.VehicleID
-	oldChainFile := state.ChainFile
-	if req.VehicleID != "" {
-		state.VehicleID = req.VehicleID
-	}
-	if req.Password != "" {
-		state.Password = req.Password
-	}
-	if req.AuthToken != "" {
-		state.AuthToken = req.AuthToken
-	}
-	if req.ChainFile != "" {
-		state.ChainFile = req.ChainFile
-	}
-	if oldVehicleID != state.VehicleID || oldChainFile != state.ChainFile {
-		state.CarUnlocked = false
-		state.EngineStarted = false
-		state.EmergencyBrakeActive = false
-		state.SafeModeActive = false
-		state.Chain = nil
-	}
-	if len(state.Chain) == 0 {
-		genesis := TelemetryData{Timestamp: nowISO(), ObstacleDistance: 999, FuelLevel: 100}
-		b := state.addBlock(genesis, "GENESIS:GO_BACKEND")
-		b.PreviousHash = "0"
-		b.BlockHash = computeBlockHash(b)
-		b.DualHashCombined = sha2s(b.BlockHash) + ":" + sha3s(b.BlockHash)
-		state.Chain[0] = b
-	}
-	writeJSON(w, map[string]any{"ok": true, "backend": "go"})
-}
-
-func handleStatus(w http.ResponseWriter, r *http.Request) {
-	state.mu.RLock()
-	defer state.mu.RUnlock()
-	writeJSON(w, map[string]any{
-		"vehicle_id":             state.VehicleID,
-		"car_unlocked":           state.CarUnlocked,
-		"engine_started":         state.EngineStarted,
-		"emergency_brake_active": state.EmergencyBrakeActive,
-		"safe_mode_active":       state.SafeModeActive,
-		"chain":                  state.Chain,
+	s.state.mu.RLock()
+	defer s.state.mu.RUnlock()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"vehicle_id":             s.state.VehicleID,
+		"car_unlocked":           s.state.CarUnlocked,
+		"engine_started":         s.state.EngineStarted,
+		"emergency_brake_active": s.state.EmergencyBrakeActive,
+		"safe_mode_active":       s.state.SafeModeActive,
+		"chain":                  s.state.Chain,
 		"security_capabilities":  securityCapabilityOutput(),
 		"identity_security":      identitySecurityOutput(),
 		"consensus_security":     consensusSecurityOutput(),
@@ -394,176 +757,277 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func handleAuth(w http.ResponseWriter, r *http.Request) {
+func (s *apiServer) handleAuth(w http.ResponseWriter, r *http.Request) {
+	if !s.requireInitialized(w) {
+		return
+	}
 	var req struct {
 		Token string `json:"token"`
 	}
-	if !readJSON(r, &req) {
+	if err := readJSON(r, &req); err != nil {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
-	state.mu.Lock()
-	defer state.mu.Unlock()
-	if hmac.Equal([]byte(req.Token), []byte(state.AuthToken)) {
-		state.CarUnlocked = true
-		state.addBlock(TelemetryData{Timestamp: nowISO()}, "AUTH:SUCCESS")
-		writeJSON(w, map[string]any{"success": true, "message": "Authentication successful"})
+	s.state.mu.Lock()
+	defer s.state.mu.Unlock()
+	if hmac.Equal([]byte(req.Token), []byte(s.state.AuthToken)) {
+		s.state.CarUnlocked = true
+		s.state.addBlock(TelemetryData{Timestamp: nowISO()}, "AUTH:SUCCESS")
+		writeJSON(w, http.StatusOK, map[string]any{"success": true, "message": "Authentication successful"})
 		return
 	}
-	state.addBlock(TelemetryData{Timestamp: nowISO()}, "AUTH:FAILED")
-	writeJSON(w, map[string]any{"success": false, "message": "Authentication failed"})
+	s.state.addBlock(TelemetryData{Timestamp: nowISO()}, "AUTH:FAILED")
+	writeJSON(w, http.StatusUnauthorized, map[string]any{"success": false, "message": "Authentication failed"})
 }
 
-func handleSimple(event string, mutate func()) http.HandlerFunc {
+func (s *apiServer) handleSimple(event string, mutate func(*State)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		state.mu.Lock()
-		defer state.mu.Unlock()
-		if mutate != nil {
-			mutate()
+		if !s.requireInitialized(w) {
+			return
 		}
-		state.addBlock(TelemetryData{Timestamp: nowISO()}, event)
-		writeJSON(w, map[string]any{"success": true, "message": event})
+		s.state.mu.Lock()
+		defer s.state.mu.Unlock()
+		if mutate != nil {
+			mutate(s.state)
+		}
+		s.state.addBlock(TelemetryData{Timestamp: nowISO()}, event)
+		writeJSON(w, http.StatusOK, map[string]any{"success": true, "message": event})
 	}
 }
 
-func handleStartEngine(w http.ResponseWriter, r *http.Request) {
-	state.mu.Lock()
-	defer state.mu.Unlock()
-	if !state.CarUnlocked {
-		state.addBlock(TelemetryData{Timestamp: nowISO()}, "ENGINE:START_DENIED:LOCKED")
-		writeJSON(w, map[string]any{"success": false, "message": "Vehicle locked"})
+func (s *apiServer) handleStartEngine(w http.ResponseWriter, r *http.Request) {
+	if !s.requireInitialized(w) {
 		return
 	}
-	state.EngineStarted = true
-	state.addBlock(TelemetryData{Timestamp: nowISO()}, "ENGINE:STARTED")
-	writeJSON(w, map[string]any{"success": true, "message": "Engine started"})
+	s.state.mu.Lock()
+	defer s.state.mu.Unlock()
+	if !s.state.CarUnlocked {
+		s.state.addBlock(TelemetryData{Timestamp: nowISO()}, "ENGINE:START_DENIED:LOCKED")
+		writeJSON(w, http.StatusForbidden, map[string]any{"success": false, "message": "Vehicle locked"})
+		return
+	}
+	s.state.EngineStarted = true
+	s.state.addBlock(TelemetryData{Timestamp: nowISO()}, "ENGINE:STARTED")
+	writeJSON(w, http.StatusOK, map[string]any{"success": true, "message": "Engine started"})
 }
 
-func handleTelemetry(w http.ResponseWriter, r *http.Request) {
+func finiteTelemetry(t TelemetryData) bool {
+	values := []float64{
+		t.Speed, t.Acceleration, t.FuelLevel, t.BatteryVoltage, t.EngineTemp,
+		t.GPSLat, t.GPSLon, t.ObstacleDistance, t.SteeringAngle, t.BrakePressure,
+		t.ThrottlePosition, t.RPM, t.Odometer, t.DriverHeartRateBPM,
+		t.DriverDrowsinessScore,
+	}
+	for _, value := range values {
+		if math.IsNaN(value) || math.IsInf(value, 0) || math.Abs(value) > 1e9 {
+			return false
+		}
+	}
+	return true
+}
+
+func (s *apiServer) handleTelemetry(w http.ResponseWriter, r *http.Request) {
+	if !s.requireInitialized(w) {
+		return
+	}
 	var req struct {
 		Event     string        `json:"event"`
 		Telemetry TelemetryData `json:"telemetry"`
 	}
-	if !readJSON(r, &req) {
+	if err := readJSON(r, &req); err != nil {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
-	state.mu.Lock()
-	defer state.mu.Unlock()
+	if len(req.Event) > 256 || !finiteTelemetry(req.Telemetry) {
+		http.Error(w, "invalid telemetry payload", http.StatusBadRequest)
+		return
+	}
+	s.state.mu.Lock()
+	defer s.state.mu.Unlock()
 	if req.Telemetry.DriverUnwell || req.Telemetry.DriverDrowsinessScore >= 0.78 || req.Telemetry.DriverHeartRateBPM >= 125 {
-		state.SafeModeActive = true
+		s.state.SafeModeActive = true
 	}
 	if req.Telemetry.EmergencyBrakeActive {
-		state.EmergencyBrakeActive = true
+		s.state.EmergencyBrakeActive = true
 	}
-	block := state.addBlock(req.Telemetry, req.Event)
-	writeJSON(w, map[string]any{"success": true, "block": block})
+	block := s.state.addBlock(req.Telemetry, req.Event)
+	writeJSON(w, http.StatusOK, map[string]any{"success": true, "block": block})
 }
 
-func handleEmergencyBrake(w http.ResponseWriter, r *http.Request) {
+func (s *apiServer) handleEmergencyBrake(w http.ResponseWriter, r *http.Request) {
+	if !s.requireInitialized(w) {
+		return
+	}
 	var req struct {
 		Distance float64 `json:"distance"`
 	}
-	_ = readJSON(r, &req)
-	state.mu.Lock()
-	defer state.mu.Unlock()
-	state.EmergencyBrakeActive = true
+	if err := readJSON(r, &req); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	if math.IsNaN(req.Distance) || math.IsInf(req.Distance, 0) || req.Distance < 0 || req.Distance > 10000 {
+		http.Error(w, "distance must be between 0 and 10000 meters", http.StatusBadRequest)
+		return
+	}
+	s.state.mu.Lock()
+	defer s.state.mu.Unlock()
+	s.state.EmergencyBrakeActive = true
 	t := TelemetryData{Timestamp: nowISO(), ObstacleDistance: req.Distance, EmergencyBrakeActive: true, BrakePressure: 100}
-	state.addBlock(t, fmt.Sprintf("EMERGENCY:MANUAL_BRAKE:OBSTACLE_%.1fM", req.Distance))
-	writeJSON(w, map[string]any{"success": true})
+	s.state.addBlock(t, fmt.Sprintf("EMERGENCY:MANUAL_BRAKE:OBSTACLE_%.1fM", req.Distance))
+	writeJSON(w, http.StatusOK, map[string]any{"success": true})
 }
 
-func handleRecovery(w http.ResponseWriter, r *http.Request) {
+func (s *apiServer) handleRecovery(w http.ResponseWriter, r *http.Request) {
+	if !s.requireInitialized(w) {
+		return
+	}
 	var req struct {
 		Key             string `json:"key"`
 		ForceChainReset bool   `json:"force_chain_reset"`
 	}
-	_ = readJSON(r, &req)
-	state.mu.Lock()
-	defer state.mu.Unlock()
-	if req.Key == state.Password {
-		state.CarUnlocked = true
-		state.addBlock(TelemetryData{Timestamp: nowISO()}, "RECOVERY:OWNER_UNLOCK:CHAIN_VALID")
-		writeJSON(w, map[string]any{"success": true})
+	if err := readJSON(r, &req); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
-	state.addBlock(TelemetryData{Timestamp: nowISO()}, "RECOVERY:OWNER_FAIL:INVALID_KEY")
-	writeJSON(w, map[string]any{"success": false, "message": "Invalid recovery key"})
+	if req.ForceChainReset {
+		http.Error(w, "remote chain reset is disabled", http.StatusForbidden)
+		return
+	}
+	s.state.mu.Lock()
+	defer s.state.mu.Unlock()
+	if hmac.Equal([]byte(req.Key), []byte(s.state.RecoveryKey)) {
+		s.state.CarUnlocked = true
+		s.state.addBlock(TelemetryData{Timestamp: nowISO()}, "RECOVERY:OWNER_UNLOCK:CHAIN_VALID")
+		writeJSON(w, http.StatusOK, map[string]any{"success": true})
+		return
+	}
+	s.state.addBlock(TelemetryData{Timestamp: nowISO()}, "RECOVERY:OWNER_FAIL:INVALID_KEY")
+	writeJSON(w, http.StatusUnauthorized, map[string]any{"success": false, "message": "Invalid recovery key"})
 }
 
-func handleVerify(w http.ResponseWriter, r *http.Request) {
-	state.mu.RLock()
-	defer state.mu.RUnlock()
-	writeJSON(w, map[string]any{"valid": state.verifyLocked()})
+func (s *apiServer) handleVerify(w http.ResponseWriter, r *http.Request) {
+	if !s.requireInitialized(w) {
+		return
+	}
+	s.state.mu.RLock()
+	defer s.state.mu.RUnlock()
+	writeJSON(w, http.StatusOK, map[string]any{"valid": s.state.verifyLocked()})
 }
 
-func handleSave(w http.ResponseWriter, r *http.Request) {
-	state.mu.RLock()
-	payload, err := json.MarshalIndent(state.Chain, "", "  ")
-	target := state.ChainFile
-	state.mu.RUnlock()
+func (s *apiServer) handleSave(w http.ResponseWriter, r *http.Request) {
+	if !s.requireInitialized(w) {
+		return
+	}
+	s.state.mu.RLock()
+	payload, err := json.MarshalIndent(s.state.Chain, "", "  ")
+	target := s.state.ChainFile
+	s.state.mu.RUnlock()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "could not serialize chain", http.StatusInternalServerError)
 		return
 	}
-	if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if target == "" {
+		http.Error(w, "chain target not configured", http.StatusPreconditionFailed)
 		return
 	}
-	if err := os.WriteFile(target, payload, 0644); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if err := os.MkdirAll(filepath.Dir(target), 0700); err != nil {
+		http.Error(w, "could not create chain directory", http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, map[string]any{"success": true, "file": target})
+	temp, err := os.CreateTemp(filepath.Dir(target), ".chain-*.tmp")
+	if err != nil {
+		http.Error(w, "could not create temporary chain file", http.StatusInternalServerError)
+		return
+	}
+	tempName := temp.Name()
+	cleanup := func() { _ = os.Remove(tempName) }
+	defer cleanup()
+	if err := temp.Chmod(0600); err != nil {
+		_ = temp.Close()
+		http.Error(w, "could not secure temporary chain file", http.StatusInternalServerError)
+		return
+	}
+	if _, err := temp.Write(payload); err != nil {
+		_ = temp.Close()
+		http.Error(w, "could not write chain", http.StatusInternalServerError)
+		return
+	}
+	if err := temp.Sync(); err != nil {
+		_ = temp.Close()
+		http.Error(w, "could not sync chain", http.StatusInternalServerError)
+		return
+	}
+	if err := temp.Close(); err != nil {
+		http.Error(w, "could not close chain file", http.StatusInternalServerError)
+		return
+	}
+	if err := os.Rename(tempName, target); err != nil {
+		_ = os.Remove(target)
+		if retryErr := os.Rename(tempName, target); retryErr != nil {
+			http.Error(w, "could not save chain", http.StatusInternalServerError)
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"success": true, "file": filepath.Base(target)})
+}
+
+func (s *apiServer) metadataHandler(fn func() map[string]any) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, fn())
+	}
+}
+
+func (s *apiServer) routes() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", s.handleHealth)
+	mux.HandleFunc("/init", s.secure(http.MethodPost, s.handleInit))
+	mux.HandleFunc("/status", s.secure(http.MethodGet, s.handleStatus))
+	mux.HandleFunc("/auth", s.secure(http.MethodPost, s.handleAuth))
+	mux.HandleFunc("/engine/start", s.secure(http.MethodPost, s.handleStartEngine))
+	mux.HandleFunc("/engine/stop", s.secure(http.MethodPost, s.handleSimple("ENGINE:STOPPED", func(st *State) { st.EngineStarted = false })))
+	mux.HandleFunc("/vehicle/lock", s.secure(http.MethodPost, s.handleSimple("VEHICLE:LOCKED", func(st *State) {
+		st.CarUnlocked = false
+		st.EngineStarted = false
+	})))
+	mux.HandleFunc("/telemetry", s.secure(http.MethodPost, s.handleTelemetry))
+	mux.HandleFunc("/emergency/brake", s.secure(http.MethodPost, s.handleEmergencyBrake))
+	mux.HandleFunc("/recovery/unlock", s.secure(http.MethodPost, s.handleRecovery))
+	mux.HandleFunc("/verify", s.secure(http.MethodGet, s.handleVerify))
+	mux.HandleFunc("/security/capabilities", s.secure(http.MethodGet, s.metadataHandler(securityCapabilityOutput)))
+	mux.HandleFunc("/identity/security", s.secure(http.MethodGet, s.metadataHandler(identitySecurityOutput)))
+	mux.HandleFunc("/consensus/security", s.secure(http.MethodGet, s.metadataHandler(consensusSecurityOutput)))
+	mux.HandleFunc("/fl/validation", s.secure(http.MethodGet, s.metadataHandler(flValidationOutput)))
+	mux.HandleFunc("/adversarial/validation", s.secure(http.MethodGet, s.metadataHandler(adversarialValidationOutput)))
+	mux.HandleFunc("/contribution/boundary", s.secure(http.MethodGet, s.metadataHandler(contributionBoundaryOutput)))
+	mux.HandleFunc("/complexity/boundary", s.secure(http.MethodGet, s.metadataHandler(complexityBoundaryOutput)))
+	mux.HandleFunc("/privacy/pedersen", s.secure(http.MethodGet, s.metadataHandler(pedersenPrivacyOutput)))
+	mux.HandleFunc("/reviewer/audit", s.secure(http.MethodGet, s.metadataHandler(reviewerAuditOutput)))
+	mux.HandleFunc("/save", s.secure(http.MethodPost, s.handleSave))
+	return mux
 }
 
 func main() {
 	if ecdhFallbackEnabled() {
 		log.Println(ecdhP256Warning)
 	}
-	mux := http.NewServeMux()
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, map[string]any{"ok": true}) })
-	mux.HandleFunc("/init", handleInit)
-	mux.HandleFunc("/status", handleStatus)
-	mux.HandleFunc("/auth", handleAuth)
-	mux.HandleFunc("/engine/start", handleStartEngine)
-	mux.HandleFunc("/engine/stop", handleSimple("ENGINE:STOPPED", func() { state.EngineStarted = false }))
-	mux.HandleFunc("/vehicle/lock", handleSimple("VEHICLE:LOCKED", func() {
-		state.CarUnlocked = false
-		state.EngineStarted = false
-	}))
-	mux.HandleFunc("/telemetry", handleTelemetry)
-	mux.HandleFunc("/emergency/brake", handleEmergencyBrake)
-	mux.HandleFunc("/recovery/unlock", handleRecovery)
-	mux.HandleFunc("/verify", handleVerify)
-	mux.HandleFunc("/security/capabilities", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, securityCapabilityOutput())
-	})
-	mux.HandleFunc("/identity/security", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, identitySecurityOutput())
-	})
-	mux.HandleFunc("/consensus/security", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, consensusSecurityOutput())
-	})
-	mux.HandleFunc("/fl/validation", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, flValidationOutput())
-	})
-	mux.HandleFunc("/adversarial/validation", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, adversarialValidationOutput())
-	})
-	mux.HandleFunc("/contribution/boundary", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, contributionBoundaryOutput())
-	})
-	mux.HandleFunc("/complexity/boundary", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, complexityBoundaryOutput())
-	})
-	mux.HandleFunc("/privacy/pedersen", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, pedersenPrivacyOutput())
-	})
-	mux.HandleFunc("/reviewer/audit", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, reviewerAuditOutput())
-	})
-	mux.HandleFunc("/save", handleSave)
-	log.Println("SmartCar Go backend listening on 127.0.0.1:8787")
-	log.Fatal(http.ListenAndServe("127.0.0.1:8787", mux))
+	secret, err := loadAPISecret()
+	if err != nil {
+		log.Fatal(err)
+	}
+	server, err := newAPIServer(secret, os.Getenv("SMARTCAR_GO_DATA_DIR"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	httpServer := &http.Server{
+		Addr:              "127.0.0.1:8787",
+		Handler:           server.routes(),
+		ReadHeaderTimeout: 3 * time.Second,
+		ReadTimeout:       5 * time.Second,
+		WriteTimeout:      5 * time.Second,
+		IdleTimeout:       30 * time.Second,
+		MaxHeaderBytes:    16 << 10,
+	}
+	log.Println("SmartCar Go backend listening on 127.0.0.1:8787 (authenticated loopback API)")
+	log.Fatal(httpServer.ListenAndServe())
 }

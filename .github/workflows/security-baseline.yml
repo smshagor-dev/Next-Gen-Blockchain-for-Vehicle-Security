@@ -12,9 +12,9 @@ permissions:
   contents: read
 
 jobs:
-  phase1-security:
+  security-validation:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -25,11 +25,17 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Compile hardened modules
-        run: |
-          python -m py_compile env_config.py sync_protocol.py did_identity.py v2x_protocol.py
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+          cache-dependency-path: api/go/go.mod
 
-      - name: Run security baseline tests
+      - name: Compile hardened Python modules
+        run: |
+          python -m py_compile env_config.py sync_protocol.py did_identity.py v2x_protocol.py control_api_security.py smartcar_backend.py
+
+      - name: Run Python security regression tests
         env:
           PYTHONPATH: .
         run: |
@@ -37,3 +43,19 @@ jobs:
           python -m unittest -v tests.test_sync_protocol_security
           python -m unittest -v tests.test_did_one_time_security
           python -m unittest -v tests.test_v2x_security
+          python -m unittest -v tests.test_control_api_security
+
+      - name: Normalize Go formatting for validation
+        working-directory: api/go
+        run: |
+          gofmt -w .
+
+      - name: Run Go security tests
+        working-directory: api/go
+        run: |
+          go test ./... -count=1
+
+      - name: Build Go backend
+        working-directory: api/go
+        run: |
+          go build ./...
