@@ -192,6 +192,26 @@ jobs:
             exit 1
           fi
 
+      - name: Verify supported native runtime rejects hardware-required software PQC
+        shell: bash
+        run: |
+          export SMARTCAR_CPP_DATA_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          export SMARTCAR_AUTH_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          export SMARTCAR_CPP_PQC_KEYSTORE_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          rm -rf "$RUNNER_TEMP/native-hardware-required-pqc"
+          mkdir -p "$RUNNER_TEMP/native-hardware-required-pqc"
+          export SMARTCAR_CPP_PQC_KEYSTORE_PATH="$RUNNER_TEMP/native-hardware-required-pqc/identity.json"
+          export SMARTCAR_CPP_PQC_HARDWARE_REQUIRED=1
+          set +e
+          ./build/native-real/smartcar_blockchain --self-test
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "Supported native runtime unexpectedly accepted software PQC under hardware-required policy."
+            exit 1
+          fi
+          test ! -e "$SMARTCAR_CPP_PQC_KEYSTORE_PATH"
+
       - name: Normalize Go formatting for validation
         working-directory: api/go
         run: |
