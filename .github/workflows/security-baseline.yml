@@ -5,6 +5,7 @@ on:
     branches: [main]
   push:
     branches:
+      - main
       - security/**
       - release/**
   workflow_dispatch:
