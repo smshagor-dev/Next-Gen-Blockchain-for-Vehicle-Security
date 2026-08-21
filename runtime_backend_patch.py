@@ -17,6 +17,7 @@ from typing import Any, Dict
 from consensus_security import consensus_security_metadata
 from identity_security import identity_security_metadata
 from ledger_integrity import LedgerIntegrityError
+from runtime_backend_security import classify_backend_runtime_error
 from runtime_isolation import (
     build_isolated_child_environment,
     runtime_isolation_metadata,
@@ -91,19 +92,6 @@ def _isolated_ensure_service(self: GoBackend):
     raise RuntimeError("Authenticated Go backend did not become ready on isolated loopback runtime")
 
 
-def _runtime_reason_from_exception(exc: Exception) -> str:
-    text = str(exc).upper()
-    if "HTTP 401" in text:
-        return "CONTROL_API_HTTP_401"
-    if "HTTP 403" in text:
-        return "CONTROL_API_HTTP_403"
-    if "HTTP 409" in text:
-        return "CONTROL_API_HTTP_409"
-    if "CONNECTION UNAVAILABLE" in text or "URLERROR" in text or "TIMEOUT" in text:
-        return "BACKEND_CONNECTION_UNAVAILABLE"
-    return "CONTROL_API_REQUEST_FAILURE"
-
-
 def _monitored_request(
     self: GoBackend,
     method: str,
@@ -116,7 +104,7 @@ def _monitored_request(
     except Exception as exc:
         get_runtime_security_monitor().observe(
             "control_api",
-            _runtime_reason_from_exception(exc),
+            classify_backend_runtime_error(exc),
             subject=getattr(self, "vehicle_id", ""),
         )
         raise
