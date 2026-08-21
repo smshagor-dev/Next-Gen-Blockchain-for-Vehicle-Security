@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 jobs:
-  sync-security:
+  phase1-security:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -27,7 +27,7 @@ jobs:
 
       - name: Compile hardened modules
         run: |
-          python -m py_compile env_config.py sync_protocol.py
+          python -m py_compile env_config.py sync_protocol.py did_identity.py
 
       - name: Run security baseline tests
         env:
@@ -35,3 +35,4 @@ jobs:
         run: |
           python -m unittest -v tests.test_security_baseline
           python -m unittest -v tests.test_sync_protocol_security
+          python -m unittest -v tests.test_did_one_time_security
