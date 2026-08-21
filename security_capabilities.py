@@ -5,6 +5,8 @@ This is deliberately conservative: the prototype is hybrid security, not
 end-to-end post-quantum security.
 """
 
+from release_metadata import RELEASE_CHANNEL, RELEASE_VERSION
+
 PQ_HYBRID_AUTHENTICATION = "PQ_HYBRID_AUTHENTICATION"
 CLASSICAL_PRIVACY_COMMITMENT = "CLASSICAL_PRIVACY_COMMITMENT"
 LEGACY_ECDH_FALLBACK_DISABLED_BY_DEFAULT = "LEGACY_ECDH_FALLBACK_DISABLED_BY_DEFAULT"
@@ -72,6 +74,8 @@ REVIEWER_AUDIT_METADATA = {
 def security_capability_output(ecdh_enabled: bool = False) -> dict:
     fallback_state = "enabled/classical" if ecdh_enabled else "disabled_by_default/classical"
     return {
+        "release_version": RELEASE_VERSION,
+        "release_channel": RELEASE_CHANNEL,
         "security_modes": [
             PQ_HYBRID_AUTHENTICATION,
             CLASSICAL_PRIVACY_COMMITMENT,
