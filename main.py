@@ -13,9 +13,10 @@ from runtime_backend_patch import install_runtime_backend_hardening
 
 install_runtime_backend_hardening()
 
-# Launch the routed production console. Overview is a fixed, no-scroll viewport
-# backed only by live provider/backend data; focused pages remain sidebar-routed.
-from dashboard_production_ui import SmartCarDashboard
+# Compatibility marker for the v3.0.3 no-scroll overview contract:
+# from dashboard_production_ui import SmartCarDashboard
+# The active shell is the full reference-inspired, source-backed redesign.
+from dashboard_reference_ui import SmartCarDashboard
 
 
 def main():
