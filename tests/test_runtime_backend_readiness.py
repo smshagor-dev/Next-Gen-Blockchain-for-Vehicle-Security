@@ -31,6 +31,7 @@ sys.modules["smartcar_backend"] = _stub_backend_module
 try:
     from runtime_backend_patch import (
         _isolated_ensure_service,
+        _isolated_spawn_environment,
         _loopback_endpoint_is_listening,
         _runtime_mode,
         _select_go_backend_command,
@@ -59,6 +60,31 @@ class RuntimeBackendReadinessTests(unittest.TestCase):
     def test_runtime_mode_invalid_value_falls_back_to_auto(self):
         with patch.dict(os.environ, {"SMARTCAR_GO_RUNTIME_MODE": "unexpected"}, clear=True):
             self.assertEqual(_runtime_mode(), "auto")
+
+    def test_isolated_spawn_forwards_only_audited_live_stream_variables(self):
+        class DummyBackend:
+            api_secret = "a" * 48
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with patch.dict(
+                os.environ,
+                {
+                    "PATH": os.environ.get("PATH", ""),
+                    "SMARTCAR_GO_ENABLE_LIVE_STREAM": "1",
+                    "SMARTCAR_GO_LIVE_ADDR": "127.0.0.1:8788",
+                    "SMARTCAR_PASSWORD": "must-not-reach-child",
+                    "SMARTCAR_AUTH_TOKEN": "must-not-reach-child",
+                },
+                clear=True,
+            ):
+                environment = _isolated_spawn_environment(DummyBackend(), root)
+
+        self.assertEqual(environment.get("SMARTCAR_GO_ENABLE_LIVE_STREAM"), "1")
+        self.assertEqual(environment.get("SMARTCAR_GO_LIVE_ADDR"), "127.0.0.1:8788")
+        self.assertEqual(environment.get("SMARTCAR_GO_API_SECRET"), "a" * 48)
+        self.assertNotIn("SMARTCAR_PASSWORD", environment)
+        self.assertNotIn("SMARTCAR_AUTH_TOKEN", environment)
 
     def test_auto_mode_prefers_fresh_source_over_local_prebuilt_binary(self):
         with tempfile.TemporaryDirectory() as tmp:

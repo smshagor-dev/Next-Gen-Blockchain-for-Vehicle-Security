@@ -16,8 +16,9 @@ install_runtime_backend_hardening()
 # Compatibility markers retained for the v3.0.3 dashboard contracts:
 # from dashboard_production_ui import SmartCarDashboard
 # from dashboard_reference_ui import SmartCarDashboard
-# The active shell is the pixel-closer, source-backed reference redesign.
-from dashboard_pixel_ui import SmartCarDashboard
+# from dashboard_pixel_ui import SmartCarDashboard
+# The active shell is the source-backed live socket production dashboard.
+from dashboard_live_ui import SmartCarDashboard
 
 
 def main():

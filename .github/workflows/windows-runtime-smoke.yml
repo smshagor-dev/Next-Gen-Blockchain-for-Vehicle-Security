@@ -28,9 +28,9 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install minimal Python runtime dependency
+      - name: Install minimal Python runtime dependencies
         shell: pwsh
-        run: python -m pip install --disable-pip-version-check "numpy==1.26.4"
+        run: python -m pip install --disable-pip-version-check "numpy==1.26.4" "Pillow>=10.2.0"
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -41,7 +41,7 @@ jobs:
       - name: Compile Windows runtime smoke modules
         shell: pwsh
         run: |
-          python -m py_compile dashboard.py dashboard_modern_ui.py dashboard_production_ui.py dashboard_reference_ui.py dashboard_pixel_ui.py runtime_backend_patch.py smartcar_backend.py scripts/bootstrap_local_env.py scripts/ci_windows_go_backend_smoke.py
+          python -m py_compile dashboard.py dashboard_modern_ui.py dashboard_production_ui.py dashboard_reference_ui.py dashboard_pixel_ui.py dashboard_live_ui.py dashboard_vehicle_art.py runtime_backend_patch.py smartcar_backend.py scripts/bootstrap_local_env.py scripts/ci_windows_go_backend_smoke.py
 
       - name: Run local bootstrap, readiness, and dashboard UI regressions
         shell: pwsh
@@ -55,6 +55,7 @@ jobs:
           python -m unittest -v tests.test_dashboard_overview_contract
           python -m unittest -v tests.test_dashboard_reference_ui
           python -m unittest -v tests.test_dashboard_pixel_ui
+          python -m unittest -v tests.test_dashboard_live_ui
 
       - name: Run Go tests and build fresh Windows backend
         shell: pwsh
@@ -71,16 +72,18 @@ jobs:
           PYTHONPATH: .
         run: python scripts/ci_windows_go_backend_smoke.py
 
-      - name: Verify loopback backend was cleaned up
+      - name: Verify loopback backends were cleaned up
         if: always()
         shell: pwsh
         run: |
-          $listener = Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue
-          if ($listener) {
-            Write-Error "Port 8787 is still listening after the Windows runtime smoke."
-            Get-CimInstance Win32_Process -Filter "ProcessId=$($listener.OwningProcess)" |
-              Select-Object ProcessId, Name, ExecutablePath, CommandLine
-            exit 1
+          foreach ($port in 8787, 8788) {
+            $listener = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
+            if ($listener) {
+              Write-Error "Port $port is still listening after the Windows runtime smoke."
+              Get-CimInstance Win32_Process -Filter "ProcessId=$($listener.OwningProcess)" |
+                Select-Object ProcessId, Name, ExecutablePath, CommandLine
+              exit 1
+            }
           }
 
       - name: Show backend diagnostics on failure
