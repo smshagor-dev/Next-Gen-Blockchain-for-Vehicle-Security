@@ -17,8 +17,10 @@ install_runtime_backend_hardening()
 # from dashboard_production_ui import SmartCarDashboard
 # from dashboard_reference_ui import SmartCarDashboard
 # from dashboard_pixel_ui import SmartCarDashboard
-# The active shell is the source-backed live socket production dashboard.
-from dashboard_live_ui import SmartCarDashboard
+# from dashboard_live_ui import SmartCarDashboard
+# The active shell adds stable in-place feed rendering and a source-backed
+# transaction graph on top of the authenticated live-socket dashboard.
+from dashboard_live_stable_ui import SmartCarDashboard
 
 
 def main():
