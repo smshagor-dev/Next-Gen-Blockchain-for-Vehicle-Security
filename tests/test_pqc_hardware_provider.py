@@ -12,6 +12,8 @@ class PqcHardwareProviderContractTests(unittest.TestCase):
         cls.policy = Path("native/pqc_provider_policy.h").read_text(encoding="utf-8")
         cls.contract = Path("native/pqc_hardware_provider.h").read_text(encoding="utf-8")
         cls.active_operations = Path("native/pqc_active_operations.h").read_text(encoding="utf-8")
+        cls.software_operations = Path("native/pqc_software_active_operations.h").read_text(encoding="utf-8")
+        cls.key_material = Path("native/pqc_key_material.h").read_text(encoding="utf-8")
         cls.sensitive_bytes = Path("native/pqc_sensitive_bytes.h").read_text(encoding="utf-8")
 
     def test_unimplemented_hardware_names_do_not_claim_hardware_capabilities(self):
@@ -53,6 +55,8 @@ class PqcHardwareProviderContractTests(unittest.TestCase):
             "validate_active_public_state",
             "capabilities_from_verified_hardware_probe",
             "validate_hardware_public_material",
+            "verify_live_provider_binding",
+            "hardware PQC provider binding changed after activation",
             "sign_ml_dsa_44",
             "decapsulate_ml_kem_512",
         ):
@@ -62,6 +66,23 @@ class PqcHardwareProviderContractTests(unittest.TestCase):
         self.assertNotIn("export_private", self.active_operations)
         self.assertIn("software PQC active state cannot claim hardware-backed/non-exportable protection", self.active_operations)
 
+    def test_software_provider_implements_same_private_operation_contract(self):
+        for required in (
+            "class SoftwarePqcActivePrivateOperations final : public PqcActivePrivateOperations",
+            "OQS_SIG_sign",
+            "OQS_KEM_decaps",
+            "PqcSensitiveBytes signature_secret_key_",
+            "PqcSensitiveBytes kem_secret_key_",
+            "kSoftwarePqcProvider",
+            "false,",
+            "true,",
+        ):
+            self.assertIn(required, self.software_operations)
+        self.assertIn("struct PqcKeyMaterial", self.key_material)
+        self.assertIn("signature_secret_key", self.key_material)
+        self.assertIn("kem_secret_key", self.key_material)
+        self.assertNotIn("hardware_backed", self.key_material)
+
     def test_derived_shared_secret_is_move_only_and_zeroized(self):
         self.assertIn("class PqcSensitiveBytes", self.sensitive_bytes)
         self.assertIn("PqcSensitiveBytes(const PqcSensitiveBytes&) = delete", self.sensitive_bytes)
@@ -69,6 +90,7 @@ class PqcHardwareProviderContractTests(unittest.TestCase):
         self.assertIn("secure_zero_bytes", self.sensitive_bytes)
         self.assertIn("~PqcSensitiveBytes()", self.sensitive_bytes)
         self.assertIn("PqcSensitiveBytes decapsulate_ml_kem_512", self.contract)
+        self.assertIn("PqcSensitiveBytes decapsulate_ml_kem_512", self.software_operations)
 
     def test_unavailable_adapter_is_fail_closed(self):
         self.assertIn("UnavailablePqcHardwareProvider", self.contract)
