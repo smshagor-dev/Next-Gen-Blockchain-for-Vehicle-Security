@@ -104,13 +104,25 @@ public:
             throw std::runtime_error("hardware PQC active operations require a provider instance");
         }
 
+        const PqcHardwareProbe preflight = provider_->probe();
+        validate_hardware_backend_probe(preflight);
+
+        PqcHardwarePublicMaterial material = provider_->load_or_create_public(identity);
+
+        // Object-level non-exportability cannot be honestly asserted until the
+        // selected identity has concrete private key objects. Re-probe after
+        // provisioning and require full evidence before exposing active state.
         const PqcHardwareProbe probe = provider_->probe();
         const PqcProviderCapabilities capabilities = capabilities_from_verified_hardware_probe(probe);
         if (!capabilities.hardware_backed || !capabilities.non_exportable || !capabilities.runtime_probe_verified) {
             throw std::runtime_error("hardware PQC provider capability verification failed closed");
         }
-
-        PqcHardwarePublicMaterial material = provider_->load_or_create_public(identity);
+        if (preflight.provider != probe.provider || preflight.device_identity != probe.device_identity ||
+            preflight.ml_dsa_44_signature_max_size != probe.ml_dsa_44_signature_max_size ||
+            preflight.ml_kem_512_ciphertext_size != probe.ml_kem_512_ciphertext_size ||
+            preflight.ml_kem_512_shared_secret_size != probe.ml_kem_512_shared_secret_size) {
+            throw std::runtime_error("hardware PQC provider binding changed during key provisioning");
+        }
         validate_hardware_public_material(probe, material, identity);
 
         device_identity_ = probe.device_identity;

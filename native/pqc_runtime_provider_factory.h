@@ -11,6 +11,10 @@
 #include "pqc_provider_policy.h"
 #include "pqc_software_active_operations.h"
 
+#if defined(SMARTCAR_ENABLE_PKCS11_PROVIDER)
+#include "pqc_pkcs11_provider.h"
+#endif
+
 namespace omniguard {
 
 inline std::shared_ptr<PqcHardwareProvider> make_registered_hardware_pqc_provider(
@@ -20,9 +24,15 @@ inline std::shared_ptr<PqcHardwareProvider> make_registered_hardware_pqc_provide
         throw std::runtime_error("runtime hardware PQC provider registry received a non-hardware provider name");
     }
 
-    // No concrete hardware adapter is registered in v3.0.3 yet. Returning the
-    // explicit unavailable adapter preserves the hardware operation path while
-    // failing closed before any software keystore can be created or used.
+#if defined(SMARTCAR_ENABLE_PKCS11_PROVIDER)
+    if (provider == kPkcs11PqcProvider) {
+        return make_pkcs11_hardware_provider_from_env();
+    }
+#endif
+
+    // TPM2/HSM remain unavailable until concrete runtime adapters are compiled
+    // and validated. A build without SMARTCAR_ENABLE_PKCS11_PROVIDER also keeps
+    // PKCS#11 fail-closed. No hardware name ever falls back to software.
     return std::make_shared<UnavailablePqcHardwareProvider>(provider);
 }
 
@@ -55,7 +65,8 @@ inline std::unique_ptr<PqcActivePrivateOperations> make_runtime_pqc_private_oper
 
     // An explicit hardware provider request never falls back to the software
     // keystore, even when SMARTCAR_CPP_PQC_HARDWARE_REQUIRED=0. The selected
-    // hardware adapter must independently pass its runtime capability probe.
+    // hardware adapter must independently pass its runtime capability probe
+    // before any software keystore can be created or used.
     std::shared_ptr<PqcHardwareProvider> hardware = make_registered_hardware_pqc_provider(requested);
     return std::make_unique<HardwarePqcActivePrivateOperations>(std::move(hardware), identity);
 }

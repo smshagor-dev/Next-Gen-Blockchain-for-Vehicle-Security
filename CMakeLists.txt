@@ -21,6 +21,7 @@ option(SMARTCAR_ENABLE_IPO "Enable interprocedural optimization/LTO when support
 option(SMARTCAR_FETCH_PINNED_LIBOQS "Fetch pinned liboqs 0.16.0 when no system package is available" OFF)
 option(SMARTCAR_FORCE_PQC_UNAVAILABLE_FOR_TESTS "Pretend liboqs is unavailable to validate fail-closed CMake behavior" OFF)
 option(SMARTCAR_ENFORCE_VALIDATION_TOOLCHAIN "Require the hosted validation compiler family/version" OFF)
+option(SMARTCAR_ENABLE_PKCS11_PROVIDER "Compile the opt-in PKCS#11 v3.2 hardware PQC provider" OFF)
 
 set(SMARTCAR_LIBOQS_VERSION "0.16.0")
 set(SMARTCAR_LIBOQS_COMMIT "5a1a854b0dc9f2141bdc771c555ee60c37950183")
@@ -109,6 +110,20 @@ if(SMARTCAR_BUILD_BLOCKCHAIN OR
     find_package(OpenSSL 3.0 REQUIRED COMPONENTS Crypto)
 endif()
 
+if(SMARTCAR_ENABLE_PKCS11_PROVIDER)
+    find_path(
+        SMARTCAR_PKCS11_INCLUDE_DIR
+        NAMES pkcs11.h
+        PATH_SUFFIXES p11-kit p11-kit-1/p11-kit
+    )
+    if(NOT SMARTCAR_PKCS11_INCLUDE_DIR)
+        message(FATAL_ERROR
+            "SMARTCAR_ENABLE_PKCS11_PROVIDER=ON requires a PKCS#11 v3.2 development header (pkcs11.h). "
+            "The header must define the standardized ML-DSA/ML-KEM v3.2 mechanisms."
+        )
+    endif()
+endif()
+
 if(NOT SMARTCAR_FORCE_PQC_UNAVAILABLE_FOR_TESTS)
     find_package(liboqs CONFIG QUIET)
 endif()
@@ -176,6 +191,15 @@ if(SMARTCAR_BUILD_BLOCKCHAIN)
             SMARTCAR_SECURE_NATIVE_CORE=1
             SMARTCAR_RELEASE_VERSION="${PROJECT_VERSION}"
     )
+    if(SMARTCAR_ENABLE_PKCS11_PROVIDER)
+        target_sources(smartcar_blockchain PRIVATE native/pqc_pkcs11_provider.cpp)
+        target_include_directories(smartcar_blockchain PRIVATE ${SMARTCAR_PKCS11_INCLUDE_DIR})
+        target_compile_definitions(smartcar_blockchain PRIVATE SMARTCAR_ENABLE_PKCS11_PROVIDER=1)
+        target_link_libraries(smartcar_blockchain PRIVATE ${CMAKE_DL_LIBS})
+        message(STATUS
+            "PKCS#11 v3.2 provider compiled: runtime still requires a real CKF_HW_SLOT token and operational ML-DSA-44/ML-KEM-512 proof before claiming hardware-backed protection."
+        )
+    endif()
     smartcar_apply_release_options(smartcar_blockchain)
     message(STATUS
         "Hardened native target ${PROJECT_VERSION}: persisted mixed-generation verification + AES-256-GCM + real ML-DSA-44/ML-KEM-512 + optional authenticated rollback anchor."

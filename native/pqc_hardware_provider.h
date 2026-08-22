@@ -42,24 +42,23 @@ struct PqcHardwarePublicMaterial {
     std::uint64_t generation = 0;
 };
 
-inline void validate_hardware_probe(const PqcHardwareProbe& probe) {
+// Preflight verifies that a real backend/token and the required mechanism set
+// are present before any identity-specific key material is provisioned. It does
+// not claim private-key non-exportability yet; that requires object-level
+// evidence after load_or_create_public() has completed.
+inline void validate_hardware_backend_probe(const PqcHardwareProbe& probe) {
     if (!is_hardware_pqc_provider_name(probe.provider)) {
         throw std::runtime_error("PQC hardware probe returned a non-hardware provider name");
     }
     if (!probe.backend_loaded || !probe.token_present || !probe.hardware_mechanisms) {
         throw std::runtime_error("PQC hardware backend/token/mechanism probe failed");
     }
-    if (!probe.private_keys_non_exportable) {
-        throw std::runtime_error("PQC hardware provider did not prove non-exportable private-key policy");
-    }
     if (!probe.ml_dsa_44_key_generation || !probe.ml_dsa_44_sign ||
         !probe.ml_kem_512_key_generation || !probe.ml_kem_512_decapsulate) {
         throw std::runtime_error("PQC hardware provider lacks required ML-DSA-44/ML-KEM-512 operations");
     }
-    if (!probe.ml_kem_512_derived_secret_non_exportable || !probe.ml_kem_512_sha3_256_raw_commitment) {
-        throw std::runtime_error(
-            "PQC hardware provider cannot keep the ML-KEM derived secret non-exportable while producing the required commitment"
-        );
+    if (!probe.ml_kem_512_sha3_256_raw_commitment) {
+        throw std::runtime_error("PQC hardware provider lacks the required SHA3-256 raw-secret commitment operation");
     }
     if (!probe.rotation_supported) {
         throw std::runtime_error("PQC hardware provider does not support guarded key rotation");
@@ -70,6 +69,18 @@ inline void validate_hardware_probe(const PqcHardwareProbe& probe) {
     if (probe.ml_dsa_44_signature_max_size == 0 || probe.ml_kem_512_ciphertext_size == 0 ||
         probe.ml_kem_512_shared_secret_size == 0) {
         throw std::runtime_error("PQC hardware provider probe lacks required algorithm size metadata");
+    }
+}
+
+inline void validate_hardware_probe(const PqcHardwareProbe& probe) {
+    validate_hardware_backend_probe(probe);
+    if (!probe.private_keys_non_exportable) {
+        throw std::runtime_error("PQC hardware provider did not prove non-exportable private-key policy");
+    }
+    if (!probe.ml_kem_512_derived_secret_non_exportable) {
+        throw std::runtime_error(
+            "PQC hardware provider cannot keep the ML-KEM derived secret non-exportable while producing the required commitment"
+        );
     }
 }
 
