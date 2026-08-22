@@ -8,6 +8,7 @@ Supports Ethereum/Fabric style connectors via HTTP RPC-style endpoints.
 Configuration is fully driven from environment variables.
 """
 
+import hashlib
 import json
 import urllib.request
 import urllib.error
@@ -26,6 +27,10 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _canonical_json(value: Dict) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
 class ContractConnector:
     def __init__(self, name: str, provider: str, endpoint: str, timeout_sec: int = 4, mock_mode: bool = True):
         self.name = name
@@ -34,16 +39,27 @@ class ContractConnector:
         self.timeout_sec = timeout_sec
         self.mock_mode = mock_mode
 
+    def _deterministic_mock_tx_hash(self, method: str, payload: Dict) -> str:
+        material = "\n".join(
+            [
+                "OMNIGUARD_SMART_CONTRACT_MOCK_V2",
+                self.provider,
+                self.name,
+                method,
+                _canonical_json(payload),
+            ]
+        )
+        return "mock_" + hashlib.sha256(material.encode("utf-8")).hexdigest()
+
     def invoke(self, method: str, payload: Dict) -> Dict:
         if self.mock_mode:
-            tx_hash = f"mock_{self.provider}_{self.name}_{abs(hash(json.dumps(payload, sort_keys=True))) % 10_000_000}"
             return {
                 "ok": True,
-                "mode": "mock",
+                "mode": "mock_deterministic",
                 "provider": self.provider,
                 "contract": self.name,
                 "method": method,
-                "tx_hash": tx_hash,
+                "tx_hash": self._deterministic_mock_tx_hash(method, payload),
                 "timestamp": _now(),
             }
 
@@ -53,7 +69,7 @@ class ContractConnector:
             "method": method,
             "payload": payload,
             "timestamp": _now(),
-        }).encode()
+        }, sort_keys=True, separators=(",", ":")).encode()
         req = urllib.request.Request(
             self.endpoint,
             data=body,
@@ -64,11 +80,45 @@ class ContractConnector:
             with urllib.request.urlopen(req, timeout=self.timeout_sec) as resp:
                 raw = resp.read().decode()
                 data = json.loads(raw) if raw else {}
-            return {"ok": True, "mode": "real", "response": data, "timestamp": _now()}
-        except urllib.error.URLError as e:
-            return {"ok": False, "mode": "real", "error": str(e), "timestamp": _now()}
-        except Exception as e:
-            return {"ok": False, "mode": "real", "error": str(e), "timestamp": _now()}
+            if not isinstance(data, dict):
+                return {
+                    "ok": False,
+                    "mode": "remote_rpc",
+                    "error_code": "REMOTE_CONTRACT_RESPONSE_INVALID",
+                    "timestamp": _now(),
+                }
+            remote_ok = data.get("ok") is True
+            tx_id = data.get("tx_hash") or data.get("transaction_id")
+            if not remote_ok or not isinstance(tx_id, str) or not tx_id.strip() or len(tx_id) > 512:
+                return {
+                    "ok": False,
+                    "mode": "remote_rpc",
+                    "error_code": "REMOTE_CONTRACT_RECEIPT_UNVERIFIED",
+                    "timestamp": _now(),
+                }
+            return {
+                "ok": True,
+                "mode": "remote_rpc",
+                "provider": self.provider,
+                "contract": self.name,
+                "method": method,
+                "tx_hash": tx_id.strip(),
+                "timestamp": _now(),
+            }
+        except urllib.error.URLError:
+            return {
+                "ok": False,
+                "mode": "remote_rpc",
+                "error_code": "REMOTE_CONTRACT_UNREACHABLE",
+                "timestamp": _now(),
+            }
+        except Exception:
+            return {
+                "ok": False,
+                "mode": "remote_rpc",
+                "error_code": "REMOTE_CONTRACT_FAILURE",
+                "timestamp": _now(),
+            }
 
 
 class DynamicSmartContractEngine:
@@ -168,4 +218,3 @@ class DynamicSmartContractEngine:
             receipts.append(result)
 
         return receipts
-
