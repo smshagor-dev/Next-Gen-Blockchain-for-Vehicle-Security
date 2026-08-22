@@ -52,11 +52,11 @@ jobs:
           grep -F 'CKM_ML_KEM_KEY_PAIR_GEN' "$include_dir/pkcs11t.h"
           grep -F 'CK_FUNCTION_LIST_3_2' "$include_dir/pkcs11t.h"
 
-      # Compile the production adapter directly so this repair branch exposes the exact OASIS v3.2 diagnostics.
       - name: Compile PKCS11 provider source against OASIS v3.2 API
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
+          log="$RUNNER_TEMP/pkcs11-v32-source-compile.log"
           c++ \
             -std=c++17 \
             -Wall -Wextra -Wpedantic -Werror \
@@ -64,7 +64,19 @@ jobs:
             -I native \
             -I "$RUNNER_TEMP/pkcs11-v3.2" \
             -fsyntax-only \
-            native/pqc_pkcs11_provider.cpp
+            native/pqc_pkcs11_provider.cpp \
+            2>&1 | tee "$log"
+          status=${PIPESTATUS[0]}
+          exit "$status"
+
+      - name: Upload compiler diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pkcs11-v32-source-compile-log
+          path: ${{ runner.temp }}/pkcs11-v32-source-compile.log
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Verify provider remains hardware-truthful
         shell: bash
