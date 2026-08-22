@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "pqc_hardware_provider.h"
 #include "pqc_provider_policy.h"
 
 namespace omniguard {
