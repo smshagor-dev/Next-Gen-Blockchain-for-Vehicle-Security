@@ -62,9 +62,36 @@ public:
         const std::vector<unsigned char>& message
     ) = 0;
 
+    // Transitional raw-secret operation retained for legacy V1 verification and
+    // software compatibility. New hardware-backed runtime blocks must use the
+    // V2 commitment operation below so the derived shared secret can stay inside
+    // the hardware provider.
     virtual PqcSensitiveBytes decapsulate_ml_kem_512(
         const std::vector<unsigned char>& ciphertext
     ) = 0;
+
+    virtual PqcKemCommitment decapsulate_ml_kem_512_commitment(
+        const std::vector<unsigned char>& ciphertext,
+        const std::string& commitment_prefix,
+        const std::string& scheme
+    ) {
+        PqcSensitiveBytes secret = decapsulate_ml_kem_512(ciphertext);
+        PqcKemCommitment commitment;
+        try {
+            commitment = make_kem_commitment(
+                scheme,
+                commitment_prefix,
+                secret.data(),
+                secret.size()
+            );
+            validate_kem_commitment(commitment);
+        } catch (...) {
+            secret.clear();
+            throw;
+        }
+        secret.clear();
+        return commitment;
+    }
 };
 
 class HardwarePqcActivePrivateOperations final : public PqcActivePrivateOperations {
@@ -132,6 +159,32 @@ public:
             throw std::runtime_error("hardware ML-KEM-512 provider returned an invalid shared-secret size");
         }
         return secret;
+    }
+
+    PqcKemCommitment decapsulate_ml_kem_512_commitment(
+        const std::vector<unsigned char>& ciphertext,
+        const std::string& commitment_prefix,
+        const std::string& scheme
+    ) override {
+        verify_live_provider_binding();
+        if (ciphertext.size() != state_.kem_ciphertext_size) {
+            throw std::runtime_error("hardware ML-KEM-512 ciphertext size is invalid");
+        }
+        if (scheme != kKemCommitmentRawV2) {
+            throw std::runtime_error(
+                "hardware ML-KEM commitment operation requires the V2 raw-secret commitment scheme"
+            );
+        }
+        PqcKemCommitment commitment = provider_->decapsulate_ml_kem_512_commitment(
+            state_.key_id,
+            ciphertext,
+            commitment_prefix
+        );
+        validate_kem_commitment(commitment);
+        if (commitment.scheme != kKemCommitmentRawV2) {
+            throw std::runtime_error("hardware ML-KEM provider returned an unexpected commitment scheme");
+        }
+        return commitment;
     }
 
 private:

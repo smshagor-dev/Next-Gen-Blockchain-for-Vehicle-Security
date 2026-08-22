@@ -15,6 +15,7 @@ class PqcHardwareProviderContractTests(unittest.TestCase):
         cls.software_operations = Path("native/pqc_software_active_operations.h").read_text(encoding="utf-8")
         cls.key_material = Path("native/pqc_key_material.h").read_text(encoding="utf-8")
         cls.sensitive_bytes = Path("native/pqc_sensitive_bytes.h").read_text(encoding="utf-8")
+        cls.commitment = Path("native/pqc_kem_commitment.h").read_text(encoding="utf-8")
 
     def test_unimplemented_hardware_names_do_not_claim_hardware_capabilities(self):
         self.assertIn("is_hardware_pqc_provider_name", self.policy)
@@ -29,6 +30,8 @@ class PqcHardwareProviderContractTests(unittest.TestCase):
             "ml_dsa_44_sign",
             "ml_kem_512_key_generation",
             "ml_kem_512_decapsulate",
+            "ml_kem_512_derived_secret_non_exportable",
+            "ml_kem_512_sha3_256_raw_commitment",
             "rotation_supported",
             "device_identity",
             "evidence_reference",
@@ -36,9 +39,20 @@ class PqcHardwareProviderContractTests(unittest.TestCase):
             "ml_kem_512_ciphertext_size",
             "ml_kem_512_shared_secret_size",
             "sign_ml_dsa_44",
+            "decapsulate_ml_kem_512_commitment",
             "decapsulate_ml_kem_512",
         ):
             self.assertIn(required, self.contract)
+
+    def test_commitment_schemes_are_explicit_and_versioned(self):
+        self.assertIn("kKemCommitmentLegacyV1", self.commitment)
+        self.assertIn("OMNIGUARD_ML_KEM_SHARED_SECRET_COMMITMENT_V1_SHA3_256_HEX", self.commitment)
+        self.assertIn("kKemCommitmentRawV2", self.commitment)
+        self.assertIn("OMNIGUARD_ML_KEM_SHARED_SECRET_COMMITMENT_V2_SHA3_256_RAW", self.commitment)
+        self.assertIn("make_kem_commitment", self.commitment)
+        self.assertIn("validate_kem_commitment", self.commitment)
+        self.assertIn("encode_secret_as_hex", self.commitment)
+        self.assertIn("EVP_sha3_256", self.commitment)
 
     def test_private_key_export_is_not_part_of_hardware_contract(self):
         self.assertNotIn("signature_secret_key", self.contract)
@@ -46,6 +60,7 @@ class PqcHardwareProviderContractTests(unittest.TestCase):
         self.assertNotIn("export_private", self.contract)
         self.assertIn("Private key", self.contract)
         self.assertIn("must never be returned", self.contract)
+        self.assertIn("without exporting", self.contract)
 
     def test_active_operation_boundary_contains_no_private_key_bytes(self):
         for required in (
@@ -58,7 +73,10 @@ class PqcHardwareProviderContractTests(unittest.TestCase):
             "verify_live_provider_binding",
             "hardware PQC provider binding changed after activation",
             "sign_ml_dsa_44",
+            "decapsulate_ml_kem_512_commitment",
             "decapsulate_ml_kem_512",
+            "hardware ML-KEM commitment operation requires the V2 raw-secret commitment scheme",
+            "hardware ML-KEM provider returned an unexpected commitment scheme",
         ):
             self.assertIn(required, self.active_operations)
         self.assertNotIn("signature_secret_key", self.active_operations)
@@ -78,6 +96,7 @@ class PqcHardwareProviderContractTests(unittest.TestCase):
             "true,",
         ):
             self.assertIn(required, self.software_operations)
+        self.assertIn("make_kem_commitment", self.active_operations)
         self.assertIn("struct PqcKeyMaterial", self.key_material)
         self.assertIn("signature_secret_key", self.key_material)
         self.assertIn("kem_secret_key", self.key_material)
@@ -93,11 +112,15 @@ class PqcHardwareProviderContractTests(unittest.TestCase):
         self.assertNotIn("\n    unsigned char* data() noexcept", self.sensitive_bytes)
         self.assertIn("PqcSensitiveBytes decapsulate_ml_kem_512", self.contract)
         self.assertIn("PqcSensitiveBytes decapsulate_ml_kem_512", self.software_operations)
+        self.assertIn("PqcKemCommitment decapsulate_ml_kem_512_commitment", self.contract)
+        self.assertIn("PqcKemCommitment decapsulate_ml_kem_512_commitment", self.active_operations)
 
     def test_unavailable_adapter_is_fail_closed(self):
         self.assertIn("UnavailablePqcHardwareProvider", self.contract)
         self.assertIn("software fallback is prohibited", self.contract)
         self.assertIn("validate_hardware_probe(probe)", self.contract)
+        self.assertIn("decapsulate_ml_kem_512_commitment", self.contract)
+        self.assertIn("fail();", self.contract)
 
     def test_header_contract_compiles_and_rejects_unverified_adapter(self):
         compiler = shutil.which("c++") or shutil.which("g++") or shutil.which("clang++")
