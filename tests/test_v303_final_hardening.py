@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from credential_policy import secret_policy
+from scripts.generate_sbom import build_sbom
 from smart_contracts import ContractConnector
 
 
@@ -94,6 +95,17 @@ class V303FinalHardeningTests(unittest.TestCase):
         ):
             self.assertTrue(Path(path).exists(), path)
         subprocess.run(["python", "-m", "py_compile", "scripts/generate_sbom.py", "scripts/generate_provenance.py", "scripts/secret_scan.py"], check=True)
+
+    def test_sbom_resolves_multiline_go_mod_directive(self):
+        sbom = build_sbom()
+        go_components = [
+            component
+            for component in sbom["components"]
+            if component["name"] == "Go toolchain module language"
+        ]
+        self.assertEqual(len(go_components), 1)
+        self.assertEqual(go_components[0]["version"], "1.22")
+        self.assertEqual(sbom["metadata"]["component"]["version"], "3.0.3")
 
     def test_release_version_is_consistently_3_0_3(self):
         self.assertEqual(Path("VERSION").read_text(encoding="utf-8").strip(), "3.0.3")

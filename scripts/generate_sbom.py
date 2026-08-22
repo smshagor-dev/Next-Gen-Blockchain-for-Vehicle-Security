@@ -19,7 +19,7 @@ GO_MOD = (ROOT / "api/go/go.mod").read_text(encoding="utf-8")
 
 
 def match(pattern: str, text: str, label: str) -> str:
-    found = re.search(pattern, text)
+    found = re.search(pattern, text, flags=re.MULTILINE)
     if not found:
         raise RuntimeError(f"could not resolve {label}")
     return found.group(1)

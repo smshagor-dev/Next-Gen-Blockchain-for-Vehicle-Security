@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -17,7 +18,7 @@ func TestReleaseVersionMatchesRepositoryVersion(t *testing.T) {
 	if releaseVersion != want {
 		t.Fatalf("Go release version %q does not match VERSION %q", releaseVersion, want)
 	}
-	if releaseVersion != "3.0.2" {
-		t.Fatalf("unexpected release version: %s", releaseVersion)
+	if !regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`).MatchString(releaseVersion) {
+		t.Fatalf("release version is not canonical semantic version X.Y.Z: %q", releaseVersion)
 	}
 }

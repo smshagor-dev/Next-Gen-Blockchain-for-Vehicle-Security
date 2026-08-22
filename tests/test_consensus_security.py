@@ -18,28 +18,34 @@ class ConsensusSecurityTests(unittest.TestCase):
         self.assertTrue(metadata["retroactive_tamper_evidence"])
         self.assertFalse(metadata["secret_values_exposed"])
 
-    def test_no_51_percent_probability_2_pow_512_claim(self):
-        targets = [
-            Path("readme.md"), Path("docs/consensus-threat-model.md"),
-            Path("blockchain.cpp"), Path("api/go/main.go"),
-            Path("dashboard.py"), Path("consensus_security.py"),
+    @staticmethod
+    def _claim_targets():
+        return [
+            Path("readme.md"),
+            Path("docs/consensus-threat-model.md"),
+            Path("native/secure_blockchain_v303.cpp"),
+            Path("api/go/main.go"),
+            Path("dashboard.py"),
+            Path("consensus_security.py"),
         ]
-        for target in targets:
+
+    def test_no_51_percent_probability_2_pow_512_claim(self):
+        for target in self._claim_targets():
+            self.assertTrue(target.exists(), str(target))
             text = target.read_text(encoding="utf-8").lower()
             self.assertNotIn("2^-512", text, str(target))
             self.assertNotIn("2^−512", text, str(target))
 
     def test_no_dual_hash_prevents_51_percent_claim(self):
         forbidden = [
-            "dual hashing prevents 51", "dual hash prevents 51",
-            "dual-hash prevents 51", "51% attack requires",
+            "dual hashing prevents 51",
+            "dual hash prevents 51",
+            "dual-hash prevents 51",
+            "51% attack requires",
             "majority adversary cannot append fraudulent",
         ]
-        targets = [
-            Path("readme.md"), Path("docs/consensus-threat-model.md"),
-            Path("blockchain.cpp"), Path("api/go/main.go"), Path("dashboard.py"),
-        ]
-        for target in targets:
+        for target in self._claim_targets():
+            self.assertTrue(target.exists(), str(target))
             text = target.read_text(encoding="utf-8").lower()
             for phrase in forbidden:
                 self.assertNotIn(phrase, text, f"{target}: {phrase}")
