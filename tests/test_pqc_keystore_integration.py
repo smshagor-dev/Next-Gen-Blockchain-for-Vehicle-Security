@@ -75,9 +75,13 @@ class PqcKeyStoreIntegrationTests(unittest.TestCase):
 
     def test_hosted_ci_supplies_isolated_keystore_to_supported_native_selftest(self):
         self.assertIn("tests.test_pqc_keystore_integration", self.workflow)
+        self.assertIn("Run secure native v3.0.3 self-test", self.workflow)
+        self.assertIn('root="$RUNNER_TEMP/v303-native"', self.workflow)
+        self.assertIn('rm -rf "$root" && mkdir -p "$root"', self.workflow)
         self.assertIn("SMARTCAR_CPP_PQC_KEYSTORE_KEY", self.workflow)
-        self.assertIn("SMARTCAR_CPP_PQC_KEYSTORE_PATH", self.workflow)
-        self.assertIn("native-core-pqc-keystore", self.workflow)
+        self.assertIn('SMARTCAR_CPP_PQC_KEYSTORE_PATH="$root/identity.json"', self.workflow)
+        self.assertIn("SMARTCAR_CPP_PQC_PROVIDER=software_encrypted_file", self.workflow)
+        self.assertIn("SMARTCAR_CPP_PQC_HARDWARE_REQUIRED=0", self.workflow)
 
 
 if __name__ == "__main__":
