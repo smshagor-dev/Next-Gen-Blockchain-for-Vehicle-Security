@@ -28,8 +28,8 @@ def _load_release_version() -> str:
 
 RELEASE_VERSION = _load_release_version()
 RELEASE_SERIES = ".".join(RELEASE_VERSION.split(".")[:2])
-INTERNAL_HARDENING_PHASE = "v3.2"
-RELEASE_NAME = "Native Cryptographic Modernization & Real-PQC Validation"
+INTERNAL_HARDENING_PHASE = "v3.3"
+RELEASE_NAME = "Durable PQC Identity, Historical Trust & Runtime Recovery Hardening"
 RELEASE_CHANNEL = "research_hardening"
 
 
@@ -42,6 +42,12 @@ def release_metadata() -> Dict[str, object]:
         "release_channel": RELEASE_CHANNEL,
         "internal_hardening_phase": INTERNAL_HARDENING_PHASE,
         "real_pqc_native_validation": True,
+        "durable_pqc_identity": True,
+        "signed_pqc_key_transitions": True,
+        "mixed_generation_ledger_verification": True,
+        "authenticated_local_rollback_anchor": True,
+        "hardware_monotonic_rollback_protection": False,
+        "hardware_pqc_provider_implemented": False,
         "native_data_at_rest": "AES-256-GCM",
         "native_signature": "ML-DSA-44",
         "native_key_encapsulation": "ML-KEM-512",
