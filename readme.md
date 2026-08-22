@@ -1,1203 +1,384 @@
-# OmniGuard V2X: A Privacy-Preserving Blockchain Framework for Smart Vehicle Security
+# OmniGuard V2X
 
-## 1. Project Identity
-- Project Name: `OmniGuard V2X`
-- Developer: `Md Shahanur Islam Shagor`
-- Author: `Md Shahanur Islam Shagor`
-- Role: `Project Architect & Lead Developer`
-- Description: A smart-car security platform where blockchain integrity, ZKP privacy, DID trust, V2X security, anomaly defense, edge processing, federated learning, forensic logging, and hardware control are integrated into one end-to-end architecture.
+**Post-quantum-aware blockchain security research platform for connected and autonomous vehicles**
 
-## Project Overview
-This is a modern security framework designed to protect smart and autonomous vehicle data against present-day cyber threats and future quantum-era risks. The platform uses Zero-Knowledge Proofs to preserve privacy, decentralized identity for trust without a central authority, and federated learning to improve AI behavior without exposing raw personal data.
+**Current public version:** `v3.0.3`  
+**Release channel:** Research hardening  
+**Developer / Project Architect & Lead Developer:** Md Shahanur Islam Shagor
 
-This prototype is positioned as an engineering integration and validation-transparency framework rather than a new cryptographic primitive. OmniGuard V2X does not introduce new cryptographic primitives; its contribution is a prototype system architecture that integrates post-quantum key establishment metadata using the ML-KEM/Kyber path, classical privacy commitments with explicit assumption labeling, Lamport-based identity authenticity, simple-majority blockchain audit logging with documented majority limitations, prototype FL poisoning sanity checks, and GUI/API security capability reporting.
+OmniGuard V2X is a research and bench-validation framework that combines authenticated vehicle telemetry, blockchain integrity, V2X trust, post-quantum key operations, privacy commitments, decentralized identity, anomaly monitoring, incident response, federated-learning experiments, hardware bridges, and reproducible security validation.
 
-The prototype has component-dependent complexity. Several local operations are `O(1)` or `O(n)`, but naive full-mesh communication and all-validator broadcast can produce `O(n^2)` network message volume. See `docs/complexity-analysis.md` for the component-level table and scalability boundary.
+> **Research boundary:** v3.0.3 is not production-certified, vehicle-safety-certified, formally verified, or a substitute for an OEM PKI/HSM deployment. The project does not introduce new cryptographic primitives; its contribution is system integration plus validation transparency.
 
-1. Decentralized Identity (DID). File: `did_identity.py`. Core functions/classes: `DIDIdentity.generate`, `DIDIdentity.sign_challenge`, `verify_did_proof`. It creates a vehicle-specific decentralized digital passport and verifies identity through Lamport one-time hash signatures, providing cryptographic identity authenticity. It does not provide Sybil resistance under open registration.
-2. Zero-Knowledge Privacy (ZKP). File: `zkp_privacy.py`. Core functions: `create_speed_limit_proof`, `verify_speed_limit_proof`, `create_location_ownership_proof`, `verify_location_ownership_proof`. It proves compliance (like speed-limit adherence) without revealing exact sensitive values such as true speed or exact location.
-3. Dual-Hash Blockchain Integrity. Files: `blockchain.py`, `blockchain.cpp`. Core functions: `dual_hash`, `compute_block_hash`. It records SHA2 and SHA3 paths for audit integrity and retroactive tamper evidence. Majority-control limitation: under simple-majority consensus, validators controlling quorum can approve syntactically valid malicious blocks. Dual hash chaining provides tamper evidence for historical modification but does not prevent forward majority control.
-4. Federated Learning and AI Security. Files: `federated_learning.py`, `fl_trainer_node.py`. Core functions/classes: `FederatedObstacleLearner.maybe_create_local_update`, `FederatedTrainer.aggregate_updates`, `_mad_filter`, `_robust_weighted_trimmed_mean`. Vehicles train locally and share only protected model deltas. Current poisoning validation is a prototype-level FL poisoning detection sanity check using a limited three-peer demonstration, not statistically sufficient for Byzantine-robustness claims.
-5. Encrypted Forensic Blackbox. Files: `edge_layer.py`, `blockchain.py`. Core functions/classes: `EdgeTelemetryLayer.record_forensic_sample`, `EdgeTelemetryLayer.build_forensic_block`, `ForensicBlackboxLogger.create_locked_package`. On impact or attack signals, the system preserves a rolling raw timeline as encrypted forensic evidence for authorized investigators.
-6. Real-Time Anomaly Detection. File: `anomaly_detector.py`. Core functions/classes: `LightweightAnomalyDetector.detect_telemetry`, `LightweightAnomalyDetector.detect_security_event`, `_mean_std`. It continuously scores abnormal behavior (sensor spikes, auth anomalies, integrity threats) with lightweight statistics suitable for edge hardware.
-7. Smart Contract Automation. File: `smart_contracts.py`. Core functions/classes: `DynamicSmartContractEngine.evaluate_and_invoke`, `_insurance_rule`, `_toll_rule`, `_maintenance_rule`, `_biometric_safety_rule`. It auto-executes policy workflows (insurance/toll/safety actions) from trusted blockchain event context.
-8. V2X Sync and Secure Communication. Files: `sync_protocol.py`, `v2x_protocol.py`. Core functions/classes: `create_message`, `verify_message`, `SmartCarBlockchain.verify_and_sync`, `DynamicCryptoAgilityLayer.maybe_switch_mode`. It defends message authenticity and integrity using signed/authenticated envelopes, session secrets, and adaptive crypto mode selection under changing latency and traffic.
-9. Hardware-to-Blockchain Bridge. Files: `hardware_bridge.py`, `pi_sensor_node.py`. Core functions/classes: `run_pi_mode`, `run_arduino_mode`, `PiTelemetryNode.run`, `to_telemetry`. It ingests real telemetry from Raspberry Pi/Arduino and pushes it into the secure blockchain pipeline in real time.
-10. Biometric and Driver Health Safety. Files: `pi_sensor_node.py`, `vehicle_sensors.py`, `blockchain.py`. Core functions/classes: `HeartRateSensorSerial.read_bpm`, `DrowsinessEyeClosureDetector.read_score`, `VehicleSensorSuite._read_biometric`, `SmartCarBlockchain._activate_safe_mode`. It monitors heart rate and drowsiness and can trigger automatic protective driving controls when risk thresholds are crossed.
-11. Advanced Consensus and Majority Validation. File: `multi_car_majority_demo.py` (and vote APIs in `sync_protocol.py`). Core functions: `verify_candidate_locally`, `make_candidate_block`, `SyncClient.submit_vote`, `SyncClient.request_vote_tally`. It demonstrates distributed validation so one malicious node cannot easily force false chain events.
-12. Latency and Performance Measurement. Files: `perf_metrics.py`, `zkp_latency_report.py`, `network_overhead_analysis.py`. Core functions: `log_zkp_latency`, `main`, `analyze`. It records cryptographic and network timing overhead to show the system remains practical for near real-time vehicular operation.
-13. Secure Configuration and Secret Hygiene. File: `env_config.py` plus `.env`. Core functions: `load_project_env_once`, `get_env`, `get_bool`, `get_int`, `get_float`. Sensitive keys and policy toggles are externally managed, reducing hardcoded secret exposure and improving operational security maturity.
+## v3.0.3 Highlights
 
-## Detailed Functional Explanation (What, Why, How, Value, Stability, Future, Importance)
-### 1. DID Identity (`did_identity.py`)
-- What was done: Implemented decentralized identity and Lamport hash-signature flow using `DIDIdentity.generate`, `DIDIdentity.sign_challenge`, and `verify_did_proof`.
-- Why: A centralized identity server is a single point of failure for fleet trust.
-- How it works: The vehicle publishes a DID document, signs challenge bits with one-time hash keys, and peers verify signature-hash pairs.
-- Practical value: Reduces identity spoofing and strengthens V2X trust bootstrap.
-- Sybil boundary: Lamport DID provides cryptographic identity authenticity, not Sybil resistance. The default `OPEN_REGISTRATION` policy has no Sybil-resistance guarantee because unlimited identities may be created.
-- Stability now: high (lightweight, deterministic verification, and minimal external dependencies).
-- Future direction: key rotation registry, DID revocation list, multi-proof identity bundle.
-- Importance: critical; secure inter-vehicle trust cannot start without strong identity verification.
+v3.0.3 focuses on durable PQC identity, historical trust, rollback/recovery safety, authenticated local runtime startup, and release integrity.
 
-### 2. ZKP Privacy (`zkp_privacy.py`)
-- What was done: Implemented `commit`, `prove_knowledge`, `verify_knowledge`, `create_speed_limit_proof`, and `verify_speed_limit_proof`.
-- Why: Exposing raw speed/location increases privacy and surveillance risk.
-- How it works: Commitment plus knowledge proofs allow compliance verification without revealing secret values.
-- Pedersen aggregation boundary: Pedersen commitments support additive homomorphism over committed values, but the aggregate remains hidden unless participants provide valid openings or a separate secure aggregation / zero-knowledge disclosure protocol is implemented. Default mode is `COMMIT_ONLY`, so aggregate statistics such as mean velocity are not recoverable from commitments alone.
-- Practical value: Enables regulation compliance while preserving user privacy.
-- Stability now: medium-high (practical and robust, but not a formally verified production range-proof system yet).
-- Future direction: Bulletproofs/zkSNARK integration, formally verified proof circuits.
-- Importance: high; this is a core privacy-by-design capability.
+- Durable encrypted ML-DSA-44 / ML-KEM-512 software keystore.
+- AES-256-GCM protection for software-stored private PQC material.
+- Stable key identifiers across process restarts.
+- Guarded local PQC key rotation with encrypted previous-keystore backup.
+- Signed old-to-new ML-DSA transition evidence.
+- Bounded historical public-key trust keyring.
+- Mixed-generation native ledger verification.
+- Authenticated local rollback anchor with explicit no-auto-restore policy.
+- Real liboqs native validation; simulated PQC is not part of the supported v3.0.3 build path.
+- Opt-in PKCS#11 v3.2 hardware PQC adapter with runtime evidence checks.
+- Secure local credential bootstrap with independent high-entropy secrets.
+- Authenticated Go loopback backend with stale-process detection and bounded readiness.
+- Windows runtime smoke validation using a real freshly built Go backend process.
+- Commit-bound integrity manifest, SBOM, provenance, secret scan, validation reports, and SHA-256 release checksums.
 
-### 3. Dual-Hash Chain Integrity (`blockchain.py`, `blockchain.cpp`)
-- What was done: Implemented SHA2+SHA3 hybrid integrity with `dual_hash` and `compute_block_hash`.
-- Why: Relying on only one hash family increases long-term cryptographic risk.
-- How it works: block payload canonical hash chaining + dual digest verification.
-- Practical value: Improves tamper detection and forensic confidence.
-- Consensus boundary: dual hash chaining does not provide protection from majority validator control, colluding validators with quorum, or valid but malicious future blocks.
-- Stability now: high (simple deterministic cryptographic primitive usage).
-- Future direction: domain-separated hash contexts, hardware-accelerated hashing.
-- Importance: critical; this is the foundation of ledger trust.
+See `docs/releases/v3.0.3.md` for the complete release notes and `docs/releases/v3.0.3-checklist.md` for the guarded release process.
 
-### 4. Federated Learning Security (`federated_learning.py`, `fl_trainer_node.py`)
-- What was done: local training + delta sharing + `_mad_filter` outlier screening + clipped updates.
-- Why: The system needs collective model improvement without sharing raw private driving data.
-- How it works: Each car computes local updates, the trainer performs small-scale aggregation with norm and MAD outlier screening. The current three-peer check can catch a trivial 100x weight-delta outlier but does not support broad poisoning-robustness or Byzantine-robustness claims.
-- Practical value: Improves fleet-wide AI safety without exposing personal data.
-- Stability now: prototype sanity check for FL validation; not statistically sufficient for Byzantine-robustness claims.
-- Future direction: secure aggregation, personalized FL, stronger poisoning defenses.
-- Importance: high; a key enabler for privacy-preserving intelligence scaling.
+## Security Model at a Glance
 
-### 5. Encrypted Forensic Blackbox (`edge_layer.py`, `blockchain.py`)
-- What was done: Built trigger-based forensic capture with `record_forensic_sample`, `build_forensic_block`, and `create_locked_package`.
-- Why: Incident investigation requires trusted immutable evidence timelines.
-- How it works: A rolling raw buffer is maintained; on trigger, an encrypted forensic bundle is locked into a chain event.
-- Practical value: insurance, legal investigation, root-cause analysis.
-- Stability now: high for logging path; crypto strength config-dependent.
-- Future direction: hardware secure enclave key wrapping, chain-of-custody metadata standardization.
-- Importance: very high for real-world accountability and incident response.
+| Area | v3.0.3 status |
+|---|---|
+| Native data at rest | AES-256-GCM |
+| Native signature | ML-DSA-44 via real liboqs |
+| Native KEM | ML-KEM-512 via real liboqs |
+| Historical ML-DSA verification | Supported for explicitly admitted generations |
+| Historical ML-KEM re-decapsulation | Not supported; historical private KEM keys are intentionally not retained |
+| Software PQC provider | Implemented; private material is encrypted but exportable to the software process |
+| PKCS#11 v3.2 provider | Opt-in adapter implemented; runtime hardware evidence required |
+| TPM2 provider | No concrete v3.0.3 adapter; fails closed |
+| Generic HSM provider | No concrete v3.0.3 adapter; fails closed |
+| Hardware monotonic rollback protection | Not implemented |
+| Production PKCS#11/HSM token validation | Not claimed |
+| Go local control API | HMAC-SHA256 authenticated, timestamp/nonce replay defense, loopback only |
+| Python fallback from Go backend | Disabled by default |
+| Classical ECDH-P256 fallback | Disabled by default; classical if explicitly enabled |
 
-### 6. Real-Time Anomaly Detection (`anomaly_detector.py`)
-- What was done: `detect_telemetry`, `detect_security_event`, z-score baseline + heuristic fusion.
-- Why: Without early anomaly detection, prevention and response are delayed.
-- How it works: Rolling mean/std baselines and rule penalties are combined into a detection score.
-- Practical value: enables fast detection of sensor spoofing, authentication abuse, and integrity anomalies.
-- Stability now: medium-high (lightweight and fast, but threshold tuning environment-specific).
-- Future direction: adaptive thresholds, online drift handling, hybrid ML anomaly scoring.
-- Importance: high; proactive defense layer.
+### Hybrid-security boundary
 
-### 7. Smart Contract Automation (`smart_contracts.py`)
-- What was done: implemented event-driven policy execution using `evaluate_and_invoke` and rule functions.
-- Why: Manual response is slow and error-prone.
-- How it works: Policy rules evaluate telemetry/event context and invoke contract connectors.
-- Practical value: insurance/toll/maintenance workflow automation.
-- Stability now: medium-high (internal abstraction is stable; external endpoint reliability still matters).
-- Future direction: audited contract ABI layer, retry-safe idempotent transaction manager.
-- Importance: medium-high; operations efficiency and trust automation.
+The native C++ v3.0.3 path uses real standardized ML-DSA-44 and ML-KEM-512. The wider research platform still contains classical components such as Pedersen commitment binding and Schnorr-style proof assumptions. Therefore OmniGuard V2X does **not** claim end-to-end post-quantum security.
 
-### 8. Secure Sync and V2X (`sync_protocol.py`, `v2x_protocol.py`)
-- What was done: authenticated message envelopes, robust socket handling, dynamic crypto agility.
-- Why: MITM/tamper/replay risk high in vehicular networks.
-- How it works: signed or HMAC-protected messages, handshake-derived session secret, latency-aware mode switching.
-- Practical value: safe low-latency vehicle-to-vehicle/infrastructure communication.
-- Stability now: medium-high (fallback logic is strong; heterogeneous networks still require tuning).
-- Future direction: full PQ signatures everywhere, formal replay protection windowing.
-- Importance: critical for connected vehicle safety.
+Pedersen commitments operate in `COMMIT_ONLY` mode by default. Aggregate statistics such as mean velocity are **not recoverable from commitments alone**; openings or a separate secure-aggregation / zero-knowledge disclosure protocol would be required.
 
-### 9. Hardware Bridge (`hardware_bridge.py`, `pi_sensor_node.py`)
-- What was done: `run_pi_mode`, `run_arduino_mode`, telemetry translation and control dispatch.
-- Why: Real deployment requires direct hardware integration beyond simulation.
-- How it works: Sensor streams are ingested, normalized, and pushed into the chain pipeline; safe-mode signals are dispatched to actuators.
-- Practical value: Improves field deployability and lab-to-road transition.
-- Stability now: medium (hardware link quality and driver stack dependent).
-- Future direction: CAN-native ingestion, watchdog recovery, offline queueing.
-- Importance: high for practical deployment credibility.
+## Architecture
 
-### 10. Biometric Safety (`pi_sensor_node.py`, `vehicle_sensors.py`, `blockchain.py`)
-- What was done: heart-rate/drowsiness intake + safe-mode activation integration.
-- Why: driver physiological risk often causes accidents before system-level failure appears.
-- How it works: Threshold crossings generate risk events; chain and contract logic trigger protective responses.
-- Practical value: human-centric safety and emergency intervention.
-- Stability now: medium (sensor quality dependent, but control path robust).
-- Future direction: multi-sensor fusion (ECG + eye + steering behavior), false-positive suppression.
-- Importance: high in safety-critical contexts.
+The current project is organized as **six implemented prototype layers**:
 
-### 11. Majority Consensus Demo (`multi_car_majority_demo.py`, `sync_protocol.py`)
-- What was done: local candidate verification + distributed vote/tally interfaces.
-- Why: Reduces risk of forged events and single-node authority abuse.
-- How it works: Peer nodes independently verify candidate blocks and majority outcomes determine acceptance.
-- Practical value: trust decentralization for validated blocks. Sybil resistance is deployment-dependent and requires an external admission policy such as proof-of-stake, proof-of-work, certificate authorities, manufacturer registries, or transportation authority enrollment.
-- Stability now: medium (demo-grade orchestration, core logic clear).
-- Future direction: production BFT voting and weighted trust scoring.
-- Importance: medium-high for decentralized resilience.
+1. **L1 — Vehicle sensing and input validation**  
+   `hardware_bridge.py`, `pi_sensor_node.py`, `vehicle_sensors.py`, `SmartCarSensorNode.ino`, optional camera module.
 
-### 12. Performance and Latency Metrics (`perf_metrics.py`, `zkp_latency_report.py`, `network_overhead_analysis.py`)
-- What was done: zkp latency logging, overhead profiling and reports.
-- Why: Security features must prove timing feasibility for real-time operation.
-- How it works: Operation-level latency is logged and payload overhead is measured and compared.
-- Metric source of truth: `docs/metrics-source-of-truth.md`; current active latency wording is `5.34 ms warm-start prototype pipeline latency`.
-- Practical value: optimization decisions, publication/report quality evidence.
-- Stability now: high (simple instrumentation pipeline).
-- Future direction: end-to-end distributed tracing, percentile SLA dashboard.
-- Importance: high for research validity and production readiness.
+2. **L2 — Cryptographic session and key establishment**  
+   `sync_protocol.py`, `v2x_protocol.py`, authenticated envelopes, replay defense, session secrets, crypto-agility controls.
 
-### 13. Secure Configuration (`env_config.py`, `.env`)
-- What was done: centralized env parsing and typed getters (`get_bool`, `get_int`, `get_float`).
-- Why: Hardcoded secrets and constants reduce both security and maintainability.
-- How it works: Project-root discovery loads config once; modules read typed values with safe runtime defaults.
-- Practical value: safer deployment, easy tuning, reproducible environment behavior.
-- Stability now: high (minimal logic, broad module coverage).
-- Future direction: secret manager integration, config schema validation and signature checks.
-- Importance: critical baseline and foundation layer for secure system operation.
+3. **L3 — Privacy and identity**  
+   `zkp_privacy.py`, `did_identity.py`, Pedersen-style commitments, proof checks, Lamport one-time identity authenticity.
 
-## 2. Project Layers
-OmniGuard V2X is described as six implemented prototype layers:
+4. **L3.5 — Federated-learning research layer**  
+   `federated_learning.py`, `fl_trainer_node.py`, local updates, clipping and prototype poisoning sanity checks.
 
-1. L1 Vehicle sensing/input validation
-- `hardware_bridge.py`, `pi_sensor_node.py`, `SmartCarSensorNode.ino`, `camera_emergency_brake.cpp`, `vehicle_sensors.py`
-- Sensor fusion, camera/object input, emergency-brake signals, biometric input, and basic telemetry validation.
+5. **L4 — Blockchain, forensic, anomaly and policy layer**  
+   `blockchain.py`, `native/secure_blockchain_v303.cpp`, `smart_contracts.py`, `edge_layer.py`, `anomaly_detector.py`.
 
-2. L2 Cryptographic session/key establishment
-- `sync_protocol.py`, `v2x_protocol.py`, `v2x_demo_nodes.py`
-- V2X messages, authenticated envelopes, session-secret establishment, and dynamic crypto-agility controls.
+6. **L5 — API, dashboard and runtime monitoring**  
+   `main.py`, `dashboard.py`, `smartcar_backend.py`, `api/go/main.go`, performance and validation reporting.
 
-3. L3 Privacy/commitment layer
-- `zkp_privacy.py`, `did_identity.py`
-- Pedersen-style commitments, Schnorr-style proof checks, and decentralized identity authenticity checks.
-
-4. L3.5 Federated learning sanity-check layer
-- `federated_learning.py`, `fl_trainer_node.py`, `decentralized_fl_demo.py`
-- Local model updates and prototype-level FL poisoning detection sanity checks. Current validation is not statistically sufficient for Byzantine-robustness claims.
-
-5. L4 Blockchain audit layer
-- `blockchain.py`, `blockchain.cpp`, `smart_contracts.py`, `edge_layer.py`, `anomaly_detector.py`
-- Dual-hash audit records, chain events, edge summaries, anomaly scoring, forensic blackbox records, and policy receipts.
-
-6. L5 API/dashboard monitoring layer
-- `main.py`, `dashboard.py`, `smartcar_backend.py`, `api/go/main.go`, `perf_metrics.py`, `zkp_latency_report.py`, `network_overhead_analysis.py`
-- Operator UI, API status surfaces, metrics reporting, and runtime monitoring.
-
-## Reviewer-Driven Corrections
-
-The project has been revised to remove overstated claims and document limitations. These corrections improve scientific validity but do not replace the need for larger-scale experiments. The current paper claim status is `corrected_but_requires_new_experiments`.
-
-The reviewer audit trail is maintained in `docs/reviewer-issue-resolution-matrix.md`. It records corrections for post-quantum security boundaries, Sybil resistance, majority-attack limits, FL validation, adversarial detection, layer count, latency, novelty, complexity, and Pedersen aggregate-statistics claims.
-
-## Structure
-
-![Project Theme](image_source/project_theam.jpg)
-
-## 3. Folder Structure
-
-```text
-Smart Car - Blockchain for Vehicle Security/
-|-- main.py
-|-- dashboard.py
-|-- blockchain.py
-|-- blockchain.cpp
-|-- blockchain.h
-|-- zkp_privacy.py
-|-- v2x_protocol.py
-|-- sync_protocol.py
-|-- did_identity.py
-|-- smart_contracts.py
-|-- edge_layer.py
-|-- anomaly_detector.py
-|-- federated_learning.py
-|-- vehicle_sensors.py
-|-- hardware_bridge.py
-|-- pi_sensor_node.py
-|-- network_overhead_analysis.py
-|-- fl_trainer_node.py
-|-- decentralized_fl_demo.py
-|-- readme.md
-|-- requirements.txt
-|-- .env
-|-- logs/
-|-- image_source/
-|   |-- project_theam.jpg
-|   |-- System-Architechture.png
-|   |-- privacy-security-flow.png
-|   |-- commonication-blockchain-synctrization.png
-|   |-- federaated-learning-flow.png
-|   |-- Zero-Knowladge-proofs.png
-|   |-- Large-language-model.png
-|   `-- road_scene.svg
-`-- build/
-```
-### System Diagram
-
-```mermaid
-flowchart BT
-    L5["L5 API/dashboard monitoring layer
-    - UI/API status
-    - Metrics reporting
-    - Runtime monitoring"]
-
-    L4["L4 Blockchain audit layer
-    - Dual-hash audit records
-    - Chain events
-    - Forensic records"]
-
-    L35["L3.5 Federated learning sanity-check layer
-    - Local updates
-    - Prototype poisoning sanity checks"]
-
-    L3["L3 Privacy/commitment layer
-    - Pedersen commitments
-    - Schnorr-style checks
-    - DID authenticity"]
-
-    L2["L2 Cryptographic session/key establishment
-    - V2X envelopes
-    - Session secrets
-    - Crypto agility"]
-
-    L1["L1 Vehicle sensing/input validation
-    - Sensors
-    - Camera input
-    - Telemetry validation"]
-
-    L1 --> L2 --> L3 --> L35 --> L4 --> L5
-```
-## 4. Production-Oriented ZKP Parameters
-
-Key parameters from `.env`:
-- `SMARTCAR_ZKP_PARAM_SET`
-- `SMARTCAR_ZKP_P`, `SMARTCAR_ZKP_G`, `SMARTCAR_ZKP_H`
-
-
-```math
-\begin{aligned}
-C&=(G^{value\bmod Q}\cdot H^r)\bmod P\\
-ch&=H(commitment\parallel t\parallel context)\bmod Q
-\end{aligned}
-```
-
-- First formula creates the Pedersen-style commitment used to hide sensitive value. Pedersen hiding is information-theoretic, but binding relies on classical discrete-log/DDH assumptions and is not post-quantum secure.
-- Second formula creates Fiat-Shamir challenge for non-interactive knowledge proof verification.
-- The Schnorr-style knowledge/range proof soundness is a classical discrete-log assumption.
-
-```mermaid
-flowchart TD
-    A[Load ZKP Params] --> B[Build Commitment]
-    B --> C[Create Knowledge Proof]
-    C --> D[Verify Proof]
-```
-
-Majority-control limitation: under simple-majority consensus, validators controlling quorum can approve syntactically valid malicious blocks. Dual hash chaining provides tamper evidence for historical modification but does not prevent forward majority control.
-
-## 5. Network Error Handling Hardening
-
-Scope:
-- Timeout retry loops
-- Broken pipe and reset handling
-- Safe send and safe shutdown paths
-
-(reliability metric used operationally):
-```math
-success_{rate}=\frac{successful_{messages}}{total_{messages}}\times 100
-```
-
-- Measures delivery reliability of sync/V2X pipeline under hardened retry and exception handling.
-
-```mermaid
-flowchart TD
-    A[Receive Message] --> B{Valid Packet}
-    B -->|Yes| C[Process]
-    B -->|No| D[Drop]
-    C --> E[Send Ack]
-    D --> F[Retry Or Close]
-```
-
-## 6. Hybrid V2V Handshake (Dynamic PQC)
-
-Crypto agility and handshake:
-- PQC KEM preferred (`ML-KEM` or `Kyber`)
-- Classical fallback (`ECDH-P256 + HKDF`) is disabled by default and is not post-quantum secure
-- Dynamic `SHA3` vs `DILITHIUM` mode switching
-- OmniGuard V2X uses ML-KEM/Kyber for post-quantum key establishment, while its Pedersen commitment binding and Schnorr-style proof soundness rely on classical discrete-log assumptions.
-- The current prototype provides hybrid security, not end-to-end post-quantum security.
-- Post-quantum protection is limited to the key-establishment path unless classical commitment/proof components are replaced.
-
-
-```math
-\begin{aligned}
-score&=w_L\cdot latency_{component}+w_T\cdot traffic_{component}\\
-latency_{component}&=\min\left(1,\frac{avg_{rtt}}{latency_{high}}\right)\\
-traffic_{component}&=\min\left(1,\frac{mps}{traffic_{high}}\right)
-\end{aligned}
-```
-
-- Converts current network condition into a bounded agility score.
-- Score drives dynamic crypto mode switch between `DILITHIUM` and `SHA3` with hysteresis.
-
-```mermaid
-flowchart TD
-    A[HELLO] --> B[Negotiate KEM]
-    B --> C{PQC Available}
-    C -->|Yes| D[PQC Session Secret]
-    C -->|No, opt-in only| E[ECDH Session Secret - Classical]
-    D --> F[Sign And Send]
-    E --> F
-    F --> G[Agility Score]
-    G --> H[Select SHA3 Or DILITHIUM]
-```
-
-## 7. Local Storage Encryption (Blockchain File)
-
-Storage modes:
-- `AES-256-GCM` primary
-- PBKDF2 based authenticated envelope fallback
-
-
-```math
-\begin{aligned}
-K&=PBKDF2\text{-}HMAC\text{-}SHA256(passphrase,salt,iterations)\\
-ciphertext&=AES\text{-}256\text{-}GCM(K,nonce,plaintext,aad)
-\end{aligned}
-```
-
-- Derives storage encryption key from passphrase.
-- Encrypts blockchain file payload with authenticated encryption to prevent tamper and leak.
-
-```mermaid
-flowchart TD
-    A[Chain Payload] --> B[Derive Key]
-    B --> C[Encrypt Payload]
-    C --> D[Write Encrypted File]
-    D --> E[Read And Verify]
-```
-
-## 8. Encrypted Blackbox Logging (Forensic Analysis)
-
-Flow:
-- Rolling window capture
-- Triggered forensic lock package
-- Separate wrapped keys for forensic and insurance
-- Inject forensic block to chain
-
-
-```math
-\begin{aligned}
-window_{samples}&=sample_{hz}\times window_{sec}\\
-forensic_{trigger\_score}&=impact_{flag}+hack_{flag}+emergency_{flag}
-\end{aligned}
-```
-
-- First formula sets how many raw records stay in rolling forensic window.
-- Second formula represents trigger logic for generating locked forensic package block.
-
-```mermaid
-flowchart TD
-    A[Collect Raw Telemetry] --> B[Rolling Queue]
-    B --> C{Impact Or Hack Trigger}
-    C -->|Yes| D[Encrypt Forensic Package]
-    D --> E[Attach To Blockchain Block]
-    C -->|No| F[Continue Buffering]
-```
-
-## 9. Multi-Modal Biometric Auth via Blockchain
-
-Fields:
-- `driver_heart_rate_bpm`
-- `driver_drowsiness_score`
-- `driver_unwell`
-
-
-```math
-\begin{aligned}
-biometric_{hash}&=SHA3\text{-}256(hr\parallel drowsiness\parallel unwell_{flag})\\
-risk_{flag}&=(hr\le hr_{low})\lor(hr\ge hr_{high})\lor(drowsiness\ge threshold)\lor unwell
-\end{aligned}
-```
-
-- Hash formula creates immutable biometric digest included in each block.
-- Risk formula decides whether safe-mode contract action should be triggered.
-
-```mermaid
-flowchart TD
-    A[Read Biometric Inputs] --> B[Compute Biometric Hash]
-    B --> C[Evaluate Safety Rule]
-    C --> D{Risk Found}
-    D -->|Yes| E[Activate Safe Mode]
-    D -->|No| F[Normal Mode]
-```
-
-## 10. Decentralized AI-Model Training (Federated Learning)
-
-Training shape:
-- Local logistic training on each vehicle
-- Share only weight deltas
-- Prototype aggregation + outlier screening + DP noise
-- Validation Level: Prototype sanity check
-- Byzantine Robustness Claim: Not supported by current test
-- Dataset Size: 24 test samples
-- Trial Count: 1
-
-
-```math
-\begin{aligned}
-\hat{y}&=\sigma(Xw),\quad \sigma(x)=\frac{1}{1+e^{-x}}\\
-\nabla_w&=\frac{X^T(\hat{y}-y)}{n},\quad w\leftarrow w-\eta\nabla_w\\
-\Delta'&=
-\begin{cases}
-\Delta, & \|\Delta\|_2\le c \\
-\Delta\cdot\frac{c}{\|\Delta\|_2}, & \|\Delta\|_2>c
-\end{cases}
-\end{aligned}
-```
-
-- First formula is logistic prediction used by local obstacle-risk model.
-- Second formula is SGD update rule for local training.
-- Third formula is norm clipping for limiting extreme client updates. Current validation covers only a small sanity check and does not prove Byzantine robustness.
-
-```mermaid
-flowchart TD
-    A[Local Samples] --> B[Feature Extraction]
-    B --> C[Local SGD]
-    C --> D[Clip And Add DP Noise]
-    D --> E[Publish Delta On Chain]
-    E --> F[Trainer Aggregate]
-    F --> G[Global Model Broadcast]
-```
-
-## 11. Self-Healing Blockchain (Pruning + Sharding)
-
-Core behavior:
-- Archive old blocks into shards
-- Keep root hash and anchor metadata on-chain
-- Build and verify cross-shard proof
-- Checkpoint state snapshots
-
-
-```math
-\begin{aligned}
-leaf_i&=SHA3\text{-}256(index\parallel block_{hash}\parallel telemetry_{hash}\parallel event_{hash}\parallel previous_{hash})\\
-root&=Merkle(leaf_1,leaf_2,\dots,leaf_n)
-\end{aligned}
-```
-
-- Leaf hash encodes each archived block into tamper-evident shard element.
-- Merkle root anchors entire shard compactly on-chain for later proof verification.
-
-```mermaid
-flowchart TD
-    A[Old Blocks] --> B[Build Shard]
-    B --> C[Compute Merkle Root]
-    C --> D[Write Archive Node]
-    D --> E[Store Signed Anchor]
-    E --> F[Checkpoint Update]
-```
-
-## 12. Platooning Security with Proof-of-Proximity (PoP)
-
-PoP rule:
-- Own distance must be in range
-- Neighbor confirmations must pass confidence threshold
-- Approval bound to proof hash in block metadata
-
-
-```math
-\begin{aligned}
-own_{valid}&=(d_{own}\in[d_{min},d_{max}])\\
-participants&=(1\text{ if }own_{valid}\text{ else }0)+N_{selected}\\
-approved&=own_{valid}\land(participants\ge required_{participants})
-\end{aligned}
-```
-
-- Own-valid checks physical range condition for platoon safety.
-- Participants counts own vehicle plus trusted nearby confirmations.
-- Approved defines final PoP consensus rule for block acceptance.
-
-```mermaid
-flowchart TD
-    A[Collect Own Distance] --> B[Collect Peer Observations]
-    B --> C[Filter By Range And Confidence]
-    C --> D[Count Participants]
-    D --> E{Approval Rule Satisfied}
-    E -->|Yes| F[PoP Approved]
-    E -->|No| G[PoP Blocked]
-```
-
-## 13. Owner Recovery Mode
-
-Flow:
-- Validate recovery key hash
-- If chain valid then unlock
-- If compromised and policy allows, force reset to genesis
-
-
-```math
-\begin{aligned}
-provided_{hash}&=SHA3\text{-}256(recovery_{key})\\
-valid_{key}&\iff provided_{hash}=stored_{owner\_recovery\_hash}
-\end{aligned}
-```
-
-- Recovery key is never compared in plaintext, only by hash equality.
-- Valid hash unlocks owner recovery flow and optional controlled chain reset path.
-
-```mermaid
-flowchart TD
-    A[Owner Recovery Request] --> B[Verify Recovery Key Hash]
-    B --> C{Valid Key}
-    C -->|No| D[Reject]
-    C -->|Yes| E{Chain Healthy}
-    E -->|Yes| F[Unlock]
-    E -->|No| G{Force Reset Allowed}
-    G -->|Yes| H[Reset To Genesis And Unlock]
-    G -->|No| I[Reject]
-```
-
-## 14. Function-wise Math and Mermaid
-
-
-### `blockchain.py`
-
-#### `dual_hash(data)`
-
-```text
-sha2 = SHA2-256(data)
-sha3 = SHA3-256(data)
-combined = SHA2-256(data + sha3)
-```
-
-```mermaid
-flowchart TD
-    A[Input Data] --> B[SHA2 Hash]
-    A --> C[SHA3 Hash]
-    A --> D[Concat Data And SHA3]
-    D --> E[Chained SHA2 Hash]
-```
-
-#### `compute_block_hash(...)`
-
-```text
-raw = index || timestamp || vehicle_id || telemetry_hash_sha3 || event_hash_sha3 || previous_hash
-block_hash = SHA3-256(raw)
-```
-
-```mermaid
-flowchart TD
-    A[Block Fields] --> B[Concatenate]
-    B --> C[SHA3 Hash]
-    C --> D[Block Hash]
-```
-
-#### `poa_sign_block(...)`
-
-```text
-payload = block_hash || "|" || validator_id || "|" || authority_round
-poa_signature = HMAC-SHA256(validator_key, payload)
-```
-
-```mermaid
-flowchart TD
-    A[Block Hash Validator Round] --> B[Build Payload]
-    B --> C[HMAC SHA256]
-    C --> D[POA Signature]
-```
-
-#### `Block.compute_hashes(...)`
-
-```text
-telemetry_hash_sha2 = SHA2-256(telemetry_string)
-telemetry_hash_sha3 = SHA3-256(telemetry_string)
-event_hash_sha2 = SHA2-256(event_data)
-event_hash_sha3 = SHA3-256(event_data)
-dual_hash_combined = SHA2-256(block_hash) || ":" || SHA3-256(block_hash)
-biometric_hash_sha3 = SHA3-256(heart_rate|drowsiness|unwell_flag)
-```
-
-```mermaid
-flowchart TD
-    A[Telemetry And Event] --> B[Telemetry Event Hashes]
-    B --> C[Compute Block Hash]
-    C --> D[Build Dual Hash]
-    A --> E[Build Biometric String]
-    E --> F[Biometric SHA3 Hash]
-```
-
-#### `SmartCarCrypto.encrypt(plaintext)`
-
-```text
-key = PBKDF2-HMAC-SHA256(password, salt, 100000, 64 bytes)
-ciphertext = plaintext XOR keystream
-mac = HMAC-SHA256(mac_key, nonce || ciphertext)
-package = base64(nonce || mac || ciphertext)
-```
-
-```mermaid
-flowchart TD
-    A[Plaintext] --> B[Generate Keystream]
-    B --> C[XOR Encrypt]
-    C --> D[Compute HMAC]
-    D --> E[Encode Base64 Package]
-```
-
-#### `SmartCarCrypto.decrypt(encrypted_b64)`
-
-```text
-expected_mac = HMAC-SHA256(mac_key, nonce || ciphertext)
-if mac != expected_mac => reject
-plaintext = ciphertext XOR keystream
-```
-
-```mermaid
-flowchart TD
-    A[Encrypted Package] --> B[Decode Parts]
-    B --> C[Recompute HMAC]
-    C --> D{HMAC Match}
-    D -->|No| E[Reject]
-    D -->|Yes| F[XOR Decrypt]
-```
-
-### `zkp_privacy.py`
-
-#### `commit(value, blind)`
-
-```text
-C = (G^(value mod Q) * H^r) mod P
-```
-
-```mermaid
-flowchart TD
-    A[Value And Blind] --> B[Power Terms]
-    B --> C[Mod Multiply]
-    C --> D[Commitment]
-```
-
-#### `prove_knowledge(...)`
-
-```text
-t  = (G^k1 * H^k2) mod P
-ch = H(commitment|t|context) mod Q
-s1 = (k1 + ch*value) mod Q
-s2 = (k2 + ch*blind) mod Q
-```
-
-```mermaid
-flowchart TD
-    A[Random Secrets] --> B[Compute T]
-    B --> C[Compute Challenge]
-    C --> D[Compute Responses]
-    D --> E[Proof Output]
-```
-
-#### `verify_knowledge(...)`
-
-```text
-lhs = (G^s1 * H^s2) mod P
-rhs = (t * commitment^ch) mod P
-valid = (lhs == rhs)
-```
-
-```mermaid
-flowchart TD
-    A[Proof And Commitment] --> B[Compute Challenge]
-    B --> C[Compute Left Side]
-    B --> D[Compute Right Side]
-    C --> E{Sides Equal}
-    D --> E
-```
-
-#### `create_speed_limit_proof(...)`
-
-```text
-speed = round(speed_kmh), speed >= 0
-diff = limit - speed
-relation_blind = (r_speed + r_diff) mod Q
-```
-
-```mermaid
-flowchart TD
-    A[Speed And Limit] --> B[Compute Diff]
-    B --> C[Commit Speed]
-    B --> D[Commit Diff]
-    C --> E[Speed Proof]
-    D --> F[Diff Proof]
-    C --> G[Relation Blind]
-    D --> G
-```
-
-#### `verify_speed_limit_proof(...)`
-
-```text
-lhs = (commit_speed * commit_diff) mod P
-rhs = (G^limit * H^relation_blind) mod P
-valid = proof_speed_ok AND proof_diff_ok AND (lhs == rhs)
-```
-
-```mermaid
-flowchart TD
-    A[Proof Object] --> B[Verify Speed Proof]
-    A --> C[Verify Diff Proof]
-    A --> D[Verify Relation]
-    B --> E{All Valid}
-    C --> E
-    D --> E
-```
-
-### `anomaly_detector.py`
-
-#### `_mean_std(key)`
-
-```text
-mean = sum(vals)/n
-var  = sum((v-mean)^2)/(n-1)
-std  = sqrt(var)
-```
-
-```mermaid
-flowchart TD
-    A[History Values] --> B[Mean]
-    B --> C[Variance]
-    C --> D[Standard Deviation]
-```
-
-#### `detect_telemetry(telemetry)`
-
-```text
-z = |(x-mean)/std|
-zsum = z_speed + z_accel + z_temp + z_rpm
-score += zsum/4 + rule_based_penalties
-is_anomaly = (score >= threshold) OR (reason_count >= 2)
-```
-
-```mermaid
-flowchart TD
-    A[Input Telemetry] --> B[Rule Penalties]
-    A --> C[Z Score Features]
-    B --> D[Total Score]
-    C --> D
-    D --> E{Anomaly Decision}
-```
-
-### `edge_layer.py`
-
-#### `_avg(vals)`
-
-```text
-avg = sum(vals)/len(vals)
-```
-
-```mermaid
-flowchart TD
-    A[Value List] --> B[Sum Values]
-    A --> C[Count Values]
-    B --> D[Divide]
-    C --> D
-```
-
-#### `_flush(event_hint)`
-
-```text
-speed      = avg(speed_vals)
-obstacle   = min(obs_vals)
-brake      = max(brake_vals)
-drowsiness = max(drowsy_vals)
-```
-
-```mermaid
-flowchart TD
-    A[Buffered Telemetry] --> B[Extract Vectors]
-    B --> C[Average Metrics]
-    B --> D[Minimum Metrics]
-    B --> E[Maximum Metrics]
-    C --> F[Summary Output]
-    D --> F
-    E --> F
-```
-
-### `vehicle_sensors.py`
-
-#### `GPSSimulator.update(speed_kmh, heading_change)`
-
-```text
-speed_ms = speed_kmh / 3.6
-d = speed_ms * dt / 111111
-lat += d * cos(heading_rad)
-lon += d * sin(heading_rad)
-```
-
-```mermaid
-flowchart TD
-    A[Speed Heading] --> B[Convert To Meter Per Second]
-    B --> C[Compute Angular Distance]
-    C --> D[Update Latitude]
-    C --> E[Update Longitude]
-```
-
-#### `EngineSimulator.update(throttle, dt)`
-
-```text
-target_rpm = 800 + (throttle/100)*6200
-rpm += (target_rpm - rpm)*0.1
-fuel -= (0.00001 + throttle*0.000005)*dt
-oil_pressure = 3.5 + (rpm/6000)*1.5 + noise
-```
-
-```mermaid
-flowchart TD
-    A[Throttle And Delta Time] --> B[Target RPM]
-    B --> C[Smooth RPM]
-    A --> D[Fuel Consumption]
-    C --> E[Oil Pressure]
-```
-
-#### `EmergencyBrakeController._on_obstacle_detected(obstacle)`
-
-```text
-if distance < 30m: brake_pressure = 100
-else brake_pressure = (1 - distance/100)*100
-```
-
-```mermaid
-flowchart TD
-    A[Obstacle Distance] --> B{Emergency Zone}
-    B -->|No| C[No Brake]
-    B -->|Yes| D{Critical Zone}
-    D -->|Yes| E[Full Brake]
-    D -->|No| F[Linear Brake]
-```
-
-### `dashboard.py`
-
-#### `_estimate_distance(box_h)`
-
-```text
-distance_m = (1.70 * 850.0) / box_h
-```
-
-```mermaid
-flowchart TD
-    A[Bounding Box Height] --> B[Distance Formula]
-    B --> C[Estimated Meter]
-```
-
-#### `_draw_speedometer()`
-
-```text
-angle_deg = 162 - (speed/220)*144
-needle_x = cx + (r-30)*cos(angle)
-needle_y = cy - (r-30)*sin(angle)
-```
-
-```mermaid
-flowchart TD
-    A[Current Speed] --> B[Clamp Speed]
-    B --> C[Compute Needle Angle]
-    C --> D[Compute Cos And Sin]
-    D --> E[Needle Position]
-```
-
-#### `_update_model()`
-
-```text
-target_speed = throttle * 1.6
-speed += (target_speed - speed) * 0.12
-rpm = 900 + speed * 36
-odometer += (speed / 3600) * 0.08
-risk = 0.01 + emergency_term + detection_term + obstacle_term + overspeed_term + noise
-```
-
-```mermaid
-flowchart TD
-    A[Throttle And Current State] --> B[Update Speed]
-    B --> C[Update RPM Temp Fuel Odometer]
-    C --> D[Compute Risk Score]
-    D --> E[Append Anomaly History]
-```
-
-### `federated_learning.py`
-
-#### `_sigmoid(x)`
-
-```text
-sigmoid(x) = 1 / (1 + exp(-clip(x,-40,40)))
-```
-
-```mermaid
-flowchart TD
-    A[Input Vector] --> B[Clip Input]
-    B --> C[Exponential]
-    C --> D[Sigmoid Output]
-```
-
-#### `FederatedObstacleLearner._extract_features(telemetry)`
-
-```text
-speed_norm = clip(speed/180, 0, 1)
-accel_norm = clip(|accel|/12, 0, 1)
-brake_norm = clip(brake/100, 0, 1)
-temp_norm  = clip((temp-60)/60, 0, 1)
-near_obstacle = 1 if distance<=35 else 0
-hr_risk = 1 if hr<=45 or hr>=140 else 0
-```
-
-```mermaid
-flowchart TD
-    A[Telemetry] --> B[Normalize Continuous Features]
-    A --> C[Compute Threshold Features]
-    B --> D[Feature Vector]
-    C --> D
-```
-
-#### `FederatedObstacleLearner._train_batch(x,y,epochs)`
-
-```text
-logits = Xw
-pred = sigmoid(logits)
-grad = X^T(pred - y)/n
-w = w - lr*grad
-loss = -mean(y*log(pred)+(1-y)*log(1-pred))
-```
-
-```mermaid
-flowchart TD
-    A[Input Batch] --> B[Forward Pass]
-    B --> C[Gradient]
-    C --> D[Weight Update]
-    D --> E[Loss Value]
-```
-
-#### `FederatedObstacleLearner._clip_delta(delta, clip_norm)`
-
-```text
-n = ||delta||2
-if n > c: delta = delta * (c/n)
-```
-
-```mermaid
-flowchart TD
-    A[Delta Vector] --> B[Norm]
-    B --> C{Above Clip}
-    C -->|Yes| D[Scale Delta]
-    C -->|No| E[Keep Delta]
-```
-
-#### `FederatedTrainer._mad_filter(vals,k)`
-
-```text
-med = median(vals)
-mad = median(|vals - med|) + 1e-9
-z = |vals - med| / mad
-keep = z <= k
-```
-
-```mermaid
-flowchart TD
-    A[Norm Values] --> B[Median]
-    B --> C[MAD]
-    C --> D[Robust Score]
-    D --> E[Keep Mask]
-```
-
-#### `FederatedTrainer._robust_weighted_trimmed_mean(...)`
-
-```text
-sort each feature column
-trim lowest/highest ratio
-output_j = sum(col_j * weight_j)/sum(weight_j)
-```
-
-```mermaid
-flowchart TD
-    A[Client Deltas And Weights] --> B[Sort Per Feature]
-    B --> C[Trim Tails]
-    C --> D[Weighted Mean]
-    D --> E[Aggregated Delta]
-```
-
-### `v2x_protocol.py`
-
-#### `DynamicCryptoAgilityLayer._agility_score(recommended_mode)`
-
-```text
-avg_rtt = mean(rtt_history)
-mps = msg_count / window_sec
-latency_component = min(1, avg_rtt/latency_hi_ms)
-traffic_component = min(1, mps/traffic_hi_mps)
-score = wL*latency_component + wT*traffic_component
-```
-
-```mermaid
-flowchart TD
-    A[RTT History] --> B[Latency Component]
-    C[Message History] --> D[Traffic Component]
-    B --> E[Weighted Score]
-    D --> E
-```
-
-#### `DynamicCryptoAgilityLayer.maybe_switch_mode(...)`
-
-```text
-if mode=DILITHIUM and score>=up_thr -> target=SHA3
-if mode=SHA3 and score<=down_thr -> target=DILITHIUM
-switch only after confirm_count and switch_interval_sec
-```
-
-```mermaid
-flowchart TD
-    A[Current Mode And Score] --> B[Target Mode]
-    B --> C[Confirmation Counter]
-    C --> D{Ready To Switch}
-    D -->|Yes| E[Switch Mode]
-    D -->|No| F[Keep Mode]
-```
-
-#### `V2XHub._recommend_crypto_mode()`
-
-```text
-score = 0.5*traffic_ratio + 0.3*client_load_ratio + 0.2*latency_ratio
-mode = SHA3 if score>=0.66 else DILITHIUM
-```
-
-```mermaid
-flowchart TD
-    A[Messages Per Second] --> B[Traffic Ratio]
-    C[Client Count] --> D[Load Ratio]
-    E[Latency Hint] --> F[Latency Ratio]
-    B --> G[Weighted Score]
-    D --> G
-    F --> G
-    G --> H[Choose Crypto Mode]
-```
-
-### `network_overhead_analysis.py`
-
-#### `analyze()`
-
-```text
-overhead_pct = ((protocol_bytes - plain_bytes) / plain_bytes) * 100
-```
-
-Applied for:
-- `protocol_no_mac_bytes`
-- `protocol_hmac_bytes`
-- `encrypted_hmac_bytes`
-
-```mermaid
-flowchart TD
-    A[Plain Bytes] --> B[Protocol Bytes]
-    B --> C[Subtract]
-    A --> D[Divide]
-    C --> D
-    D --> E[Multiply By Hundred]
-```
-
-### `did_identity.py`
-
-#### `_msg_bits(message)`
-
-```text
-digest = SHA3-256(message)
-bits[i] = (byte >> shift) & 1
-```
-
-```mermaid
-flowchart TD
-    A[Message] --> B[SHA3 Digest Bytes]
-    B --> C[Bit Extraction]
-    C --> D[Bit Vector]
-```
-
-#### `verify_did_proof(challenge, proof, did_document)`
-
-```text
-challenge_hash == SHA3-256(challenge)
-for each i: SHA3(signature[i]) == public_pairs[i][bit_i]
-```
-
-```mermaid
-flowchart TD
-    A[Challenge Proof Document] --> B[Challenge Hash Check]
-    B --> C[Lamport Verify Loop]
-    C --> D{All Matched}
-```
-
-
-#### `blockchain.py::LocalStorageCipher.encrypt_payload(payload)`
-
-```text
-key = PBKDF2-HMAC-SHA256(passphrase, salt, iterations, 32 bytes)
-ciphertext = AES-256-GCM(key, nonce, plaintext, aad)
-```
-
-#### `blockchain.py::_archive_shard_root(blocks)`
-
-```text
-leaf_i = SHA3-256(index|block_hash|telemetry_hash|event_hash|previous_hash)
-parent = SHA3-256(left || right)
-repeat until single root hash
-```
-
-#### `blockchain.py::_build_merkle_proof(...)` and `_verify_merkle_proof(...)`
-
-```text
-proof step = {position, sibling_hash}
-verify by iterative hashing from leaf to root
-```
-
-#### `blockchain.py::_evaluate_pop_consensus(...)`
-
-```text
-own_valid = min_dist <= own_distance <= max_dist
-participants = (1 if own_valid else 0) + selected_neighbor_count
-approved = own_valid AND participants >= required_participants
-```
-
-#### `dashboard.py::_refresh_v2x_nodes()`
-
-```text
-ang  = (now * (0.6 + i*0.08) + i*0.9) mod (2*pi)
-dist = 0.2 + ((sin(now*0.3 + i) + 1) * 0.35)
-```
-
-
-
-## 15. Full System Chain Connect Mermaid
 ```mermaid
 flowchart LR
-    S1[Vehicle Sensors] --> S2[Edge Layer]
-    S2 --> S3[Anomaly Detector]
-    S2 --> S4[ZKP Privacy]
-    S3 --> S5[Blockchain Core]
-    S4 --> S5
-    S5 --> S6[Smart Contracts]
-    S5 --> S7[Forensic Blackbox]
-    S5 --> S8[Federated Learning]
-    S5 --> S9[Pruning And Sharding]
-    S5 --> S10[PoP Validation]
-    S5 --> S11[DID Verification]
-    S5 --> S12[Encrypted Local Storage]
-    S5 --> S13[V2X Protocol]
-    S13 --> S14[V2X Hub And Peer Nodes]
-    S5 --> S15[Dashboard UI]
-    S15 --> S16[Owner Recovery And Control]
+    L1[Vehicle sensing / input validation] --> L2[Authenticated session and key establishment]
+    L2 --> L3[Privacy / identity]
+    L3 --> L35[Federated-learning research]
+    L35 --> L4[Blockchain / forensic / anomaly / policy]
+    L4 --> L5[API / dashboard / runtime monitoring]
 ```
 
-## 16. Full System Description
-OmniGuard V2X is a full-stack smart-vehicle security platform where telemetry enters through sensor and hardware interfaces, gets filtered and summarized at edge, is validated for anomaly and privacy, and is committed to a PoA-based blockchain with optional PoP constraints. The system keeps dual-hash block integrity, cryptographically signs validation rounds, and stores sensitive state with encryption-at-rest.
+## Permissioned Identity and Consensus Boundary
 
-On top of core chain integrity, the platform adds forensic blackbox packaging for incident response, biometric risk-aware safe-mode enforcement, DID-based identity checks, and dynamic smart-contract triggers for automated policy actions. In networked operation, nodes communicate through hardened sync and V2X channels that support dynamic cryptographic agility and post-quantum aware handshake paths.
+Normal configuration uses explicit identity admission and permissioned validator membership. Lamport DID proves identity-key authenticity; it does not itself provide Sybil resistance. Sybil resistance depends on external enrollment/governance such as a manufacturer or transportation-authority registry.
 
-For long-term resilience, self-healing storage applies pruning, sharding, signed shard anchors, and checkpointed trust verification. In parallel, federated learning allows decentralized on-vehicle model improvement while sharing only clipped and protected updates. Its current validation remains a small-scale FL sanity check, not a fleet-scale robustness result.
+Dual-hash chaining provides tamper evidence for historical mutation, but it does not prevent forward control by a sufficiently large malicious authorized validator coalition. Production consensus requires an explicit trust/governance model beyond the prototype.
 
-## Run
+## Secure Local Setup
+
+### Prerequisites
+
+- Python 3.10+
+- Go 1.22+ for normal source-based Go backend development
+- CMake + C++17 toolchain for native builds
+- OpenSSL 3.x development libraries for native cryptography
+- liboqs 0.16.0 or the repository-pinned liboqs fetch path for native PQC builds
+
+Create a Python environment and install project dependencies:
+
+```bash
+python -m venv .venv
+```
+
+Windows PowerShell:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+```
+
+Linux/macOS shell:
+
+```bash
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+### Generate local credentials
+
+A fresh checkout must not rely on embedded secret defaults. Run:
+
+```bash
+python scripts/bootstrap_local_env.py
+```
+
+The bootstrap script:
+
+- creates/repairs the gitignored `.env`;
+- generates independent high-entropy values only for missing managed credentials;
+- preserves existing non-empty credentials by default;
+- keeps insecure secret defaults disabled;
+- never prints secret values.
+
+To intentionally rotate every managed local credential:
+
+```bash
+python scripts/bootstrap_local_env.py --rotate-all
+```
+
+A full rotation changes the Go API credential. If an older project-owned Go backend is still listening on `127.0.0.1:8787`, the new dashboard correctly rejects it until that verified stale project process is stopped. See `INITIAL_SETUP.md` for the safe Windows recovery procedure.
+
+### Start the dashboard
+
 ```bash
 python main.py
 ```
 
-Optional demos:
-```bash
-python multi_car_majority_demo.py
-python v2x_demo_nodes.py
-python pqc_kyber_handshake_test.py
-python attacker_fake_zkp.py
-python zkp_latency_report.py
-python network_overhead_analysis.py
-python decentralized_fl_demo.py
-python fl_trainer_node.py
+The default backend is Go and remains loopback-only.
+
+## Go Runtime Selection
+
+Normal development uses:
+
+```text
+SMARTCAR_BACKEND=go
+SMARTCAR_GO_API_URL=http://127.0.0.1:8787
+SMARTCAR_GO_RUNTIME_MODE=auto
+SMARTCAR_GO_STARTUP_TIMEOUT_SEC=45
+SMARTCAR_BACKEND_ALLOW_PYTHON_FALLBACK=0
 ```
+
+`SMARTCAR_GO_RUNTIME_MODE=auto` prefers the checked-out `api/go` source when the Go toolchain is available. This prevents an older local `build/smartcar_go_backend.exe` from silently taking precedence after source updates. A compatible prebuilt backend is used only when appropriate.
+
+Explicit modes:
+
+```text
+SMARTCAR_GO_RUNTIME_MODE=source
+SMARTCAR_GO_RUNTIME_MODE=prebuilt
+```
+
+Backend startup diagnostics are written to:
+
+```text
+logs/processes/go-backend.log
+```
+
+The log start marker records `runtime=source` or `runtime=prebuilt`.
+
+## Native v3.0.3 Build
+
+The supported native target is `native/secure_blockchain_v303.cpp`. The historical simulated-PQC `blockchain.cpp` path has been removed from the supported build graph.
+
+Example reproducible validation-style configure:
+
+```bash
+cmake -S . -B build/native-real \
+  -DSMARTCAR_FETCH_PINNED_LIBOQS=ON \
+  -DSMARTCAR_BUILD_PQC_KEYSTORE_SELFTEST=ON \
+  -DSMARTCAR_BUILD_PQC_KEY_ADMIN=ON \
+  -DSMARTCAR_BUILD_PQC_TRUST_ADMIN=ON \
+  -DSMARTCAR_BUILD_PQC_HISTORY_VERIFY=ON \
+  -DSMARTCAR_BUILD_PQC_STATE_ADMIN=ON \
+  -DSMARTCAR_ENABLE_NATIVE_OPT=OFF \
+  -DSMARTCAR_ENABLE_UNSAFE_FAST_MATH=OFF \
+  -DSMARTCAR_ENABLE_IPO=OFF \
+  -DSMARTCAR_BUILD_CAMERA_MODULE=OFF
+
+cmake --build build/native-real --config Release --parallel 2
+```
+
+The pinned liboqs source identity is recorded in `CMakeLists.txt`. The supported native build fails closed when real liboqs is unavailable.
+
+## PKCS#11 v3.2 Adapter
+
+The PKCS#11 provider is opt-in at compile time:
+
+```bash
+cmake -S . -B build/pkcs11 \
+  -DSMARTCAR_FETCH_PINNED_LIBOQS=ON \
+  -DSMARTCAR_ENABLE_PKCS11_PROVIDER=ON \
+  -DSMARTCAR_BUILD_CAMERA_MODULE=OFF
+```
+
+Runtime configuration is documented in `.env.example`. A PKCS#11 request does not imply hardware-backed protection by itself. The adapter must verify the real module/token, hardware slot, ML-DSA/ML-KEM mechanisms, non-exportable private-key policy, non-exportable derived-secret handling, commitment support, and guarded rotation capability. Failure at any required evidence step is fail-closed; an explicit hardware request never silently falls back to the software keystore.
+
+Hosted CI validates the PKCS#11 v3.2 source/ABI boundary against canonical OASIS headers. It does not claim validation of a specific production token or HSM.
+
+## Durable PQC Identity and Rotation
+
+The software PQC lifecycle includes:
+
+- encrypted ML-DSA-44 / ML-KEM-512 private material;
+- stable active key IDs;
+- explicit local rotation confirmation;
+- encrypted previous-keystore backup;
+- signed old-to-new transition evidence;
+- bounded historical public-key trust;
+- no silent historical-generation eviction.
+
+Historical private keys are not retained as an always-active key set. Historical ML-DSA signatures can be verified after explicit trust admission, while historical ML-KEM shared-secret claims are not independently re-decapsulated.
+
+## Rollback and Recovery Boundary
+
+`OMNIGUARD_PQC_ROLLBACK_ANCHOR_V1` binds local identity generation, active key ID, trust-keyring head and previous anchor state using an authenticated local record.
+
+This mechanism is not a TPM monotonic counter and is not externally immutable. If an attacker can roll back the anchor, keystore and trust keyring together, local state alone cannot prove the rollback. Hardware monotonic counters, WORM storage or remote transparency checkpoints remain future deployment work.
+
+Recovery checks never automatically restore an historical private identity. Operator-controlled recovery remains explicit.
+
+## Validation and CI
+
+Three workflows form the exact-main pre-tag gate for v3.0.3:
+
+- **Security Baseline** — Python regression suites, secret scan, release identity, integrity manifest, SBOM/provenance, adversarial/HIL/incident validation, real-PQC native build/self-tests, mixed-generation validation, rollback/recovery validation, Go tests/fuzzing and Linux validation packaging.
+- **PKCS11 Source Conformance** — canonical OASIS PKCS#11 v3.2 headers, strict provider compilation and hardware-truthfulness checks.
+- **Windows Runtime Smoke** — credential-bootstrap/readiness regressions, fresh Windows Go backend build, HMAC-authenticated real-process health/chain verification and loopback cleanup.
+
+The guarded v3.0.3 tag path refuses to create the tag unless all three workflows are `completed/success` for the exact current `main` commit.
+
+After tagging, `.github/workflows/release-v3.0.3.yml` regenerates validation evidence from the tagged commit and publishes only the verified package.
+
+## Release Evidence
+
+The v3.0.3 validation/publication pipeline produces:
+
+- release integrity manifest bound to the exact commit;
+- CycloneDX repository-declared SBOM;
+- non-secret build provenance;
+- current-tree prohibited-secret scan;
+- adversarial validation report;
+- software-HIL security validation report;
+- incident-response validation report;
+- SHA-256 checksums for publication artifacts.
+
+Never publish `.env`, private keys, recovery/wrapping credentials, raw sensitive logs or unreviewed build directories.
+
+## Reviewer-Driven Corrections
+
+Reviewer-facing security claims have been narrowed and documented. Current paper claim status is:
+
+```text
+corrected_but_requires_new_experiments
+```
+
+Key corrections include:
+
+- no full post-quantum claim for the whole platform;
+- no Sybil-resistance claim from DID alone;
+- no majority-attack-resistance claim from dual hashing;
+- no general detection-rate headline from single-run sanity checks;
+- no unsupported Byzantine-robustness claim from the current small FL experiment;
+- no new cryptographic primitive claim;
+- no whole-system `O(n)` claim;
+- no secure-aggregation/statistics-recovery claim from Pedersen commitments alone.
+
+Current FL evaluation is a prototype sanity check and is **not statistically sufficient for Byzantine-robustness claims**. Larger peer counts, realistic attacks, multi-seed experiments and confidence intervals remain research work.
+
+The canonical active performance wording is **5.34 ms warm-start prototype pipeline latency** from the documented prototype environment; it is not a production SLA.
+
+See:
+
+- `docs/reviewer-issue-resolution-matrix.md`
+- `docs/security-assumptions.md`
+- `docs/identity-security-model.md`
+- `docs/consensus-threat-model.md`
+- `docs/adversarial-validation-limitations.md`
+- `docs/fl-validation-limitations.md`
+- `docs/complexity-analysis.md`
+- `docs/pedersen-aggregation-model.md`
+- `docs/metrics-source-of-truth.md`
+
+## Repository Layout
+
+```text
+.
+|-- main.py
+|-- dashboard.py
+|-- smartcar_backend.py
+|-- runtime_backend_patch.py
+|-- blockchain.py
+|-- sync_protocol.py
+|-- v2x_protocol.py
+|-- did_identity.py
+|-- zkp_privacy.py
+|-- federated_learning.py
+|-- smart_contracts.py
+|-- incident_response.py
+|-- api/
+|   `-- go/
+|       |-- main.go
+|       `-- release_version.go
+|-- native/
+|   |-- secure_blockchain_v303.cpp
+|   |-- pqc_key_store.cpp
+|   |-- pqc_trust_keyring.cpp
+|   |-- pqc_state_guard.cpp
+|   |-- pqc_pkcs11_provider.cpp
+|   `-- pkcs11_platform.h
+|-- scripts/
+|   |-- bootstrap_local_env.py
+|   |-- create_v3_0_3_tag.sh
+|   |-- ci_windows_go_backend_smoke.py
+|   |-- generate_sbom.py
+|   |-- generate_provenance.py
+|   `-- secret_scan.py
+|-- tests/
+|-- docs/
+|   |-- releases/
+|   `-- security/
+|-- .github/workflows/
+|-- INITIAL_SETUP.md
+|-- CHANGELOG.md
+|-- SECURITY.md
+|-- VERSION
+`-- CMakeLists.txt
+```
+
+## Research Limitations
+
+v3.0.3 does not claim:
+
+- production automotive deployment readiness;
+- ISO 26262 / ASIL certification;
+- formal verification;
+- absence of vulnerabilities;
+- protection against an authorized malicious validator supermajority;
+- production PKI/enrollment governance;
+- validated production custody on a specific TPM2/HSM/PKCS#11 token;
+- hardware monotonic rollback resistance;
+- fleet-scale Byzantine-robust federated learning;
+- a production-grade ZK range-proof system;
+- a fully post-quantum end-to-end architecture.
+
+## Documentation
+
+- Initial setup: `INITIAL_SETUP.md`
+- Security policy: `SECURITY.md`
+- Release notes: `docs/releases/v3.0.3.md`
+- Release checklist: `docs/releases/v3.0.3-checklist.md`
+- Supply-chain guidance: `docs/security/SUPPLY_CHAIN.md`
+- Historical credential remediation: `docs/security/HISTORY_REMEDIATION.md`
+- Changelog: `CHANGELOG.md`
+
+## License
+
+See `LICENSE`.
