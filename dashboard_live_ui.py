@@ -21,8 +21,6 @@ from dashboard import DashboardDataProvider
 from dashboard_vehicle_art import render_vehicle_hero
 
 
-# Richer production palette. Mutating the module-level palette is intentional: the
-# inherited shell reads these constants dynamically while preserving its structure.
 _LIVE_PALETTE = {
     "BG": "#030914",
     "TOPBAR": "#030914",
@@ -87,14 +85,37 @@ class LiveSocketSmartCarDashboard(pixel.PixelMatchedSmartCarDashboard):
         self._vehicle_photo_key = None
         super().__init__()
 
-        # Swap in the cache-aware provider after the inherited constructor has
-        # completed. Camera/detection state is then repopulated by the normal UI loop.
+        self._strip_manual_refresh_controls()
         self.provider = LiveDashboardDataProvider(self.blockchain, self.VEHICLE_ID)
         try:
             self.provider.set_camera_status(bool(self.cap and self.cap.isOpened()))
         except Exception:
             self.provider.set_camera_status(False, "camera unavailable")
         self._start_live_socket_bridge()
+
+    def _strip_manual_refresh_controls(self) -> None:
+        """Remove inherited manual-refresh affordances from the active live shell."""
+        page = getattr(self, "_reference_pages", {}).get("settings")
+        if page is None:
+            return
+
+        def walk(widget):
+            for child in list(widget.winfo_children()):
+                try:
+                    text = str(child.cget("text"))
+                except Exception:
+                    text = ""
+                if text == "Refresh Now":
+                    child.destroy()
+                    continue
+                if text == "Refresh Interval":
+                    try:
+                        child.configure(text="Live Update")
+                    except Exception:
+                        pass
+                walk(child)
+
+        walk(page)
 
     # ----------------------------------------------------------- live transport
 
@@ -128,7 +149,12 @@ class LiveSocketSmartCarDashboard(pixel.PixelMatchedSmartCarDashboard):
                         refresh()
                     snapshot = self.provider.collect()
 
-                payload = json.dumps(snapshot, ensure_ascii=False, separators=(",", ":"), default=str).encode("utf-8") + b"\n"
+                payload = json.dumps(
+                    snapshot,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                    default=str,
+                ).encode("utf-8") + b"\n"
                 tx = self._live_socket_tx
                 if tx is None:
                     return
@@ -137,7 +163,6 @@ class LiveSocketSmartCarDashboard(pixel.PixelMatchedSmartCarDashboard):
                     self._live_socket_connected = True
                     self._live_last_error = ""
                 except (socket.timeout, BlockingIOError):
-                    # The UI is busy. Drop this frame rather than blocking the backend.
                     pass
             except Exception as exc:
                 self._live_socket_connected = False
@@ -187,7 +212,6 @@ class LiveSocketSmartCarDashboard(pixel.PixelMatchedSmartCarDashboard):
                 self._render_snapshot(snapshot)
                 self._live_last_snapshot_at = now
             elif now - self._live_last_snapshot_at >= self.FALLBACK_COLLECT_INTERVAL_SEC:
-                # Fail-safe path if socketpair is unavailable or the collector faults.
                 with self._live_action_lock:
                     self._snapshot = self.provider.collect()
                 self._render_snapshot(self._snapshot)
@@ -201,7 +225,7 @@ class LiveSocketSmartCarDashboard(pixel.PixelMatchedSmartCarDashboard):
         self.after(self.LIVE_UI_INTERVAL_MS, self._update_ui)
 
     def manual_refresh(self) -> None:
-        """Compatibility hook: request an immediate source-backed frame, never a UI mode."""
+        """Compatibility-only immediate frame request; no active UI button calls this."""
         try:
             with self._live_action_lock:
                 refresh = getattr(self.blockchain, "_refresh", None)
@@ -211,7 +235,6 @@ class LiveSocketSmartCarDashboard(pixel.PixelMatchedSmartCarDashboard):
             self._render_snapshot(self._snapshot)
             self._live_last_snapshot_at = time.monotonic()
         except Exception:
-            # The normal live/fallback loop owns retry behavior.
             pass
 
     # --------------------------------------------------------------- visuals
@@ -232,7 +255,6 @@ class LiveSocketSmartCarDashboard(pixel.PixelMatchedSmartCarDashboard):
             canvas.delete("all")
             canvas.create_image(width / 2, height / 2, image=self._vehicle_photo, anchor="center")
         except Exception:
-            # Environments without Pillow retain the previous deterministic vector fallback.
             self._vehicle_photo = None
             self._vehicle_photo_key = None
             super()._draw_vehicle_art(canvas)
@@ -244,6 +266,15 @@ class LiveSocketSmartCarDashboard(pixel.PixelMatchedSmartCarDashboard):
                 self.backend_value_label.configure(text="LIVE • SOCKET", fg=pixel.GREEN)
             elif self._live_last_error:
                 self.backend_value_label.configure(text="Live fallback", fg=pixel.YELLOW)
+        settings = getattr(self, "settings_rows", {})
+        if "refresh" in settings:
+            settings["refresh"].configure(
+                text=(
+                    f"Socket • {int(self.LIVE_COLLECT_INTERVAL_SEC * 1000)} ms"
+                    if self._live_socket_connected
+                    else "Automatic fallback"
+                )
+            )
 
     # ------------------------------------------------------------- action lock
 
