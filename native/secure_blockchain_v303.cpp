@@ -3,6 +3,7 @@
 // authenticated data-at-rest, explicit trust history, and optional rollback anchor.
 
 #include "pqc_key_store.h"
+#include "pqc_runtime_provider_factory.h"
 #include "pqc_software_active_operations.h"
 #include "pqc_state_guard.h"
 #include "pqc_trust_keyring.h"
@@ -36,7 +37,6 @@ using json = nlohmann::json;
 using omniguard::PqcActivePrivateOperations;
 using omniguard::PqcActivePublicState;
 using omniguard::PqcKeyMaterial;
-using omniguard::PqcKeyStore;
 using omniguard::PqcRollbackAnchor;
 using omniguard::PqcSensitiveBytes;
 using omniguard::PqcTrustKeyring;
@@ -610,7 +610,7 @@ public:
         const std::filesystem::path& keystore_path,
         const std::string& keystore_key
     ) : vehicle_id_(std::move(vehicle_id)), cipher_(data_key),
-        active_(PqcKeyStore(keystore_path, keystore_key, vehicle_id_).load_or_create()) {
+        active_(omniguard::make_runtime_pqc_private_operations(keystore_path, keystore_key, vehicle_id_)) {
         if (vehicle_id_.empty() || vehicle_id_.size() > 256 || active_.identity() != vehicle_id_) {
             throw std::runtime_error("native runtime vehicle/PQC identity binding is invalid");
         }
@@ -925,8 +925,13 @@ int main(int argc, char** argv) {
     try {
         const std::string data_key = require_env_secret("SMARTCAR_CPP_DATA_KEY");
         (void)require_env_secret("SMARTCAR_AUTH_TOKEN");
-        const std::string keystore_key = require_env_secret("SMARTCAR_CPP_PQC_KEYSTORE_KEY");
-        const std::filesystem::path keystore_path(require_env_value("SMARTCAR_CPP_PQC_KEYSTORE_PATH"));
+        const std::string requested_provider = omniguard::requested_pqc_provider_from_env();
+        std::string keystore_key;
+        std::filesystem::path keystore_path;
+        if (requested_provider == omniguard::kSoftwarePqcProvider) {
+            keystore_key = require_env_secret("SMARTCAR_CPP_PQC_KEYSTORE_KEY");
+            keystore_path = require_env_value("SMARTCAR_CPP_PQC_KEYSTORE_PATH");
+        }
 
         if (argc > 1 && std::string(argv[1]) == "--self-test") {
             return run_self_test(data_key, keystore_key, keystore_path);
