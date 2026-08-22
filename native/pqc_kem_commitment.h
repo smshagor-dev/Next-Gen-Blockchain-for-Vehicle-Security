@@ -3,23 +3,23 @@
 #include <cstddef>
 #include <stdexcept>
 #include <string>
-+
+
 #include <openssl/evp.h>
-+
+
 #include "pqc_sensitive_bytes.h"
-+
+
 namespace omniguard {
-+
+
 inline constexpr const char* kKemCommitmentLegacyV1 =
     "OMNIGUARD_ML_KEM_SHARED_SECRET_COMMITMENT_V1_SHA3_256_HEX";
 inline constexpr const char* kKemCommitmentRawV2 =
     "OMNIGUARD_ML_KEM_SHARED_SECRET_COMMITMENT_V2_SHA3_256_RAW";
-+
+
 struct PqcKemCommitment {
     std::string scheme;
     std::string digest_hex;
 };
-+
+
 inline bool is_lower_hex_256(const std::string& value) {
     if (value.size() != 64) return false;
     for (const char ch : value) {
@@ -27,7 +27,7 @@ inline bool is_lower_hex_256(const std::string& value) {
     }
     return true;
 }
-+
+
 inline std::string commitment_bytes_to_hex(const unsigned char* data, std::size_t size) {
     static constexpr char kHex[] = "0123456789abcdef";
     std::string output(size * 2, '0');
@@ -37,7 +37,7 @@ inline std::string commitment_bytes_to_hex(const unsigned char* data, std::size_
     }
     return output;
 }
-+
+
 inline std::string sha3_256_commitment_hex(
     const std::string& prefix,
     const unsigned char* secret,
@@ -47,12 +47,12 @@ inline std::string sha3_256_commitment_hex(
     if (prefix.empty() || secret == nullptr || secret_size == 0) {
         throw std::runtime_error("ML-KEM commitment input is incomplete");
     }
-+
+
     EVP_MD_CTX* context = EVP_MD_CTX_new();
     if (context == nullptr) {
         throw std::runtime_error("ML-KEM commitment digest context allocation failed");
     }
-+
+
     unsigned char digest[32]{};
     unsigned int digest_size = 0;
     bool ok = EVP_DigestInit_ex(context, EVP_sha3_256(), nullptr) == 1 &&
@@ -75,12 +75,12 @@ inline std::string sha3_256_commitment_hex(
         secure_zero_bytes(digest, sizeof(digest));
         throw std::runtime_error("ML-KEM commitment digest failed");
     }
-+
+
     const std::string output = commitment_bytes_to_hex(digest, sizeof(digest));
     secure_zero_bytes(digest, sizeof(digest));
     return output;
 }
-+
+
 inline PqcKemCommitment make_kem_commitment(
     const std::string& scheme,
     const std::string& prefix,
@@ -95,7 +95,7 @@ inline PqcKemCommitment make_kem_commitment(
     }
     throw std::runtime_error("unsupported ML-KEM shared-secret commitment scheme");
 }
-+
+
 inline void validate_kem_commitment(const PqcKemCommitment& commitment) {
     if (commitment.scheme != kKemCommitmentLegacyV1 && commitment.scheme != kKemCommitmentRawV2) {
         throw std::runtime_error("ML-KEM commitment scheme is unsupported");
@@ -104,5 +104,5 @@ inline void validate_kem_commitment(const PqcKemCommitment& commitment) {
         throw std::runtime_error("ML-KEM commitment digest is malformed");
     }
 }
-+
+
 }  // namespace omniguard
