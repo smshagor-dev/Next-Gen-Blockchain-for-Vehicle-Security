@@ -2,14 +2,16 @@
 
 This shell keeps the authenticated Go live-socket backend from ``dashboard_live_ui``
 but avoids destructive redraws for high-frequency dashboard widgets. Feed rows are
-allocated once and updated in place, and the transaction overview renders a cached,
-source-backed ledger-growth graph from real block timestamps.
+allocated once and updated in place, the transaction overview renders a cached,
+source-backed ledger-growth graph from real block timestamps, and the navigation
+sidebar is larger and user-resizable without affecting backend behavior.
 """
 
 from __future__ import annotations
 
 import tkinter as tk
 from datetime import datetime, timezone
+from tkinter import font
 from typing import Any, Dict, List, Sequence, Tuple
 
 import dashboard_reference_ui as reference
@@ -18,15 +20,88 @@ from dashboard_live_ui import LiveSocketSmartCarDashboard
 
 
 class StableLiveSmartCarDashboard(LiveSocketSmartCarDashboard):
-    """Live socket dashboard with non-destructive feeds and a persistent ledger graph."""
+    """Live socket dashboard with stable feeds, graphing, and resizable navigation."""
 
     TRANSACTION_GRAPH_WINDOW = 36
+    SIDEBAR_DEFAULT_WIDTH = 292
+    SIDEBAR_MIN_WIDTH = 220
+    SIDEBAR_MAX_WIDTH = 390
 
     def __init__(self) -> None:
         # These must exist before the inherited constructor performs its first render.
         self._stable_feed_slots: Dict[str, List[Dict[str, Any]]] = {}
         self._transaction_chart_signatures: Dict[str, Tuple[Any, ...]] = {}
+        self._sidebar_drag_start_x = 0
+        self._sidebar_drag_start_width = self.SIDEBAR_DEFAULT_WIDTH
+        self._sidebar_current_width = self.SIDEBAR_DEFAULT_WIDTH
         super().__init__()
+
+    # ---------------------------------------------------------- sidebar UX
+
+    def _setup_reference_fonts(self) -> None:
+        """Keep content typography unchanged while making navigation easier to read."""
+        super()._setup_reference_fonts()
+        self.f_sidebar_menu = font.Font(family="Segoe UI", size=11)
+        self.f_sidebar_group = font.Font(family="Segoe UI", size=9, weight="bold")
+        self.f_sidebar_status = font.Font(family="Segoe UI", size=9)
+
+    def _build_reference_sidebar(self) -> None:
+        """Build the inherited sidebar, then make it wider and drag-resizable."""
+        super()._build_reference_sidebar()
+        self._set_sidebar_width(self.SIDEBAR_DEFAULT_WIDTH)
+
+        for button in self._reference_buttons.values():
+            button.configure(font=self.f_sidebar_menu, padx=12, pady=11)
+
+        self._apply_sidebar_label_fonts(self.sidebar)
+
+        self._sidebar_resize_handle = tk.Frame(
+            self.sidebar,
+            bg="#1b3557",
+            width=7,
+            cursor="sb_h_double_arrow",
+        )
+        self._sidebar_resize_handle.place(relx=1.0, x=-7, y=0, relheight=1.0)
+        self._sidebar_resize_handle.bind("<Button-1>", self._on_sidebar_resize_start)
+        self._sidebar_resize_handle.bind("<B1-Motion>", self._on_sidebar_resize_drag)
+        self._sidebar_resize_handle.bind("<Double-Button-1>", self._on_sidebar_resize_reset)
+        self._sidebar_resize_handle.bind("<Enter>", lambda _e: self._sidebar_resize_handle.configure(bg="#456ea7"))
+        self._sidebar_resize_handle.bind("<Leave>", lambda _e: self._sidebar_resize_handle.configure(bg="#1b3557"))
+        self.after_idle(self._sidebar_resize_handle.lift)
+
+    def _apply_sidebar_label_fonts(self, widget: tk.Widget) -> None:
+        """Increase only navigation/group/status text, not dashboard content fonts."""
+        for child in widget.winfo_children():
+            try:
+                text = str(child.cget("text"))
+            except Exception:
+                text = ""
+            if isinstance(child, tk.Label):
+                if text in {"CORE", "SECURITY", "SYSTEM"}:
+                    child.configure(font=self.f_sidebar_group)
+                elif text in {"Checking runtime...", "Runtime partial", "Runtime connected", "Runtime not connected"}:
+                    child.configure(font=self.f_sidebar_status)
+            self._apply_sidebar_label_fonts(child)
+
+    def _set_sidebar_width(self, width: int) -> int:
+        bounded = max(self.SIDEBAR_MIN_WIDTH, min(int(width), self.SIDEBAR_MAX_WIDTH))
+        self._sidebar_current_width = bounded
+        if hasattr(self, "sidebar"):
+            self.sidebar.configure(width=bounded)
+            self.sidebar.pack_propagate(False)
+        return bounded
+
+    def _on_sidebar_resize_start(self, event: tk.Event) -> None:
+        self._sidebar_drag_start_x = int(event.x_root)
+        current = int(self.sidebar.winfo_width() or self._sidebar_current_width)
+        self._sidebar_drag_start_width = current
+
+    def _on_sidebar_resize_drag(self, event: tk.Event) -> None:
+        delta = int(event.x_root) - self._sidebar_drag_start_x
+        self._set_sidebar_width(self._sidebar_drag_start_width + delta)
+
+    def _on_sidebar_resize_reset(self, _event: tk.Event | None = None) -> None:
+        self._set_sidebar_width(self.SIDEBAR_DEFAULT_WIDTH)
 
     # ---------------------------------------------------------- stable feeds
 
