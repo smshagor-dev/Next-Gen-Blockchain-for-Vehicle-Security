@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "pkcs11_platform.h"
 #include "pqc_hardware_provider.h"
 
 namespace omniguard {
