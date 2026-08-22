@@ -64,6 +64,7 @@ jobs:
           python -m unittest -v tests.test_pqc_keystore_foundation
           python -m unittest -v tests.test_pqc_keystore_integration
           python -m unittest -v tests.test_pqc_key_rotation
+          python -m unittest -v tests.test_pqc_trust_history
 
       - name: Verify canonical release identity
         env:
@@ -121,6 +122,8 @@ jobs:
             -DSMARTCAR_FETCH_PINNED_LIBOQS=OFF \
             -DSMARTCAR_BUILD_PQC_KEYSTORE_SELFTEST=OFF \
             -DSMARTCAR_BUILD_PQC_KEY_ADMIN=OFF \
+            -DSMARTCAR_BUILD_PQC_TRUST_ADMIN=OFF \
+            -DSMARTCAR_BUILD_PQC_HISTORY_VERIFY=OFF \
             -DSMARTCAR_BUILD_LEGACY_CPP_DEMO=OFF \
             -DSMARTCAR_BUILD_CAMERA_MODULE=OFF \
             > build/native-strict.log 2>&1
@@ -139,6 +142,8 @@ jobs:
             -DSMARTCAR_BUILD_BLOCKCHAIN=OFF \
             -DSMARTCAR_BUILD_PQC_KEYSTORE_SELFTEST=OFF \
             -DSMARTCAR_BUILD_PQC_KEY_ADMIN=OFF \
+            -DSMARTCAR_BUILD_PQC_TRUST_ADMIN=OFF \
+            -DSMARTCAR_BUILD_PQC_HISTORY_VERIFY=OFF \
             -DSMARTCAR_BUILD_LEGACY_CPP_DEMO=ON \
             -DSMARTCAR_FORCE_PQC_UNAVAILABLE_FOR_TESTS=ON \
             -DSMARTCAR_ENABLE_NATIVE_OPT=OFF \
@@ -147,19 +152,27 @@ jobs:
             -DSMARTCAR_BUILD_CAMERA_MODULE=OFF
           cmake --build build/native-legacy --config Release --target smartcar_blockchain_legacy_demo --parallel 2
 
-      - name: Build pinned real-PQC native target, keystore self-test, and key admin
+      - name: Build pinned real-PQC native, keystore, rotation, and trust-history targets
         run: |
           cmake -S . -B build/native-real \
             -DSMARTCAR_FETCH_PINNED_LIBOQS=ON \
             -DSMARTCAR_BUILD_PQC_KEYSTORE_SELFTEST=ON \
             -DSMARTCAR_BUILD_PQC_KEY_ADMIN=ON \
+            -DSMARTCAR_BUILD_PQC_TRUST_ADMIN=ON \
+            -DSMARTCAR_BUILD_PQC_HISTORY_VERIFY=ON \
             -DSMARTCAR_BUILD_LEGACY_CPP_DEMO=OFF \
             -DSMARTCAR_ENABLE_NATIVE_OPT=OFF \
             -DSMARTCAR_ENABLE_UNSAFE_FAST_MATH=OFF \
             -DSMARTCAR_ENABLE_IPO=OFF \
             -DSMARTCAR_BUILD_CAMERA_MODULE=OFF
           grep -F "CMAKE_PROJECT_VERSION:STATIC=3.0.2" build/native-real/CMakeCache.txt
-          cmake --build build/native-real --config Release --target smartcar_blockchain smartcar_pqc_keystore_selftest smartcar_pqc_key_admin --parallel 2
+          cmake --build build/native-real --config Release --target \
+            smartcar_blockchain \
+            smartcar_pqc_keystore_selftest \
+            smartcar_pqc_key_admin \
+            smartcar_pqc_trust_admin \
+            smartcar_pqc_history_verify \
+            --parallel 2
 
       - name: Run secure native crypto self-test
         shell: bash
@@ -191,6 +204,106 @@ jobs:
             echo "Software PQC provider unexpectedly satisfied hardware-required policy."
             exit 1
           fi
+
+      - name: Run bounded PQC trust-keyring self-test
+        shell: bash
+        run: |
+          ./build/native-real/smartcar_pqc_trust_admin --self-test
+
+      - name: Run PQC historical trust end-to-end validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/pqc-history-e2e"
+          vehicle="SMARTCAR_PQC_HISTORY_E2E"
+          rm -rf "$root"
+          mkdir -p "$root"
+          export SMARTCAR_CPP_DATA_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          export SMARTCAR_AUTH_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          export SMARTCAR_CPP_PQC_KEYSTORE_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          export SMARTCAR_CPP_PQC_KEYSTORE_PATH="$root/active-keystore.json"
+          export SMARTCAR_CPP_PQC_TRUST_KEYRING_PATH="$root/trust-keyring.json"
+          export SMARTCAR_CPP_PQC_TRUST_MAX_GENERATIONS=8
+          export SMARTCAR_CPP_PQC_ROTATION_ENABLED=1
+          export SMARTCAR_CPP_PQC_HARDWARE_REQUIRED=0
+
+          ./build/native-real/smartcar_pqc_trust_admin init --identity "$vehicle" > "$root/root.json"
+          ./build/native-real/smartcar_blockchain "$vehicle" "$root/pre-rotation-ledger.json"
+
+          old_id="$(./build/native-real/smartcar_pqc_key_admin inspect --identity "$vehicle" | python -c 'import json,sys; print(json.load(sys.stdin)["key_id"])')"
+          ./build/native-real/smartcar_pqc_key_admin rotate \
+            --identity "$vehicle" \
+            --reason "hosted historical trust transition" \
+            --confirm "ROTATE:$old_id" \
+            --rotation-dir "$root/rotations" > "$root/rotation.json"
+          backup="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["backup_path"])' "$root/rotation.json")"
+          new_id="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["new_key_id"])' "$root/rotation.json")"
+
+          set +e
+          ./build/native-real/smartcar_pqc_history_verify verify \
+            --identity "$vehicle" \
+            --ledger "$root/pre-rotation-ledger.json" > "$root/pre-admission.json" 2> "$root/pre-admission.err"
+          pre_admission_status=$?
+          set -e
+          if [ "$pre_admission_status" -eq 0 ]; then
+            echo "Historical verification unexpectedly trusted a rotated key before explicit admission."
+            exit 1
+          fi
+
+          ./build/native-real/smartcar_pqc_trust_admin admit \
+            --identity "$vehicle" \
+            --previous-keystore "$backup" \
+            --reason "hosted historical trust transition" \
+            --confirm "ADMIT:$new_id" > "$root/admission.json"
+
+          ./build/native-real/smartcar_pqc_history_verify verify \
+            --identity "$vehicle" \
+            --ledger "$root/pre-rotation-ledger.json" > "$root/historical-report.json"
+          python - "$root/historical-report.json" <<'PY'
+          import json, sys
+          report = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert report["verified"] is True
+          assert report["historical_generation_blocks"] >= 1
+          assert report["trusted_generation_count"] == 2
+          assert report["historical_ml_dsa_authenticity_verified"] is True
+          assert report["historical_ml_kem_decapsulation_verified"] is False
+          assert report["historical_kem_private_keys_retained"] is False
+          PY
+
+          ./build/native-real/smartcar_blockchain "$vehicle" "$root/post-rotation-ledger.json"
+          ./build/native-real/smartcar_pqc_history_verify verify \
+            --identity "$vehicle" \
+            --ledger "$root/post-rotation-ledger.json" > "$root/current-report.json"
+          python - "$root/current-report.json" <<'PY'
+          import json, sys
+          report = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert report["verified"] is True
+          assert report["current_generation_blocks"] >= 1
+          assert report["current_ml_kem_decapsulation_verified"] is True
+          PY
+
+          python - "$root/pre-rotation-ledger.json" "$root/tampered-ledger.json" <<'PY'
+          import json, sys
+          source, target = sys.argv[1:]
+          ledger = json.load(open(source, encoding="utf-8"))
+          ledger[0]["event_data"] = "TAMPERED:HISTORICAL-EVENT"
+          json.dump(ledger, open(target, "w", encoding="utf-8"), indent=2)
+          PY
+          set +e
+          ./build/native-real/smartcar_pqc_history_verify verify \
+            --identity "$vehicle" \
+            --ledger "$root/tampered-ledger.json"
+          tampered_status=$?
+          set -e
+          if [ "$tampered_status" -eq 0 ]; then
+            echo "Tampered historical ledger unexpectedly passed verification."
+            exit 1
+          fi
+
+          mkdir -p security-reports/pqc-history
+          cp "$root/historical-report.json" security-reports/pqc-history/historical-report.json
+          cp "$root/current-report.json" security-reports/pqc-history/current-report.json
+          cp "$root/admission.json" security-reports/pqc-history/admission-metadata.json
 
       - name: Verify supported native runtime rejects hardware-required software PQC
         shell: bash
@@ -251,6 +364,15 @@ jobs:
             sha256sum smartcar_blockchain smartcar_go_backend VERSION v3.0.2.md release-integrity-manifest.json > SHA256SUMS
             sha256sum -c SHA256SUMS
           )
+
+      - name: Upload PQC historical trust reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pqc-historical-trust-validation
+          path: security-reports/pqc-history/
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Upload release integrity manifest
         if: always()
