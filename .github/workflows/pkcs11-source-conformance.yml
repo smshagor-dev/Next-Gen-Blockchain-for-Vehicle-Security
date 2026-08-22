@@ -8,6 +8,7 @@ on:
       - main
       - security/**
       - release/**
+      - ci/**
   workflow_dispatch:
 
 permissions:
