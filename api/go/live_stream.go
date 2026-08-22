@@ -78,11 +78,7 @@ func runLiveBridgeFromEnvironment() error {
 	if err := validateLiveStreamAddr(addr); err != nil {
 		return err
 	}
-	bridge := &liveBridge{
-		secret:  append([]byte(nil), secret...),
-		addr:    addr,
-		clients: make(map[*liveClient]struct{}),
-	}
+	bridge := &liveBridge{secret: append([]byte(nil), secret...), addr: addr, clients: make(map[*liveClient]struct{})}
 	return bridge.run()
 }
 
@@ -115,7 +111,6 @@ func (b *liveBridge) run() error {
 	}
 	defer listener.Close()
 	log.Printf("SmartCar live stream listening on %s (authenticated loopback socket)", b.addr)
-
 	go b.broadcastLoop()
 	for {
 		conn, err := listener.Accept()
@@ -168,21 +163,20 @@ func (b *liveBridge) authenticateClient(conn net.Conn) {
 		_ = conn.Close()
 		return
 	}
+	if err := encoder.Encode(liveHandshake{Type: "ready", Protocol: liveProtocolLabel}); err != nil {
+		_ = conn.Close()
+		return
+	}
 	_ = conn.SetDeadline(time.Time{})
+
 	client := &liveClient{conn: conn}
 	b.clientsM.Lock()
 	b.clients[client] = struct{}{}
 	b.clientsM.Unlock()
-
-	if err := encoder.Encode(liveHandshake{Type: "ready", Protocol: liveProtocolLabel}); err != nil {
-		b.removeClient(client)
-		return
-	}
 	if status, err := b.fetchStatus(); err == nil {
 		b.writeClient(client, liveEnvelope{Type: "status", Data: status})
 	}
 
-	// Keep the connection open and detect client shutdown without accepting commands.
 	_, _ = io.Copy(io.Discard, reader)
 	b.removeClient(client)
 }
