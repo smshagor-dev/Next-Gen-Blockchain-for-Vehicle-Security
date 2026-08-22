@@ -75,7 +75,8 @@ class LiveSocketDashboardContractTests(unittest.TestCase):
     def test_vehicle_art_is_antialiased_pillow_renderer(self):
         self.assertIn("Image.Resampling.LANCZOS", self.art_text)
         self.assertIn("ImageFilter.GaussianBlur", self.art_text)
-        self.assertIn("Metallic vertical gradient", self.art_text)
+        self.assertIn("def _vertical_gradient", self.art_text)
+        self.assertIn("draw.line((0, y, image.width, y)", self.art_text)
         self.assertIn("wheel_r", self.art_text)
         self.assertIn("spoke_r", self.art_text)
         self.assertIn("(164, 37, 59, 255)", self.art_text)
