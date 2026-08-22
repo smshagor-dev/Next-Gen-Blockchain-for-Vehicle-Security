@@ -163,6 +163,7 @@ class PqcHardwareProviderContractTests(unittest.TestCase):
                     str(source_path),
                     "-o",
                     str(binary_path),
+                    "-lcrypto",
                 ],
                 check=True,
             )
