@@ -1,5 +1,6 @@
 import re
 import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -13,6 +14,7 @@ class V303FinalHardeningTests(unittest.TestCase):
     def setUpClass(cls):
         cls.runtime = Path("native/secure_blockchain_v303.cpp").read_text(encoding="utf-8")
         cls.provider = Path("native/pqc_provider_policy.h").read_text(encoding="utf-8")
+        cls.hardware_provider = Path("native/pqc_hardware_provider.h").read_text(encoding="utf-8")
         cls.anchor_header = Path("native/pqc_state_guard.h").read_text(encoding="utf-8")
         cls.anchor = Path("native/pqc_state_guard.cpp").read_text(encoding="utf-8")
         cls.state_admin = Path("native/pqc_state_admin.cpp").read_text(encoding="utf-8")
@@ -58,6 +60,41 @@ class V303FinalHardeningTests(unittest.TestCase):
         self.assertIn("available = false", self.provider)
         self.assertIn("hardware provider fallback is never simulated", self.provider)
         self.assertIn("SMARTCAR_CPP_PQC_PROVIDER", self.provider)
+        self.assertIn("runtime_probe_verified", self.provider)
+        self.assertIn("every positive hardware capability stays false", self.provider)
+
+    def test_hardware_provider_contract_is_non_exportable_and_probe_gated(self):
+        for required in (
+            "class PqcHardwareProvider",
+            "PqcHardwareProbe",
+            "private_keys_non_exportable",
+            "ml_dsa_44_key_generation",
+            "ml_dsa_44_sign",
+            "ml_kem_512_key_generation",
+            "ml_kem_512_decapsulate",
+            "rotation_supported",
+            "device_identity",
+            "evidence_reference",
+            "sign_ml_dsa_44",
+            "decapsulate_ml_kem_512",
+            "validate_hardware_probe(probe)",
+            "validate_hardware_public_material",
+            "material.provider != probe.provider",
+            "material.identity != expected_identity",
+            "material.generation == 0",
+            "UnavailablePqcHardwareProvider",
+            "software fallback is prohibited",
+        ):
+            self.assertIn(required, self.hardware_provider)
+        self.assertNotIn("signature_secret_key", self.hardware_provider)
+        self.assertNotIn("kem_secret_key", self.hardware_provider)
+        self.assertNotIn("export_private", self.hardware_provider)
+
+    def test_hardware_provider_contract_suite_runs_in_security_baseline(self):
+        subprocess.run(
+            [sys.executable, "-m", "unittest", "-v", "tests.test_pqc_hardware_provider"],
+            check=True,
+        )
 
     def test_rollback_key_has_independent_credential_domain(self):
         policy = secret_policy("SMARTCAR_CPP_PQC_ROLLBACK_KEY")
