@@ -37,7 +37,6 @@ public:
     }
 
     const unsigned char* data() const noexcept { return bytes_.data(); }
-    unsigned char* data() noexcept { return bytes_.data(); }
     std::size_t size() const noexcept { return bytes_.size(); }
     bool empty() const noexcept { return bytes_.empty(); }
 
