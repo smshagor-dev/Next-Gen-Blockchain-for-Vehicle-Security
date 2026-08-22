@@ -97,6 +97,26 @@ python main.py
 
 Never blindly terminate an unknown process just because it owns port `8787`.
 
+## Go runtime selection in v3.0.3
+
+Normal development uses:
+
+```text
+SMARTCAR_GO_RUNTIME_MODE=auto
+SMARTCAR_GO_STARTUP_TIMEOUT_SEC=45
+```
+
+`auto` prefers the checked-out `api/go` source when the Go toolchain is available. This prevents an older local `build/smartcar_go_backend.exe` from silently taking precedence after a source update. If Go is not available, `auto` can use a compatible prebuilt backend when one exists.
+
+Explicit modes are available for controlled environments:
+
+```text
+SMARTCAR_GO_RUNTIME_MODE=source
+SMARTCAR_GO_RUNTIME_MODE=prebuilt
+```
+
+Use `source` only when the Go toolchain and source tree are present. Use `prebuilt` only when you intentionally want the packaged binary. The backend diagnostic log records the selected runtime as `runtime=source` or `runtime=prebuilt`.
+
 ## Important Security Settings
 
 Normal local development keeps:
@@ -168,6 +188,20 @@ Get-Content .\logs\processes\go-backend.log -Tail 100
 ```
 
 The default startup window is 45 seconds to accommodate cold Windows `go run .` builds. If needed, it can be adjusted within the supported 5-120 second range with `SMARTCAR_GO_STARTUP_TIMEOUT_SEC`.
+
+The start marker identifies which path was selected:
+
+```text
+runtime=source
+```
+
+or
+
+```text
+runtime=prebuilt
+```
+
+If a development checkout unexpectedly reports `runtime=prebuilt` while Go is installed, confirm `.env` does not explicitly set `SMARTCAR_GO_RUNTIME_MODE=prebuilt`.
 
 ### Go backend does not start
 
