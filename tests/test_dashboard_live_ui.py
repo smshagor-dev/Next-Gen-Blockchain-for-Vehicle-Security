@@ -10,6 +10,7 @@ class LiveSocketDashboardContractTests(unittest.TestCase):
         cls.ui_text = cls.ui_path.read_text(encoding="utf-8")
         cls.ui_tree = ast.parse(cls.ui_text)
         cls.art_text = Path("dashboard_vehicle_art.py").read_text(encoding="utf-8")
+        cls.go_live_text = Path("api/go/live_stream.go").read_text(encoding="utf-8")
         cls.main_text = Path("main.py").read_text(encoding="utf-8-sig")
 
     def test_main_launches_live_socket_shell(self):
@@ -19,18 +20,35 @@ class LiveSocketDashboardContractTests(unittest.TestCase):
         self.assertIn("class LiveSocketSmartCarDashboard(pixel.PixelMatchedSmartCarDashboard)", self.ui_text)
         self.assertIn("SmartCarDashboard = LiveSocketSmartCarDashboard", self.ui_text)
 
-    def test_live_transport_uses_socketpair_and_background_thread(self):
-        self.assertIn("socket.socketpair()", self.ui_text)
-        self.assertIn("threading.Thread", self.ui_text)
-        self.assertIn("SmartCarDashboardLiveSocket", self.ui_text)
-        self.assertIn("_drain_live_socket", self.ui_text)
-        self.assertIn("json.dumps(", self.ui_text)
-        self.assertIn("json.loads(line.decode", self.ui_text)
+    def test_go_backend_exposes_authenticated_loopback_live_socket(self):
+        self.assertIn('defaultLiveStreamAddr = "127.0.0.1:8788"', self.go_live_text)
+        self.assertIn('liveProtocolLabel     = "smartcar-live-v1"', self.go_live_text)
+        self.assertIn("validateLiveStreamAddr", self.go_live_text)
+        self.assertIn("liveProof", self.go_live_text)
+        self.assertIn("hmac.Equal", self.go_live_text)
+        self.assertIn("isLoopbackRemote", self.go_live_text)
+        self.assertIn("SMARTCAR_GO_ENABLE_LIVE_STREAM", self.go_live_text)
 
-    def test_ui_loop_is_continuous_and_manual_refresh_is_only_compatibility(self):
+    def test_dashboard_connects_to_go_live_socket_not_local_socketpair(self):
+        self.assertIn("socket.create_connection", self.ui_text)
+        self.assertIn("SmartCarDashboardGoLiveSocket", self.ui_text)
+        self.assertIn("_connect_live_socket", self.ui_text)
+        self.assertIn("_recv_json_line", self.ui_text)
+        self.assertIn("_apply_live_status", self.ui_text)
+        self.assertNotIn("socket.socketpair()", self.ui_text)
+
+    def test_live_handshake_uses_same_secret_without_exposing_it(self):
+        method = self._method_source("_connect_live_socket")
+        self.assertIn("api_secret", method)
+        self.assertIn("hmac.new", method)
+        self.assertIn("hashlib.sha256", method)
+        self.assertIn('"type": "auth"', method)
+        self.assertNotIn("print(", method)
+
+    def test_ui_loop_is_push_first_and_http_refresh_is_fallback_only(self):
         method = self._method_source("_update_ui")
-        self.assertIn("LIVE_UI_INTERVAL_MS", method)
-        self.assertIn("_drain_live_socket", method)
+        self.assertIn("_drain_live_queue", method)
+        self.assertIn("not self._live_socket_connected", method)
         self.assertIn("FALLBACK_COLLECT_INTERVAL_SEC", method)
         self.assertNotIn("self.manual_refresh()", method)
 
@@ -46,6 +64,13 @@ class LiveSocketDashboardContractTests(unittest.TestCase):
         self.assertIn("backend.live_cache", method)
         self.assertIn("_CACHE_ATTRS", method)
         self.assertIn("super()._metadata(method_name)", method)
+
+    def test_socket_status_uses_existing_ledger_verifier(self):
+        method = self._method_source("_apply_live_status")
+        self.assertIn("_ledger_verifier", method)
+        self.assertIn("verify_and_track", method)
+        self.assertIn("BackendBlock", method)
+        self.assertIn("_security_capabilities", method)
 
     def test_vehicle_art_is_antialiased_pillow_renderer(self):
         self.assertIn("Image.Resampling.LANCZOS", self.art_text)
@@ -76,7 +101,7 @@ class LiveSocketDashboardContractTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden.lower(), lowered)
 
-    def test_backend_actions_are_serialized_against_live_refresh(self):
+    def test_backend_actions_are_serialized_against_live_updates(self):
         for method_name in ("_do_auth", "_do_start", "_do_stop", "_do_lock", "_do_recover"):
             method = self._method_source(method_name)
             self.assertIn("self._live_action_lock", method)
@@ -85,7 +110,7 @@ class LiveSocketDashboardContractTests(unittest.TestCase):
     def test_shutdown_stops_socket_worker(self):
         method = self._method_source("on_closing")
         self.assertIn("self._live_stop.set()", method)
-        self.assertIn("sock.close()", method)
+        self.assertIn("conn.shutdown", method)
         self.assertIn("thread.join", method)
         self.assertIn("super().on_closing()", method)
 
