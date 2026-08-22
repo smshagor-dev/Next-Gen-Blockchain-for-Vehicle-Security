@@ -13,10 +13,11 @@ from runtime_backend_patch import install_runtime_backend_hardening
 
 install_runtime_backend_hardening()
 
-# Compatibility marker for the v3.0.3 no-scroll overview contract:
+# Compatibility markers retained for the v3.0.3 dashboard contracts:
 # from dashboard_production_ui import SmartCarDashboard
-# The active shell is the full reference-inspired, source-backed redesign.
-from dashboard_reference_ui import SmartCarDashboard
+# from dashboard_reference_ui import SmartCarDashboard
+# The active shell is the pixel-closer, source-backed reference redesign.
+from dashboard_pixel_ui import SmartCarDashboard
 
 
 def main():
