@@ -83,12 +83,14 @@ class PqcHardwareProviderContractTests(unittest.TestCase):
         self.assertIn("kem_secret_key", self.key_material)
         self.assertNotIn("hardware_backed", self.key_material)
 
-    def test_derived_shared_secret_is_move_only_and_zeroized(self):
+    def test_derived_shared_secret_is_move_only_zeroized_and_read_only(self):
         self.assertIn("class PqcSensitiveBytes", self.sensitive_bytes)
         self.assertIn("PqcSensitiveBytes(const PqcSensitiveBytes&) = delete", self.sensitive_bytes)
         self.assertIn("operator=(const PqcSensitiveBytes&) = delete", self.sensitive_bytes)
         self.assertIn("secure_zero_bytes", self.sensitive_bytes)
         self.assertIn("~PqcSensitiveBytes()", self.sensitive_bytes)
+        self.assertIn("const unsigned char* data() const noexcept", self.sensitive_bytes)
+        self.assertNotIn("\n    unsigned char* data() noexcept", self.sensitive_bytes)
         self.assertIn("PqcSensitiveBytes decapsulate_ml_kem_512", self.contract)
         self.assertIn("PqcSensitiveBytes decapsulate_ml_kem_512", self.software_operations)
 
