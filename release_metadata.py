@@ -1,10 +1,4 @@
-"""Canonical release metadata for OmniGuard V2X.
-
-The repository-level VERSION file is the source of truth for the public release
-number. Internal hardening phases may use a different engineering phase label;
-that mapping is exposed explicitly so public release numbering cannot silently
-drift from implementation history.
-"""
+"""Canonical release metadata for OmniGuard V2X."""
 
 from __future__ import annotations
 
@@ -34,7 +28,6 @@ RELEASE_CHANNEL = "research_hardening"
 
 
 def release_metadata() -> Dict[str, object]:
-    """Return non-secret, conservative release/build identity metadata."""
     return {
         "release_version": RELEASE_VERSION,
         "release_series": RELEASE_SERIES,
@@ -47,7 +40,11 @@ def release_metadata() -> Dict[str, object]:
         "mixed_generation_ledger_verification": True,
         "authenticated_local_rollback_anchor": True,
         "hardware_monotonic_rollback_protection": False,
-        "hardware_pqc_provider_implemented": False,
+        "hardware_pqc_provider_implemented": True,
+        "pkcs11_v32_provider_adapter_implemented": True,
+        "pkcs11_production_token_validated": False,
+        "tpm2_pqc_provider_implemented": False,
+        "generic_hsm_pqc_provider_implemented": False,
         "native_data_at_rest": "AES-256-GCM",
         "native_signature": "ML-DSA-44",
         "native_key_encapsulation": "ML-KEM-512",
