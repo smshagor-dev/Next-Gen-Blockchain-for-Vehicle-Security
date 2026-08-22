@@ -1,6 +1,6 @@
 #pragma once
 
-// OASIS PKCS #11 headers intentionally require applications to provide five
+// OASIS PKCS #11 v3.2 section 2.2 requires applications to provide five
 // platform/compiler macros before including <pkcs11.h>. Keep the defaults
 // conservative and overridable so integrators may provide ABI-specific forms.
 #ifndef CK_PTR
