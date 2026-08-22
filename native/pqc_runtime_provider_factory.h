@@ -65,7 +65,8 @@ inline std::unique_ptr<PqcActivePrivateOperations> make_runtime_pqc_private_oper
 
     // An explicit hardware provider request never falls back to the software
     // keystore, even when SMARTCAR_CPP_PQC_HARDWARE_REQUIRED=0. The selected
-    // hardware adapter must independently pass its runtime capability probe.
+    // hardware adapter must independently pass its runtime capability probe
+    // before any software keystore can be created or used.
     std::shared_ptr<PqcHardwareProvider> hardware = make_registered_hardware_pqc_provider(requested);
     return std::make_unique<HardwarePqcActivePrivateOperations>(std::move(hardware), identity);
 }
