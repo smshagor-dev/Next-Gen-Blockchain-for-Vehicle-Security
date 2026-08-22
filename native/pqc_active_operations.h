@@ -86,6 +86,7 @@ public:
         PqcHardwarePublicMaterial material = provider_->load_or_create_public(identity);
         validate_hardware_public_material(probe, material, identity);
 
+        device_identity_ = probe.device_identity;
         state_ = {
             material.provider,
             material.key_id,
@@ -110,6 +111,7 @@ public:
     std::vector<unsigned char> sign_ml_dsa_44(
         const std::vector<unsigned char>& message
     ) override {
+        verify_live_provider_binding();
         std::vector<unsigned char> signature = provider_->sign_ml_dsa_44(state_.key_id, message);
         if (signature.empty() || signature.size() > state_.signature_max_size) {
             throw std::runtime_error("hardware ML-DSA-44 provider returned an invalid signature size");
@@ -120,6 +122,7 @@ public:
     PqcSensitiveBytes decapsulate_ml_kem_512(
         const std::vector<unsigned char>& ciphertext
     ) override {
+        verify_live_provider_binding();
         if (ciphertext.size() != state_.kem_ciphertext_size) {
             throw std::runtime_error("hardware ML-KEM-512 ciphertext size is invalid");
         }
@@ -132,7 +135,19 @@ public:
     }
 
 private:
+    void verify_live_provider_binding() const {
+        const PqcHardwareProbe probe = provider_->probe();
+        (void)capabilities_from_verified_hardware_probe(probe);
+        if (probe.provider != state_.provider || probe.device_identity != device_identity_ ||
+            probe.ml_dsa_44_signature_max_size != state_.signature_max_size ||
+            probe.ml_kem_512_ciphertext_size != state_.kem_ciphertext_size ||
+            probe.ml_kem_512_shared_secret_size != state_.kem_shared_secret_size) {
+            throw std::runtime_error("hardware PQC provider binding changed after activation");
+        }
+    }
+
     std::shared_ptr<PqcHardwareProvider> provider_;
+    std::string device_identity_;
     PqcActivePublicState state_;
 };
 
