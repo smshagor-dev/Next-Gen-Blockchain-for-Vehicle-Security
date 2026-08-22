@@ -2,6 +2,24 @@
 
 This changelog summarizes the public release sequence for the research hardening line. Internal engineering phase labels are noted where they differ from public patch-version numbering.
 
+## v3.0.3 — Durable PQC Identity, Historical Trust & Runtime Recovery Hardening
+
+Internal hardening phase: `v3.3`.
+
+- Adds a durable encrypted ML-DSA-44 / ML-KEM-512 identity keystore with AES-256-GCM protection for software-stored private material.
+- Adds guarded local PQC key rotation, encrypted previous-keystore backups, signed old-to-new transitions, and a bounded historical public-key trust keyring.
+- Adds mixed-generation native ledger verification so admitted historical ML-DSA generations remain verifiable while new active-generation blocks can be appended safely.
+- Explicitly reports that historical ML-KEM private keys are not retained and historical shared-secret claims are not independently re-decapsulated.
+- Adds the authenticated `OMNIGUARD_PQC_ROLLBACK_ANCHOR_V1` software rollback/recovery state boundary with explicit no-auto-restore behavior and no claim of hardware monotonicity.
+- Adds an opt-in PKCS#11 v3.2 hardware PQC adapter for ML-DSA-44 / ML-KEM-512, gated by real token/mechanism/non-exportability runtime evidence; TPM2 and generic HSM adapters remain unavailable and fail closed.
+- Adds PKCS#11 v3.2 source/ABI conformance validation using canonical OASIS headers and strict C++ compilation.
+- Adds secure local `.env` bootstrap with independent high-entropy credentials, preserved existing secrets by default, explicit full rotation, and no secret-value printing.
+- Hardens authenticated Go loopback startup with stale-endpoint detection, bounded 45-second cold-start readiness, dedicated backend logs, and child-only cleanup.
+- Development runtime selection now prefers checked-out Go source when the Go toolchain is present, avoiding silent reuse of stale local prebuilt `smartcar_go_backend.exe` artifacts; packaged/no-Go environments can still use compatible prebuilt binaries.
+- Adds regression coverage for local credential bootstrap, stale loopback authentication mismatch, startup timeout bounds, and source/prebuilt runtime selection.
+- Adds commit-bound release integrity manifests, deterministic SBOM generation, build provenance, current-tree secret scanning, SHA-256 publication checksums, and guarded exact-main tag/publication workflows.
+- Keeps release claims bounded: research validation only, no production automotive certification, formal verification, production HSM custody claim, or hardware-monotonic rollback guarantee.
+
 ## v3.0.2 — Native Cryptographic Modernization & Real-PQC Validation
 
 Internal hardening phase: `v3.2`.
