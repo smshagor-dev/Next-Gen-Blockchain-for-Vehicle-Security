@@ -77,6 +77,10 @@ class V303FinalHardeningTests(unittest.TestCase):
             "sign_ml_dsa_44",
             "decapsulate_ml_kem_512",
             "validate_hardware_probe(probe)",
+            "validate_hardware_public_material",
+            "material.provider != probe.provider",
+            "material.identity != expected_identity",
+            "material.generation == 0",
             "UnavailablePqcHardwareProvider",
             "software fallback is prohibited",
         ):
