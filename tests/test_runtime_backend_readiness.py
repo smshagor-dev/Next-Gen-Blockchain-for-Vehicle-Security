@@ -1,11 +1,15 @@
 import os
 import socket
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from runtime_backend_patch import (
     _isolated_ensure_service,
     _loopback_endpoint_is_listening,
+    _runtime_mode,
+    _select_go_backend_command,
     _startup_timeout_seconds,
 )
 
@@ -22,6 +26,73 @@ class RuntimeBackendReadinessTests(unittest.TestCase):
             self.assertEqual(_startup_timeout_seconds(), 120.0)
         with patch.dict(os.environ, {"SMARTCAR_GO_STARTUP_TIMEOUT_SEC": "invalid"}, clear=True):
             self.assertEqual(_startup_timeout_seconds(), 45.0)
+
+    def test_runtime_mode_invalid_value_falls_back_to_auto(self):
+        with patch.dict(os.environ, {"SMARTCAR_GO_RUNTIME_MODE": "unexpected"}, clear=True):
+            self.assertEqual(_runtime_mode(), "auto")
+
+    def test_auto_mode_prefers_fresh_source_over_local_prebuilt_binary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            go_root = root / "api" / "go"
+            build_root = root / "build"
+            go_root.mkdir(parents=True)
+            build_root.mkdir(parents=True)
+            (go_root / "go.mod").write_text("module example\n", encoding="utf-8")
+            (go_root / "main.go").write_text("package main\nfunc main() {}\n", encoding="utf-8")
+            exe = build_root / ("smartcar_go_backend.exe" if os.name == "nt" else "smartcar_go_backend")
+            exe.write_bytes(b"stale-local-binary")
+
+            with patch.dict(os.environ, {}, clear=True), patch(
+                "runtime_backend_patch.shutil.which", return_value="C:/Go/bin/go.exe"
+            ):
+                cmd, cwd, source = _select_go_backend_command(root)
+
+            self.assertEqual(source, "source")
+            self.assertEqual(cmd[1:], ["run", "."])
+            self.assertEqual(Path(cwd), go_root)
+
+    def test_prebuilt_mode_honors_explicit_operator_choice(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            go_root = root / "api" / "go"
+            build_root = root / "build"
+            go_root.mkdir(parents=True)
+            build_root.mkdir(parents=True)
+            (go_root / "go.mod").write_text("module example\n", encoding="utf-8")
+            (go_root / "main.go").write_text("package main\nfunc main() {}\n", encoding="utf-8")
+            exe = build_root / ("smartcar_go_backend.exe" if os.name == "nt" else "smartcar_go_backend")
+            exe.write_bytes(b"prebuilt")
+
+            with patch.dict(
+                os.environ, {"SMARTCAR_GO_RUNTIME_MODE": "prebuilt"}, clear=True
+            ), patch("runtime_backend_patch.shutil.which", return_value="C:/Go/bin/go.exe"):
+                cmd, cwd, source = _select_go_backend_command(root)
+
+            self.assertEqual(source, "prebuilt")
+            self.assertEqual(cmd, [str(exe)])
+            self.assertEqual(Path(cwd), root)
+
+    def test_auto_mode_falls_back_to_prebuilt_when_go_toolchain_is_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            go_root = root / "api" / "go"
+            build_root = root / "build"
+            go_root.mkdir(parents=True)
+            build_root.mkdir(parents=True)
+            (go_root / "go.mod").write_text("module example\n", encoding="utf-8")
+            (go_root / "main.go").write_text("package main\nfunc main() {}\n", encoding="utf-8")
+            exe = build_root / ("smartcar_go_backend.exe" if os.name == "nt" else "smartcar_go_backend")
+            exe.write_bytes(b"prebuilt")
+
+            with patch.dict(os.environ, {}, clear=True), patch(
+                "runtime_backend_patch.shutil.which", return_value=None
+            ):
+                cmd, cwd, source = _select_go_backend_command(root)
+
+            self.assertEqual(source, "prebuilt")
+            self.assertEqual(cmd, [str(exe)])
+            self.assertEqual(Path(cwd), root)
 
     def test_loopback_probe_detects_listening_endpoint(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
