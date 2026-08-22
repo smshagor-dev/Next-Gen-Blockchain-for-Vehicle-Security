@@ -13,8 +13,9 @@ from runtime_backend_patch import install_runtime_backend_hardening
 
 install_runtime_backend_hardening()
 
-# UI-only branch: keep the existing runtime/backend and launch the modern skin.
-from dashboard_modern_ui import SmartCarDashboard
+# Launch the routed production console. Overview is a fixed, no-scroll viewport
+# backed only by live provider/backend data; focused pages remain sidebar-routed.
+from dashboard_production_ui import SmartCarDashboard
 
 
 def main():
