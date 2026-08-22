@@ -72,16 +72,18 @@ jobs:
           PYTHONPATH: .
         run: python scripts/ci_windows_go_backend_smoke.py
 
-      - name: Verify loopback backend was cleaned up
+      - name: Verify loopback backends were cleaned up
         if: always()
         shell: pwsh
         run: |
-          $listener = Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue
-          if ($listener) {
-            Write-Error "Port 8787 is still listening after the Windows runtime smoke."
-            Get-CimInstance Win32_Process -Filter "ProcessId=$($listener.OwningProcess)" |
-              Select-Object ProcessId, Name, ExecutablePath, CommandLine
-            exit 1
+          foreach ($port in 8787, 8788) {
+            $listener = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
+            if ($listener) {
+              Write-Error "Port $port is still listening after the Windows runtime smoke."
+              Get-CimInstance Win32_Process -Filter "ProcessId=$($listener.OwningProcess)" |
+                Select-Object ProcessId, Name, ExecutablePath, CommandLine
+              exit 1
+            }
           }
 
       - name: Show backend diagnostics on failure
