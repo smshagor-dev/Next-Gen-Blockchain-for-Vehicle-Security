@@ -21,22 +21,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Fetch pinned PKCS11 v3.2 header
+      - name: Fetch OASIS PKCS11 v3.2 standard headers
         shell: bash
         run: |
           set -euo pipefail
           include_dir="$RUNNER_TEMP/pkcs11-v3.2"
+          base="https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.2/os/include/pkcs11-v3.2"
           mkdir -p "$include_dir"
-          curl --fail --show-error --silent --location --proto '=https' --tlsv1.2 --retry 3 \
-            "https://raw.githubusercontent.com/p11-glue/p11-kit/120050e353e8f43d7c40bbcc047f667f903f4de5/common/pkcs11.h" \
-            --output "$include_dir/pkcs11.h"
-          grep -Eq '^#define CRYPTOKI_VERSION_MAJOR[[:space:]]+3$' "$include_dir/pkcs11.h"
-          grep -Eq '^#define CRYPTOKI_VERSION_MINOR[[:space:]]+2$' "$include_dir/pkcs11.h"
-          grep -F 'CKM_ML_DSA_KEY_PAIR_GEN' "$include_dir/pkcs11.h"
-          grep -F 'CKM_ML_KEM_KEY_PAIR_GEN' "$include_dir/pkcs11.h"
-          grep -F 'CK_FUNCTION_LIST_3_2' "$include_dir/pkcs11.h"
+          for header in pkcs11.h pkcs11t.h pkcs11f.h; do
+            curl --fail --show-error --silent --location --proto '=https' --tlsv1.2 --retry 3 \
+              "$base/$header" \
+              --output "$include_dir/$header"
+            test -s "$include_dir/$header"
+          done
+          grep -Eq '^#define[[:space:]]+CRYPTOKI_VERSION_MAJOR[[:space:]]+3([[:space:]]|$)' "$include_dir/pkcs11t.h"
+          grep -Eq '^#define[[:space:]]+CRYPTOKI_VERSION_MINOR[[:space:]]+2([[:space:]]|$)' "$include_dir/pkcs11t.h"
+          grep -F 'CKM_ML_DSA_KEY_PAIR_GEN' "$include_dir/pkcs11t.h"
+          grep -F 'CKM_ML_KEM_KEY_PAIR_GEN' "$include_dir/pkcs11t.h"
+          grep -F 'CK_FUNCTION_LIST_3_2' "$include_dir/pkcs11t.h"
 
-      - name: Compile PKCS11 provider source against v3.2 API
+      - name: Compile PKCS11 provider source against OASIS v3.2 API
         shell: bash
         run: |
           set -euo pipefail
@@ -57,5 +61,4 @@ jobs:
           grep -F 'CKA_NEVER_EXTRACTABLE' native/pqc_pkcs11_provider.cpp
           grep -F 'C_DecapsulateKey' native/pqc_pkcs11_provider.cpp
           grep -F 'C_DigestKey' native/pqc_pkcs11_provider.cpp
-          grep -F 'software tokens must not produce a hardware-backed claim' tests/test_pqc_hardware_provider.py || true
           ! grep -F 'software_encrypted_file' native/pqc_pkcs11_provider.cpp
