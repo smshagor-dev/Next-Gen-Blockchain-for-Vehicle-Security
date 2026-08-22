@@ -3,6 +3,15 @@ import unittest
 from unittest.mock import patch
 
 from env_config import _parse_env_line, get_required_secret
+from tests.test_local_env_bootstrap import LocalEnvBootstrapTests
+from tests.test_runtime_backend_readiness import RuntimeBackendReadinessTests
+
+# Keep the two imported TestCase classes in this module intentionally. Both the
+# Security Baseline and guarded v3.0.3 publication workflow already execute
+# tests.test_security_baseline, so unittest's module loader will include these
+# recent local-bootstrap and Go-readiness regressions in the final release gate.
+assert issubclass(LocalEnvBootstrapTests, unittest.TestCase)
+assert issubclass(RuntimeBackendReadinessTests, unittest.TestCase)
 
 
 class SecurityBaselineTests(unittest.TestCase):
