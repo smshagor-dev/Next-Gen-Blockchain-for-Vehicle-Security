@@ -365,7 +365,7 @@ v3.0.3 does not claim:
 - production PKI/enrollment governance;
 - validated production custody on a specific TPM2/HSM/PKCS#11 token;
 - hardware monotonic rollback resistance;
-- fleet-scale Byzantine-robust federated learning;
+- fleet-scale Byzantine-robust federated learning is not claimed;
 - a production-grade ZK range-proof system;
 - a fully post-quantum end-to-end architecture.
 
