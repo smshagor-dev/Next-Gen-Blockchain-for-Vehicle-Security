@@ -1,4 +1,4 @@
-﻿# OmniGuard V2X: A Privacy-Preserving Blockchain Framework for Smart Vehicle Security
+# OmniGuard V2X: A Privacy-Preserving Blockchain Framework for Smart Vehicle Security
 # Developer : Md Shahanur Islam Shagor
 # Role      : Project Architect & Lead Developer
 """
@@ -25,9 +25,9 @@ import logging
 import uuid
 
 try:
-    from env_config import load_project_env_once, get_env, get_int, get_bool
+    from env_config import load_project_env_once, get_env, get_int, get_bool, get_required_secret
 except Exception:
-    from env_config import load_project_env_once, get_env, get_int, get_bool
+    from env_config import load_project_env_once, get_env, get_int, get_bool, get_required_secret
 
 try:
     from did_identity import DIDIdentity, verify_did_proof
@@ -109,7 +109,7 @@ except Exception:
 CONSENSUS_POA = "POA"
 CONSENSUS_POP_POA = "POA_POP"
 DEFAULT_POA_AUTHORITY_ID = "authority_node_1"
-DEFAULT_POA_AUTHORITY_KEY = "SmartCarPoAKey_2024_Node1"
+# PoA validator keys must be explicitly configured or supplied by an authority registry.
 
 # ============================================================
 # SHA2 / SHA3 Hash Utilities
@@ -665,7 +665,7 @@ class SmartCarBlockchain:
         self.consensus = CONSENSUS_POP_POA if self.pop_enabled else CONSENSUS_POA
 
         validator_id = validator_id or get_env("SMARTCAR_VALIDATOR_ID", DEFAULT_POA_AUTHORITY_ID)
-        validator_key = validator_key or get_env("SMARTCAR_VALIDATOR_KEY", DEFAULT_POA_AUTHORITY_KEY)
+        validator_key = validator_key or get_required_secret("SMARTCAR_VALIDATOR_KEY")
         self.authority_registry: Dict[str, str] = dict(authority_registry or {})
         if validator_id not in self.authority_registry:
             self.authority_registry[validator_id] = validator_key
