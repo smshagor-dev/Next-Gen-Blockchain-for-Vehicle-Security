@@ -9,6 +9,7 @@ exception text, credentials, and request payloads are never retained.
 from __future__ import annotations
 
 import os
+import shutil
 import socket
 import subprocess
 import time
@@ -63,6 +64,52 @@ def _startup_timeout_seconds() -> float:
     return max(5.0, min(timeout, 120.0))
 
 
+def _runtime_mode() -> str:
+    """Return the requested Go runtime mode, defaulting safely to auto."""
+    mode = os.getenv("SMARTCAR_GO_RUNTIME_MODE", "auto").strip().lower()
+    if mode not in {"auto", "source", "prebuilt"}:
+        return "auto"
+    return mode
+
+
+def _select_go_backend_command(root: Path) -> tuple[list[str], str, str]:
+    """Select a fresh source runtime when possible, otherwise a prebuilt binary.
+
+    A repository checkout may contain an untracked build/smartcar_go_backend.exe
+    left over from an older source revision. In auto mode, a present Go toolchain
+    and source tree therefore take precedence over that local artifact. Packaged
+    installs without Go continue to use the prebuilt binary.
+    """
+    go_root = root / "api" / "go"
+    exe = root / "build" / ("smartcar_go_backend.exe" if os.name == "nt" else "smartcar_go_backend")
+    go_binary = shutil.which("go")
+    source_available = (go_root / "go.mod").is_file() and (go_root / "main.go").is_file()
+    mode = _runtime_mode()
+
+    if mode == "source":
+        if not source_available:
+            raise RuntimeError("SMARTCAR_GO_RUNTIME_MODE=source requested but Go backend source is unavailable")
+        if not go_binary:
+            raise RuntimeError("SMARTCAR_GO_RUNTIME_MODE=source requested but the Go toolchain was not found")
+        return [go_binary, "run", "."], str(go_root), "source"
+
+    if mode == "prebuilt":
+        if not exe.exists():
+            raise RuntimeError("SMARTCAR_GO_RUNTIME_MODE=prebuilt requested but the Go backend binary is unavailable")
+        return [str(exe)], str(root), "prebuilt"
+
+    if source_available and go_binary:
+        return [go_binary, "run", "."], str(go_root), "source"
+    if exe.exists():
+        return [str(exe)], str(root), "prebuilt"
+
+    if source_available:
+        raise RuntimeError(
+            "Go backend source is available but the Go toolchain was not found and no prebuilt backend exists"
+        )
+    raise RuntimeError("No Go backend source or compatible prebuilt backend is available")
+
+
 def _loopback_endpoint_is_listening(base_url: str, timeout: float = 0.20) -> bool:
     """Probe TCP reachability only; authentication is still decided by _health()."""
     try:
@@ -114,14 +161,8 @@ def _isolated_ensure_service(self: GoBackend):
         )
 
     root = Path(__file__).resolve().parent
-    go_root = root / "api" / "go"
-    exe = root / "build" / ("smartcar_go_backend.exe" if os.name == "nt" else "smartcar_go_backend")
-    if exe.exists():
-        cmd = [str(exe)]
-        cwd = str(root)
-    else:
-        cmd = ["go", "run", "."]
-        cwd = str(go_root)
+    cmd, cwd, runtime_source = _select_go_backend_command(root)
+    self._backend_runtime_source = runtime_source
 
     log_dir = root / "logs" / "processes"
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -137,7 +178,9 @@ def _isolated_ensure_service(self: GoBackend):
     # Keep backend diagnostics local and separate from the GUI log. The Go
     # backend never logs credential values; exceptions expose only this path.
     with open(log_path, mode="a", encoding="utf-8", buffering=1) as backend_log:
-        backend_log.write(f"\n--- backend start {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n")
+        backend_log.write(
+            f"\n--- backend start {time.strftime('%Y-%m-%d %H:%M:%S')} runtime={runtime_source} ---\n"
+        )
         backend_log.flush()
         popen_kwargs["stdout"] = backend_log
         popen_kwargs["stderr"] = subprocess.STDOUT
@@ -157,7 +200,7 @@ def _isolated_ensure_service(self: GoBackend):
             )
             raise RuntimeError(
                 f"Go backend exited before authenticated health verification "
-                f"(exit_code={return_code}); see {log_path}"
+                f"(exit_code={return_code}, runtime={runtime_source}); see {log_path}"
             )
         time.sleep(0.25)
 
@@ -168,7 +211,8 @@ def _isolated_ensure_service(self: GoBackend):
         subject=getattr(self, "vehicle_id", ""),
     )
     raise RuntimeError(
-        f"Authenticated Go backend did not become ready within {timeout:.0f}s; see {log_path}"
+        f"Authenticated Go backend did not become ready within {timeout:.0f}s "
+        f"(runtime={runtime_source}); see {log_path}"
     )
 
 
