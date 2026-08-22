@@ -52,6 +52,7 @@ jobs:
           grep -F 'CKM_ML_KEM_KEY_PAIR_GEN' "$include_dir/pkcs11t.h"
           grep -F 'CK_FUNCTION_LIST_3_2' "$include_dir/pkcs11t.h"
 
+      # Keep the production adapter compiled directly against the canonical OASIS headers.
       - name: Compile PKCS11 provider source against OASIS v3.2 API
         shell: bash
         run: |
