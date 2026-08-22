@@ -42,13 +42,14 @@ jobs:
         run: |
           python -m py_compile runtime_backend_patch.py smartcar_backend.py scripts/bootstrap_local_env.py scripts/ci_windows_go_backend_smoke.py
 
-      - name: Run local bootstrap and Go readiness regressions
+      - name: Run release-facing Python regressions
         shell: pwsh
         env:
           PYTHONPATH: .
         run: |
           python -m unittest -v tests.test_local_env_bootstrap
           python -m unittest -v tests.test_runtime_backend_readiness
+          python -m unittest -v tests.test_security_claims
 
       - name: Run Go tests and build fresh Windows backend
         shell: pwsh
