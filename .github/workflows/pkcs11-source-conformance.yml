@@ -1,0 +1,76 @@
+name: PKCS11 Source Conformance
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - main
+      - security/**
+      - release/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pkcs11-v32-source-compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch canonical OASIS PKCS11 v3.2 release headers
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/pkcs11-spec-v3.2-os.zip"
+          extract_dir="$RUNNER_TEMP/pkcs11-v3.2-release"
+          include_dir="$RUNNER_TEMP/pkcs11-v3.2"
+          release_url="https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.2/os/pkcs11-spec-v3.2-os.zip"
+
+          curl --fail --show-error --silent --location --proto '=https' --tlsv1.2 --retry 3 \
+            --user-agent 'OmniGuard-PKCS11-Conformance/3.0.3' \
+            "$release_url" \
+            --output "$archive"
+
+          # OASIS Standard 03 June 2026 release manifest SHA-1 for the canonical ZIP.
+          echo 'c5c814f09a64c79c9cdcd001a96b64f9cd546d9f  '"$archive" | sha1sum --check --strict
+
+          mkdir -p "$extract_dir" "$include_dir"
+          unzip -q "$archive" \
+            'include/pkcs11-v3.2/pkcs11.h' \
+            'include/pkcs11-v3.2/pkcs11t.h' \
+            'include/pkcs11-v3.2/pkcs11f.h' \
+            -d "$extract_dir"
+          cp "$extract_dir/include/pkcs11-v3.2/"*.h "$include_dir/"
+
+          grep -Eq '^#define[[:space:]]+CRYPTOKI_VERSION_MAJOR[[:space:]]+3([[:space:]]|$)' "$include_dir/pkcs11t.h"
+          grep -Eq '^#define[[:space:]]+CRYPTOKI_VERSION_MINOR[[:space:]]+2([[:space:]]|$)' "$include_dir/pkcs11t.h"
+          grep -F 'CKM_ML_DSA_KEY_PAIR_GEN' "$include_dir/pkcs11t.h"
+          grep -F 'CKM_ML_KEM_KEY_PAIR_GEN' "$include_dir/pkcs11t.h"
+          grep -F 'CK_FUNCTION_LIST_3_2' "$include_dir/pkcs11t.h"
+
+      - name: Compile PKCS11 provider source against OASIS v3.2 API
+        shell: bash
+        run: |
+          set -euo pipefail
+          c++ \
+            -std=c++17 \
+            -Wall -Wextra -Wpedantic -Werror \
+            -DSMARTCAR_ENABLE_PKCS11_PROVIDER=1 \
+            -I native \
+            -I "$RUNNER_TEMP/pkcs11-v3.2" \
+            -fsyntax-only \
+            native/pqc_pkcs11_provider.cpp
+
+      - name: Verify provider remains hardware-truthful
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'CKF_HW_SLOT' native/pqc_pkcs11_provider.cpp
+          grep -F 'CKA_NEVER_EXTRACTABLE' native/pqc_pkcs11_provider.cpp
+          grep -F 'C_DecapsulateKey' native/pqc_pkcs11_provider.cpp
+          grep -F 'C_DigestKey' native/pqc_pkcs11_provider.cpp
+          ! grep -F 'software_encrypted_file' native/pqc_pkcs11_provider.cpp
