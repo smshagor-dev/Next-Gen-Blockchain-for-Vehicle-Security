@@ -1,3 +1,4 @@
+#include "pqc_kem_commitment.h"
 #include "pqc_key_store.h"
 #include "pqc_trust_keyring.h"
 
@@ -190,6 +191,54 @@ std::string require_string(const json& object, const char* key) {
     return value;
 }
 
+std::string commitment_scheme_for_block(const json& block) {
+    if (!block.contains("pqc_shared_secret_commitment_scheme")) {
+        return omniguard::kKemCommitmentLegacyV1;
+    }
+    const std::string scheme = require_string(block, "pqc_shared_secret_commitment_scheme");
+    if (scheme != omniguard::kKemCommitmentLegacyV1 && scheme != omniguard::kKemCommitmentRawV2) {
+        throw std::runtime_error("historical ledger ML-KEM commitment scheme is unsupported");
+    }
+    return scheme;
+}
+
+std::string pqc_message_for(
+    const std::string& key_id,
+    const std::string& block_hash,
+    const std::string& dual_hash,
+    const std::string& previous_hash,
+    const std::string& timestamp,
+    const std::string& commitment_scheme
+) {
+    std::string message = std::string(kPqcDomain) + "\n" + key_id + "\n" +
+        block_hash + "\n" + dual_hash + "\n" + previous_hash + "\n" + timestamp;
+    if (commitment_scheme == omniguard::kKemCommitmentRawV2) {
+        message += "\n" + commitment_scheme;
+    } else if (commitment_scheme != omniguard::kKemCommitmentLegacyV1) {
+        throw std::runtime_error("historical verifier cannot construct message for unsupported ML-KEM commitment scheme");
+    }
+    return message;
+}
+
+std::string pqc_binding_hash_for(
+    const std::string& key_id,
+    const std::string& message,
+    const std::string& signature_hex,
+    const std::string& ciphertext_hex,
+    const std::string& shared_secret_hash,
+    const std::string& commitment_scheme
+) {
+    std::string input = std::string(kPqcDomain) + "\n" + key_id + "\n" + message + "\n" +
+        signature_hex + "\n" + ciphertext_hex;
+    if (commitment_scheme == omniguard::kKemCommitmentRawV2) {
+        input += "\n" + commitment_scheme;
+    } else if (commitment_scheme != omniguard::kKemCommitmentLegacyV1) {
+        throw std::runtime_error("historical verifier cannot bind unsupported ML-KEM commitment scheme");
+    }
+    input += "\n" + shared_secret_hash;
+    return sha3_256_hex(input);
+}
+
 std::size_t require_index(const json& object) {
     if (!object.contains("index") || !object.at("index").is_number_unsigned()) {
         throw std::runtime_error("historical ledger index is missing or invalid");
@@ -366,7 +415,8 @@ std::string block_hash_for(
 bool verify_current_kem_claim(
     const PqcKeyMaterial& active_material,
     const std::vector<unsigned char>& ciphertext,
-    const std::string& expected_shared_secret_hash
+    const std::string& expected_shared_secret_hash,
+    const std::string& commitment_scheme
 ) {
     KemPtr kem(OQS_KEM_new(OQS_KEM_alg_ml_kem_512));
     if (!kem || active_material.kem_secret_key.size() != kem->length_secret_key ||
@@ -384,12 +434,22 @@ bool verify_current_kem_claim(
         OPENSSL_cleanse(secret.data(), secret.size());
         return false;
     }
-    const std::string actual = sha3_256_hex(
-        std::string(kPqcDomain) + "\n" + active_material.key_id + "\n" +
-        to_hex(secret.data(), secret.size())
-    );
+    const std::string prefix = std::string(kPqcDomain) + "\n" + active_material.key_id + "\n";
+    omniguard::PqcKemCommitment commitment;
+    try {
+        commitment = omniguard::make_kem_commitment(
+            commitment_scheme,
+            prefix,
+            secret.data(),
+            secret.size()
+        );
+        omniguard::validate_kem_commitment(commitment);
+    } catch (...) {
+        OPENSSL_cleanse(secret.data(), secret.size());
+        throw;
+    }
     OPENSSL_cleanse(secret.data(), secret.size());
-    return actual == expected_shared_secret_hash;
+    return commitment.scheme == commitment_scheme && commitment.digest_hex == expected_shared_secret_hash;
 }
 
 json verify_ledger(
@@ -405,6 +465,8 @@ json verify_ledger(
 
     std::size_t historical_blocks = 0;
     std::size_t current_blocks = 0;
+    std::size_t commitment_v1_blocks = 0;
+    std::size_t commitment_v2_blocks = 0;
     std::string previous_block_hash(64, '0');
     for (std::size_t i = 0; i < ledger.size(); ++i) {
         const json& block = ledger.at(i);
@@ -453,6 +515,12 @@ json verify_ledger(
         const std::string shared_secret_hash = require_string(block, "pqc_shared_secret_hash");
         const std::string binding_hash = require_string(block, "pqc_binding_hash");
         const std::string pqc_digest = require_string(block, "pqc_digest");
+        const std::string commitment_scheme = commitment_scheme_for_block(block);
+        if (commitment_scheme == omniguard::kKemCommitmentRawV2) {
+            ++commitment_v2_blocks;
+        } else {
+            ++commitment_v1_blocks;
+        }
         if (!is_sha3_hex(shared_secret_hash) || !is_sha3_hex(binding_hash) || !is_sha3_hex(pqc_digest)) {
             throw std::runtime_error("historical ledger PQC digest field is malformed");
         }
@@ -474,8 +542,14 @@ json verify_ledger(
             kem->length_public_key
         );
         const auto kem_ciphertext = from_hex_exact(kem_ciphertext_hex, kem->length_ciphertext);
-        const std::string message = std::string(kPqcDomain) + "\n" + key_id + "\n" +
-            block_hash + "\n" + dual_hash + "\n" + previous_hash + "\n" + timestamp;
+        const std::string message = pqc_message_for(
+            key_id,
+            block_hash,
+            dual_hash,
+            previous_hash,
+            timestamp,
+            commitment_scheme
+        );
         if (!keyring.verify_detached_signature(
                 key_id,
                 message,
@@ -486,9 +560,13 @@ json verify_ledger(
             )) {
             throw std::runtime_error("historical ledger ML-DSA signature is not admitted by the verified trust keyring");
         }
-        const std::string expected_binding = sha3_256_hex(
-            std::string(kPqcDomain) + "\n" + key_id + "\n" + message + "\n" +
-            signature_hex + "\n" + kem_ciphertext_hex + "\n" + shared_secret_hash
+        const std::string expected_binding = pqc_binding_hash_for(
+            key_id,
+            message,
+            signature_hex,
+            kem_ciphertext_hex,
+            shared_secret_hash,
+            commitment_scheme
         );
         if (binding_hash != expected_binding) {
             throw std::runtime_error("historical ledger PQC binding hash validation failed");
@@ -501,7 +579,12 @@ json verify_ledger(
         }
 
         if (key_id == active_material.key_id) {
-            if (!verify_current_kem_claim(active_material, kem_ciphertext, shared_secret_hash)) {
+            if (!verify_current_kem_claim(
+                    active_material,
+                    kem_ciphertext,
+                    shared_secret_hash,
+                    commitment_scheme
+                )) {
                 throw std::runtime_error("current-generation historical ledger ML-KEM claim failed verification");
             }
             ++current_blocks;
@@ -518,6 +601,8 @@ json verify_ledger(
         {"block_count", ledger.size()},
         {"current_generation_blocks", current_blocks},
         {"historical_generation_blocks", historical_blocks},
+        {"kem_commitment_v1_blocks", commitment_v1_blocks},
+        {"kem_commitment_v2_blocks", commitment_v2_blocks},
         {"trusted_generation_count", trusted.size()},
         {"active_key_id", active_material.key_id},
         {"historical_ml_dsa_authenticity_verified", true},
