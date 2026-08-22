@@ -1,17 +1,46 @@
 import os
 import socket
+import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from runtime_backend_patch import (
-    _isolated_ensure_service,
-    _loopback_endpoint_is_listening,
-    _runtime_mode,
-    _select_go_backend_command,
-    _startup_timeout_seconds,
-)
+# These tests exercise only the launcher/readiness policy. Keep them independent
+# from optional dashboard/ML dependencies (NumPy/OpenCV/etc.) by providing the
+# minimal GoBackend class contract that runtime_backend_patch captures at import.
+# The real backend is exercised separately by Windows Runtime Smoke.
+_stub_backend_module = types.ModuleType("smartcar_backend")
+
+
+class _StubGoBackend:
+    def _request(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def _refresh(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def security_capabilities(self):
+        return {}
+
+
+_stub_backend_module.GoBackend = _StubGoBackend
+_original_smartcar_backend = sys.modules.get("smartcar_backend")
+sys.modules["smartcar_backend"] = _stub_backend_module
+try:
+    from runtime_backend_patch import (
+        _isolated_ensure_service,
+        _loopback_endpoint_is_listening,
+        _runtime_mode,
+        _select_go_backend_command,
+        _startup_timeout_seconds,
+    )
+finally:
+    if _original_smartcar_backend is None:
+        sys.modules.pop("smartcar_backend", None)
+    else:
+        sys.modules["smartcar_backend"] = _original_smartcar_backend
 
 
 class RuntimeBackendReadinessTests(unittest.TestCase):
