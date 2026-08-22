@@ -43,6 +43,8 @@ def _isolated_spawn_environment(self: GoBackend, root: Path) -> Dict[str, str]:
             "SMARTCAR_GO_API_SECRET",
             "SMARTCAR_GO_DATA_DIR",
             "SMARTCAR_GO_ALLOW_CLASSICAL_ECDH_FALLBACK",
+            "SMARTCAR_GO_ENABLE_LIVE_STREAM",
+            "SMARTCAR_GO_LIVE_ADDR",
         },
         smartcar_overrides={
             "SMARTCAR_GO_API_SECRET": self.api_secret,
