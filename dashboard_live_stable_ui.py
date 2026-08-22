@@ -8,13 +8,12 @@ source-backed ledger-growth graph from real block timestamps.
 
 from __future__ import annotations
 
-import math
 import tkinter as tk
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Sequence, Tuple
 
 import dashboard_reference_ui as reference
-from dashboard import NO_DATA, UNAVAILABLE
+from dashboard import NO_DATA
 from dashboard_live_ui import LiveSocketSmartCarDashboard
 
 
@@ -144,9 +143,14 @@ class StableLiveSmartCarDashboard(LiveSocketSmartCarDashboard):
         if raw.endswith("Z"):
             raw = raw[:-1] + "+00:00"
         try:
-            return datetime.fromisoformat(raw)
+            parsed = datetime.fromisoformat(raw)
         except ValueError:
             return None
+        # Backend timestamps are UTC RFC3339. Normalize older naive chain entries
+        # to UTC so mixed old/new histories cannot raise aware-vs-naive errors.
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
 
     def _transaction_series(self, chain: Sequence[Any]) -> List[Tuple[datetime, int, str]]:
         """Return real timestamp + cumulative committed-record count + event label."""
@@ -166,14 +170,11 @@ class StableLiveSmartCarDashboard(LiveSocketSmartCarDashboard):
         width = max(int(canvas.winfo_width() or 0), 360)
         height = max(int(canvas.winfo_height() or 0), 170)
         raw_tail = list(chain)[-self.TRANSACTION_GRAPH_WINDOW :]
-        source_signature = tuple(
-            (
-                self._block_fields(block).get("index"),
-                self._block_fields(block).get("timestamp"),
-                self._block_fields(block).get("event"),
-            )
-            for block in raw_tail
-        )
+        signature_rows = []
+        for block in raw_tail:
+            fields = self._block_fields(block)
+            signature_rows.append((fields.get("index"), fields.get("timestamp"), fields.get("event")))
+        source_signature = tuple(signature_rows)
         signature = (width, height, source_signature)
         key = str(canvas)
         if self._transaction_chart_signatures.get(key) == signature:
