@@ -15,6 +15,29 @@ class StableLiveDashboardContractTests(unittest.TestCase):
         self.assertIn("from dashboard_live_stable_ui import SmartCarDashboard", self.main_text)
         self.assertIn("class StableLiveSmartCarDashboard(LiveSocketSmartCarDashboard)", self.text)
 
+    def test_sidebar_is_larger_and_drag_resizable(self):
+        build = self._method_source("_build_reference_sidebar")
+        drag = self._method_source("_on_sidebar_resize_drag")
+        setter = self._method_source("_set_sidebar_width")
+        self.assertIn("SIDEBAR_DEFAULT_WIDTH = 292", self.text)
+        self.assertIn("SIDEBAR_MIN_WIDTH = 220", self.text)
+        self.assertIn("SIDEBAR_MAX_WIDTH = 390", self.text)
+        self.assertIn("sb_h_double_arrow", build)
+        self.assertIn("<B1-Motion>", build)
+        self.assertIn("<Double-Button-1>", build)
+        self.assertIn("f_sidebar_menu", build)
+        self.assertIn("pady=11", build)
+        self.assertIn("event.x_root", drag)
+        self.assertIn("SIDEBAR_MIN_WIDTH", setter)
+        self.assertIn("SIDEBAR_MAX_WIDTH", setter)
+
+    def test_sidebar_uses_dedicated_larger_fonts(self):
+        fonts = self._method_source("_setup_reference_fonts")
+        labels = self._method_source("_apply_sidebar_label_fonts")
+        self.assertIn('size=11', fonts)
+        self.assertIn('size=9', fonts)
+        self.assertIn('"CORE", "SECURITY", "SYSTEM"', labels)
+
     def test_activity_feed_updates_in_place_without_destroy(self):
         method = self._method_source("_render_activity_feed")
         helper = self._method_source("_apply_feed_items")
