@@ -12,6 +12,7 @@ class V303FinalHardeningTests(unittest.TestCase):
     def setUpClass(cls):
         cls.runtime = Path("native/secure_blockchain_v303.cpp").read_text(encoding="utf-8")
         cls.provider = Path("native/pqc_provider_policy.h").read_text(encoding="utf-8")
+        cls.anchor_header = Path("native/pqc_state_guard.h").read_text(encoding="utf-8")
         cls.anchor = Path("native/pqc_state_guard.cpp").read_text(encoding="utf-8")
         cls.state_admin = Path("native/pqc_state_admin.cpp").read_text(encoding="utf-8")
         cls.cmake = Path("CMakeLists.txt").read_text(encoding="utf-8")
@@ -33,7 +34,8 @@ class V303FinalHardeningTests(unittest.TestCase):
         self.assertIn("refusing to overwrite an existing native ledger", self.runtime)
 
     def test_rollback_anchor_is_authenticated_and_not_overclaimed(self):
-        self.assertIn("OMNIGUARD_PQC_ROLLBACK_ANCHOR_V1", self.anchor)
+        self.assertIn("OMNIGUARD_PQC_ROLLBACK_ANCHOR_V1", self.anchor_header)
+        self.assertIn("OMNIGUARD_PQC_ROLLBACK_ANCHOR_HMAC_V1", self.anchor_header)
         self.assertIn("HMAC", self.anchor)
         self.assertIn("sequence != generation", self.anchor)
         self.assertIn("hardware_monotonic", self.anchor)
