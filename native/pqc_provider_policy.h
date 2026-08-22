@@ -111,8 +111,8 @@ inline PqcProviderCapabilities enforce_pqc_provider_policy(bool hardware_require
     }
     if (hardware_required && (!capabilities.hardware_backed || !capabilities.non_exportable)) {
         throw std::runtime_error(
-            "hardware-backed non-exportable PQC provider is required, but active provider '" + capabilities.provider +
-            "' does not have runtime-verified hardware protection; software fallback is prohibited"
+            "hardware-backed PQC provider is required and private keys must be non-exportable, but active provider '" +
+            capabilities.provider + "' does not have runtime-verified hardware protection; software fallback is prohibited"
         );
     }
     return capabilities;
