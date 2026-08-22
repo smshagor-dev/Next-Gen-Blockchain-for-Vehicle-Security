@@ -56,6 +56,24 @@ inline void validate_hardware_probe(const PqcHardwareProbe& probe) {
     }
 }
 
+inline void validate_hardware_public_material(
+    const PqcHardwareProbe& probe,
+    const PqcHardwarePublicMaterial& material,
+    const std::string& expected_identity
+) {
+    validate_hardware_probe(probe);
+    if (material.provider != probe.provider || !is_hardware_pqc_provider_name(material.provider)) {
+        throw std::runtime_error("PQC hardware public material/provider binding is invalid");
+    }
+    if (expected_identity.empty() || material.identity != expected_identity) {
+        throw std::runtime_error("PQC hardware public material/identity binding is invalid");
+    }
+    if (material.key_id.empty() || material.generation == 0 ||
+        material.signature_public_key.empty() || material.kem_public_key.empty()) {
+        throw std::runtime_error("PQC hardware public material is incomplete");
+    }
+}
+
 inline PqcProviderCapabilities capabilities_from_verified_hardware_probe(const PqcHardwareProbe& probe) {
     validate_hardware_probe(probe);
     return {
