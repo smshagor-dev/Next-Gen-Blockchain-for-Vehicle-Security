@@ -14,6 +14,7 @@ class V303FinalHardeningTests(unittest.TestCase):
     def setUpClass(cls):
         cls.runtime = Path("native/secure_blockchain_v303.cpp").read_text(encoding="utf-8")
         cls.provider = Path("native/pqc_provider_policy.h").read_text(encoding="utf-8")
+        cls.provider_factory = Path("native/pqc_runtime_provider_factory.h").read_text(encoding="utf-8")
         cls.hardware_provider = Path("native/pqc_hardware_provider.h").read_text(encoding="utf-8")
         cls.anchor_header = Path("native/pqc_state_guard.h").read_text(encoding="utf-8")
         cls.anchor = Path("native/pqc_state_guard.cpp").read_text(encoding="utf-8")
@@ -54,6 +55,27 @@ class V303FinalHardeningTests(unittest.TestCase):
         self.assertNotIn("kem_secret_key_", self.runtime)
         self.assertNotIn("OQS_SIG_sign(", self.runtime)
         self.assertNotIn("OQS_KEM_decaps(", self.runtime)
+
+    def test_runtime_provider_factory_never_silently_falls_back(self):
+        for required in (
+            "make_runtime_pqc_private_operations",
+            "requested_pqc_provider_from_env",
+            "make_registered_hardware_pqc_provider",
+            "UnavailablePqcHardwareProvider",
+            "HardwarePqcActivePrivateOperations",
+            "explicit hardware provider request never falls back",
+            "before any software keystore can be created or used",
+        ):
+            self.assertIn(required, self.provider_factory)
+        self.assertIn(
+            "active_(omniguard::make_runtime_pqc_private_operations(keystore_path, keystore_key, vehicle_id_))",
+            self.runtime,
+        )
+        self.assertIn("requested_provider == omniguard::kSoftwarePqcProvider", self.runtime)
+        self.assertNotIn(
+            "active_(PqcKeyStore(keystore_path, keystore_key, vehicle_id_).load_or_create())",
+            self.runtime,
+        )
 
     def test_rollback_anchor_is_authenticated_and_not_overclaimed(self):
         self.assertIn("OMNIGUARD_PQC_ROLLBACK_ANCHOR_V1", self.anchor_header)
