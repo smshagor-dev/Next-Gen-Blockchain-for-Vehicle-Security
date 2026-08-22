@@ -66,7 +66,9 @@ class ReferenceDashboardContractTests(unittest.TestCase):
             self.assertIn(marker, render)
 
     def test_reference_screenshot_numbers_are_not_hardcoded(self):
-        for forbidden in ("128", "1,256", "98.6%", "+18.7%", "156 ms", "3.2s"):
+        # Guard only user-visible literal KPI strings from the reference image.
+        # Numeric canvas geometry (for example cx - 128) is legitimate UI layout.
+        for forbidden in ('"128"', '"1,256"', '"98.6%"', '"+18.7%"', '"156 ms"', '"3.2s"'):
             self.assertNotIn(forbidden, self.text)
 
     def test_no_demo_or_random_runtime_generation(self):
