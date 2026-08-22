@@ -872,9 +872,9 @@ int run_self_test(
     const std::string identity = "SMARTCAR_CPP_SELFTEST";
     const std::filesystem::path ledger_path = keystore_path.string() + ".runtime-ledger.json";
     std::error_code ignored;
-    std::filesystem::remove(ledger_path, ignored);
     {
         NativeRuntime runtime(identity, data_key, keystore_path, keystore_key);
+        std::filesystem::remove(ledger_path, ignored);
         runtime.create_new();
         runtime.append("SELFTEST:TELEMETRY");
         runtime.save(ledger_path);
