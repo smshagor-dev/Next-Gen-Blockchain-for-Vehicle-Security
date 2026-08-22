@@ -168,7 +168,20 @@ def main() -> int:
     generated, preserved = bootstrap_local_env(env_path, rotate_all=args.rotate_all)
     print(f"Local environment ready: {env_path}")
     print(f"Generated/rotated credentials: {generated}; preserved credentials: {preserved}")
-    print("Secret values were not printed. You can now run: python main.py")
+    print("Secret values were not printed.")
+
+    if args.rotate_all:
+        print("IMPORTANT: --rotate-all changed the Go API credential.")
+        print(
+            "If a previous SmartCar Go backend is still listening on 127.0.0.1:8787, "
+            "stop only the verified project-owned stale backend before starting the dashboard."
+        )
+        print(
+            "If main.py reports an authenticated-health/port-8787 conflict, follow "
+            "INITIAL_SETUP.md -> Troubleshooting -> configured Go backend endpoint already in use."
+        )
+
+    print("You can now run: python main.py")
     return 0
 
 
