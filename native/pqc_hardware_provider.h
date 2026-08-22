@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <stdexcept>
 #include <string>
@@ -7,6 +8,7 @@
 #include <vector>
 
 #include "pqc_provider_policy.h"
+#include "pqc_sensitive_bytes.h"
 
 namespace omniguard {
 
@@ -23,6 +25,9 @@ struct PqcHardwareProbe {
     bool ml_kem_512_key_generation = false;
     bool ml_kem_512_decapsulate = false;
     bool rotation_supported = false;
+    std::size_t ml_dsa_44_signature_max_size = 0;
+    std::size_t ml_kem_512_ciphertext_size = 0;
+    std::size_t ml_kem_512_shared_secret_size = 0;
 };
 
 struct PqcHardwarePublicMaterial {
@@ -53,6 +58,10 @@ inline void validate_hardware_probe(const PqcHardwareProbe& probe) {
     }
     if (probe.device_identity.empty() || probe.evidence_reference.empty()) {
         throw std::runtime_error("PQC hardware provider probe lacks device/evidence identity");
+    }
+    if (probe.ml_dsa_44_signature_max_size == 0 || probe.ml_kem_512_ciphertext_size == 0 ||
+        probe.ml_kem_512_shared_secret_size == 0) {
+        throw std::runtime_error("PQC hardware provider probe lacks required algorithm size metadata");
     }
 }
 
@@ -106,7 +115,9 @@ public:
         const std::vector<unsigned char>& message
     ) = 0;
 
-    virtual std::vector<unsigned char> decapsulate_ml_kem_512(
+    // The derived ML-KEM shared secret is intentionally move-only and is
+    // zeroized when it leaves scope. This does not export the ML-KEM private key.
+    virtual PqcSensitiveBytes decapsulate_ml_kem_512(
         const std::string& key_id,
         const std::vector<unsigned char>& ciphertext
     ) = 0;
@@ -143,7 +154,7 @@ public:
         fail();
     }
 
-    std::vector<unsigned char> decapsulate_ml_kem_512(
+    PqcSensitiveBytes decapsulate_ml_kem_512(
         const std::string&,
         const std::vector<unsigned char>&
     ) override {
