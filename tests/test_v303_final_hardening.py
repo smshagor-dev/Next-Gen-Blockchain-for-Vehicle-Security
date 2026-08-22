@@ -13,9 +13,12 @@ class V303FinalHardeningTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.runtime = Path("native/secure_blockchain_v303.cpp").read_text(encoding="utf-8")
+        cls.history_verifier = Path("native/pqc_history_verifier.cpp").read_text(encoding="utf-8")
         cls.provider = Path("native/pqc_provider_policy.h").read_text(encoding="utf-8")
         cls.provider_factory = Path("native/pqc_runtime_provider_factory.h").read_text(encoding="utf-8")
         cls.hardware_provider = Path("native/pqc_hardware_provider.h").read_text(encoding="utf-8")
+        cls.active_operations = Path("native/pqc_active_operations.h").read_text(encoding="utf-8")
+        cls.kem_commitment = Path("native/pqc_kem_commitment.h").read_text(encoding="utf-8")
         cls.anchor_header = Path("native/pqc_state_guard.h").read_text(encoding="utf-8")
         cls.anchor = Path("native/pqc_state_guard.cpp").read_text(encoding="utf-8")
         cls.state_admin = Path("native/pqc_state_admin.cpp").read_text(encoding="utf-8")
@@ -43,7 +46,7 @@ class V303FinalHardeningTests(unittest.TestCase):
             "PqcActivePrivateOperations",
             "SoftwarePqcActivePrivateOperations",
             "private_operations_->sign_ml_dsa_44",
-            "private_operations_->decapsulate_ml_kem_512",
+            "private_operations_->decapsulate_ml_kem_512_commitment",
             "active_pqc_provider",
             "active_pqc_hardware_backed",
             "active_pqc_non_exportable",
@@ -51,10 +54,42 @@ class V303FinalHardeningTests(unittest.TestCase):
             "active_pqc_private_operations_opaque",
         ):
             self.assertIn(required, self.runtime)
+        self.assertNotIn("private_operations_->decapsulate_ml_kem_512(ciphertext)", self.runtime)
         self.assertNotIn("signature_secret_key_", self.runtime)
         self.assertNotIn("kem_secret_key_", self.runtime)
         self.assertNotIn("OQS_SIG_sign(", self.runtime)
         self.assertNotIn("OQS_KEM_decaps(", self.runtime)
+
+    def test_runtime_emits_authenticated_v2_kem_commitments_and_keeps_v1_compatibility(self):
+        for required in (
+            "kKemCommitmentLegacyV1",
+            "kKemCommitmentRawV2",
+            "pqc_shared_secret_commitment_scheme",
+            "commitment_scheme_for_block",
+            "pqc_message_for",
+            "pqc_binding_hash_for",
+            "decapsulate_ml_kem_512_commitment",
+            "kem_commitment_v1_blocks",
+            "kem_commitment_v2_blocks",
+            "new_block_kem_commitment_scheme",
+        ):
+            self.assertIn(required, self.runtime)
+            self.assertIn(required, self.history_verifier)
+        self.assertIn(
+            'if (!block.contains("pqc_shared_secret_commitment_scheme"))',
+            self.runtime,
+        )
+        self.assertIn(
+            'return omniguard::kKemCommitmentLegacyV1;',
+            self.runtime,
+        )
+        self.assertIn(
+            'const std::string commitment_scheme = omniguard::kKemCommitmentRawV2;',
+            self.runtime,
+        )
+        self.assertIn('message += "\\n" + commitment_scheme;', self.runtime)
+        self.assertIn('input += "\\n" + commitment_scheme;', self.runtime)
+        self.assertIn("make_kem_commitment", self.kem_commitment)
 
     def test_runtime_provider_factory_never_silently_falls_back(self):
         for required in (
@@ -113,10 +148,13 @@ class V303FinalHardeningTests(unittest.TestCase):
             "ml_dsa_44_sign",
             "ml_kem_512_key_generation",
             "ml_kem_512_decapsulate",
+            "ml_kem_512_derived_secret_non_exportable",
+            "ml_kem_512_sha3_256_raw_commitment",
             "rotation_supported",
             "device_identity",
             "evidence_reference",
             "sign_ml_dsa_44",
+            "decapsulate_ml_kem_512_commitment",
             "decapsulate_ml_kem_512",
             "validate_hardware_probe(probe)",
             "validate_hardware_public_material",
@@ -127,6 +165,10 @@ class V303FinalHardeningTests(unittest.TestCase):
             "software fallback is prohibited",
         ):
             self.assertIn(required, self.hardware_provider)
+        self.assertIn(
+            "hardware ML-KEM commitment operation requires the V2 raw-secret commitment scheme",
+            self.active_operations,
+        )
         self.assertNotIn("signature_secret_key", self.hardware_provider)
         self.assertNotIn("kem_secret_key", self.hardware_provider)
         self.assertNotIn("export_private", self.hardware_provider)
