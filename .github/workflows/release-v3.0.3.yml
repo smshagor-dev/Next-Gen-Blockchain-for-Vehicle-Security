@@ -1,27 +1,40 @@
-name: Security Baseline
+name: Publish OmniGuard V2X v3.0.3
 
 on:
-  pull_request:
-    branches: [main]
   push:
-    branches:
-      - main
-      - security/**
-      - release/**
+    tags:
+      - v3.0.3
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: omniguard-v3.0.3-publication
+  cancel-in-progress: false
+
 jobs:
-  security-validation:
+  validate-and-package:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
-      - name: Checkout
+      - name: Checkout tagged commit
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Verify tag identity and exact main target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_TYPE" = "tag"
+          test "$GITHUB_REF_NAME" = "v3.0.3"
+          test "$(tr -d '\r\n' < VERSION)" = "3.0.3"
+          git fetch origin main --no-tags
+          main_sha="$(git rev-parse origin/main)"
+          test "$GITHUB_SHA" = "$main_sha"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -f .github/workflows/release-v3.0.3.yml
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -34,12 +47,10 @@ jobs:
           go-version: "1.22.x"
           cache-dependency-path: api/go/go.mod
 
-      - name: Compile hardened Python modules
-        run: |
-          python -m py_compile release_metadata.py release_integrity.py credential_policy.py key_provider.py runtime_isolation.py runtime_security_monitor.py runtime_backend_security.py runtime_backend_patch.py incident_response.py incident_response_runtime.py incident_response_validation.py env_config.py replay_security.py permissioned_consensus.py consensus_security.py identity_security.py sync_protocol_legacy.py sync_protocol.py did_identity.py v2x_protocol.py control_api_security.py ledger_integrity.py adversarial_validation.py hil_security_validation.py smartcar_backend.py smart_contracts.py main.py
-          python -m py_compile scripts/generate_sbom.py scripts/generate_provenance.py scripts/secret_scan.py
+      - name: Run current-tree secret scan
+        run: python scripts/secret_scan.py
 
-      - name: Run Python security regression tests
+      - name: Run release regression suites
         env:
           PYTHONPATH: .
         run: |
@@ -69,48 +80,13 @@ jobs:
           python -m unittest -v tests.test_pqc_key_rotation
           python -m unittest -v tests.test_pqc_trust_history
 
-      - name: Run current-tree secret scan
-        run: python scripts/secret_scan.py
-
-      - name: Verify canonical release identity
+      - name: Run deterministic security validation reports
         env:
           PYTHONPATH: .
         run: |
-          test "$(tr -d '\r\n' < VERSION)" = "3.0.3"
-          python - <<'PY'
-          from release_metadata import RELEASE_VERSION, release_metadata
-          from security_capabilities import security_capability_output
-          assert RELEASE_VERSION == "3.0.3"
-          assert release_metadata()["internal_hardening_phase"] == "v3.3"
-          assert security_capability_output(False)["release_version"] == "3.0.3"
-          PY
-
-      - name: Generate and verify release integrity manifest
-        env:
-          PYTHONPATH: .
-        run: |
-          python release_integrity.py --commit-sha "$GITHUB_SHA" --output security-reports/release-integrity-manifest.json
-          python release_integrity.py --verify security-reports/release-integrity-manifest.json
-
-      - name: Generate SBOM and provenance
-        run: |
-          python scripts/generate_sbom.py --output security-reports/sbom-v3.0.3.cdx.json
-          python scripts/generate_provenance.py --commit-sha "$GITHUB_SHA" --output security-reports/provenance-v3.0.3.json
-
-      - name: Run deterministic adversarial campaigns
-        env:
-          PYTHONPATH: .
-        run: python adversarial_validation.py --seed 168938023 --iterations 256 --max-duration-sec 20 --output security-reports/adversarial-validation.json
-
-      - name: Run deterministic software HIL security scenarios
-        env:
-          PYTHONPATH: .
-        run: python hil_security_validation.py --output security-reports/hil-security-validation.json
-
-      - name: Run deterministic incident-response scenarios
-        env:
-          PYTHONPATH: .
-        run: python incident_response_validation.py --output security-reports/incident-response-validation.json
+          python adversarial_validation.py --seed 168938023 --iterations 256 --max-duration-sec 20 --output security-reports/adversarial-validation.json
+          python hil_security_validation.py --output security-reports/hil-security-validation.json
+          python incident_response_validation.py --output security-reports/incident-response-validation.json
 
       - name: Verify hardened native target fails closed without liboqs
         shell: bash
@@ -129,10 +105,7 @@ jobs:
           status=$?
           set -e
           cat build/native-strict.log
-          if [ "$status" -eq 0 ]; then
-            echo "Hardened native configure unexpectedly succeeded without liboqs." >&2
-            exit 1
-          fi
+          test "$status" -ne 0
           grep -F "Real liboqs is required for the hardened native blockchain target" build/native-strict.log
 
       - name: Build pinned real-PQC v3.0.3 targets
@@ -154,11 +127,11 @@ jobs:
             smartcar_blockchain smartcar_pqc_keystore_selftest smartcar_pqc_key_admin \
             smartcar_pqc_trust_admin smartcar_pqc_history_verify smartcar_pqc_state_admin --parallel 2
 
-      - name: Run secure native v3.0.3 self-test
+      - name: Run native v3.0.3 self-tests
         shell: bash
         run: |
           set -euo pipefail
-          root="$RUNNER_TEMP/v303-native"
+          root="$RUNNER_TEMP/v303-native-selftest"
           rm -rf "$root" && mkdir -p "$root"
           export SMARTCAR_CPP_DATA_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
           export SMARTCAR_AUTH_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
@@ -188,7 +161,7 @@ jobs:
           export SMARTCAR_CPP_PQC_PROVIDER=software_encrypted_file
           export SMARTCAR_CPP_PQC_HARDWARE_REQUIRED=0
           ./build/native-real/smartcar_pqc_trust_admin init --identity "$vehicle" > "$root/root.json"
-          ./build/native-real/smartcar_blockchain init --identity "$vehicle" --ledger "$root/ledger.json" > "$root/initial.json"
+          ./build/native-real/smartcar_blockchain init --identity "$vehicle" --ledger "$root/ledger.json" > "$root/initial-report.json"
           old_id="$(./build/native-real/smartcar_pqc_key_admin inspect --identity "$vehicle" | python -c 'import json,sys; print(json.load(sys.stdin)["key_id"])')"
           ./build/native-real/smartcar_pqc_key_admin rotate --identity "$vehicle" --reason "v3.0.3 hosted mixed generation" --confirm "ROTATE:$old_id" --rotation-dir "$root/rotations" > "$root/rotation.json"
           backup="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["backup_path"])' "$root/rotation.json")"
@@ -226,6 +199,7 @@ jobs:
           export SMARTCAR_CPP_PQC_TRUST_KEYRING_PATH="$root/trust.json"
           export SMARTCAR_CPP_PQC_TRUST_MAX_GENERATIONS=8
           export SMARTCAR_CPP_PQC_ROTATION_ENABLED=1
+          export SMARTCAR_CPP_PQC_ROTATION_DIR="$root/rotations"
           export SMARTCAR_CPP_PQC_ROLLBACK_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
           export SMARTCAR_CPP_PQC_ROLLBACK_ANCHOR_PATH="$root/anchor.json"
           export SMARTCAR_CPP_PQC_PROVIDER=software_encrypted_file
@@ -268,46 +242,109 @@ jobs:
             test ! -e "$RUNNER_TEMP/$provider.json"
           done
 
-      - name: Normalize Go formatting for validation
-        working-directory: api/go
-        run: gofmt -w .
-
-      - name: Run Go security tests and fuzz seed corpus
-        working-directory: api/go
-        run: go test ./... -count=1
-
-      - name: Run bounded Go fuzz campaigns
+      - name: Run Go tests and bounded fuzz campaigns
         working-directory: api/go
         run: |
+          gofmt -w .
+          go test ./... -count=1
           go test -run=^$ -fuzz=FuzzSafeChainPathConfined -fuzztime=2s -timeout=30s
           go test -run=^$ -fuzz=FuzzControlAPIMalformedEmergency -fuzztime=2s -timeout=30s
           go test -run=^$ -fuzz=FuzzHealthChallengeParser -fuzztime=2s -timeout=30s
           go test -run=^$ -fuzz=FuzzControlAPIUnsignedMutation -fuzztime=2s -timeout=30s
+          go build -trimpath -o ../../build/smartcar_go_backend-v3.0.3-linux-amd64 .
 
-      - name: Build Go backend validation binary
-        working-directory: api/go
-        run: go build -trimpath -o ../../build/smartcar_go_backend-v3.0.3-linux-amd64 .
+      - name: Generate commit-bound release integrity manifest
+        env:
+          PYTHONPATH: .
+        run: |
+          python release_integrity.py --commit-sha "$GITHUB_SHA" --output security-reports/release-integrity-manifest.json
+          python release_integrity.py --verify security-reports/release-integrity-manifest.json
 
-      - name: Package v3.0.3 Linux validation artifacts
+      - name: Generate SBOM and provenance
+        run: |
+          python scripts/generate_sbom.py --output security-reports/sbom-v3.0.3.cdx.json
+          python scripts/generate_provenance.py --commit-sha "$GITHUB_SHA" --output security-reports/provenance-v3.0.3.json
+
+      - name: Package tagged validation artifacts and verify SHA-256
         shell: bash
         run: |
           set -euo pipefail
-          package_dir="security-reports/v3.0.3-linux-amd64"
+          package_dir="dist/omniguard-v3.0.3-linux-amd64-validation"
           mkdir -p "$package_dir"
           cp build/native-real/smartcar_blockchain "$package_dir/smartcar_blockchain-v3.0.3-linux-amd64"
           cp build/smartcar_go_backend-v3.0.3-linux-amd64 "$package_dir/"
-          cp VERSION "$package_dir/"
+          cp VERSION "$package_dir/VERSION"
           cp docs/releases/v3.0.3.md "$package_dir/RELEASE_NOTES.md"
           cp security-reports/release-integrity-manifest.json "$package_dir/"
           cp security-reports/sbom-v3.0.3.cdx.json "$package_dir/"
           cp security-reports/provenance-v3.0.3.json "$package_dir/"
+          cp security-reports/adversarial-validation.json "$package_dir/"
+          cp security-reports/hil-security-validation.json "$package_dir/"
+          cp security-reports/incident-response-validation.json "$package_dir/"
           cp -r security-reports/v303 "$package_dir/"
           (cd "$package_dir" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS && sha256sum -c SHA256SUMS)
 
-      - name: Upload v3.0.3 final-hardening evidence
+      - name: Upload validated publication payload
         uses: actions/upload-artifact@v4
         with:
-          name: omniguard-v3.0.3-final-hardening
-          path: security-reports/
+          name: omniguard-v3.0.3-publication-payload
+          path: dist/omniguard-v3.0.3-linux-amd64-validation/
           if-no-files-found: error
           retention-days: 14
+
+  publish:
+    needs: validate-and-package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Download validated publication payload
+        uses: actions/download-artifact@v4
+        with:
+          name: omniguard-v3.0.3-publication-payload
+          path: dist/omniguard-v3.0.3-linux-amd64-validation
+
+      - name: Re-verify publication payload and tag binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_TYPE" = "tag"
+          test "$GITHUB_REF_NAME" = "v3.0.3"
+          package_dir="dist/omniguard-v3.0.3-linux-amd64-validation"
+          test "$(tr -d '\r\n' < "$package_dir/VERSION")" = "3.0.3"
+          (cd "$package_dir" && sha256sum -c SHA256SUMS)
+          python3 - "$package_dir/release-integrity-manifest.json" "$GITHUB_SHA" <<'PY'
+          import json, sys
+          from pathlib import Path
+          manifest=json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+          if manifest.get('release_version')!='3.0.3': raise SystemExit('release manifest version mismatch')
+          if manifest.get('release_tag')!='v3.0.3': raise SystemExit('release manifest tag mismatch')
+          if manifest.get('commit_sha')!=sys.argv[2]: raise SystemExit('release manifest commit mismatch')
+          PY
+
+      - name: Refuse duplicate GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then exit 1; fi
+
+      - name: Publish GitHub Release from validated tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          package_dir="dist/omniguard-v3.0.3-linux-amd64-validation"
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "OmniGuard V2X v3.0.3" --notes-file "$package_dir/RELEASE_NOTES.md" \
+            "$package_dir/smartcar_blockchain-v3.0.3-linux-amd64#Hardened native C++ validation binary (Linux amd64)" \
+            "$package_dir/smartcar_go_backend-v3.0.3-linux-amd64#Go control backend validation binary (Linux amd64)" \
+            "$package_dir/SHA256SUMS#SHA-256 checksums" \
+            "$package_dir/release-integrity-manifest.json#Commit-bound release integrity manifest" \
+            "$package_dir/sbom-v3.0.3.cdx.json#Repository-declared SBOM" \
+            "$package_dir/provenance-v3.0.3.json#Build validation provenance" \
+            "$package_dir/adversarial-validation.json#Adversarial validation report" \
+            "$package_dir/hil-security-validation.json#Software-HIL validation report" \
+            "$package_dir/incident-response-validation.json#Incident-response validation report"

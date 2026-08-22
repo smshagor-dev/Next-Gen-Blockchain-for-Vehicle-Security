@@ -153,7 +153,12 @@ def build_manifest(
             "signature": "ML-DSA-44",
             "key_encapsulation": "ML-KEM-512",
             "simulated_pqc_supported_target": False,
-            "legacy_demo_isolated": True,
+            "legacy_simulated_pqc_source_removed": True,
+            "durable_identity": True,
+            "signed_historical_trust": True,
+            "mixed_generation_verification": True,
+            "hardware_pqc_provider_implemented": False,
+            "hardware_monotonic_rollback_protection": False,
         },
         "claims": {
             "production_certified": False,
@@ -192,7 +197,7 @@ def verify_manifest(path: Path, *, root: Path = Path(".")) -> bool:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    parser = argparse.ArgumentParser(description="Generate/verify the v3.0.2 integrity manifest")
+    parser = argparse.ArgumentParser(description="Generate/verify the v3.0.3 integrity manifest")
     parser.add_argument("--output", type=Path, default=Path("security-reports/release-integrity-manifest.json"))
     parser.add_argument("--commit-sha", default=None)
     parser.add_argument("--verify", type=Path, default=None)

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <stdexcept>
 #include <string>
@@ -7,12 +9,17 @@
 namespace omniguard {
 
 inline constexpr const char* kSoftwarePqcProvider = "software_encrypted_file";
+inline constexpr const char* kTpm2PqcProvider = "tpm2";
+inline constexpr const char* kPkcs11PqcProvider = "pkcs11";
+inline constexpr const char* kHsmPqcProvider = "hsm";
 
 struct PqcProviderCapabilities {
     std::string provider;
     bool hardware_backed = false;
     bool non_exportable = false;
-    bool rotation_supported = true;
+    bool rotation_supported = false;
+    bool implemented = false;
+    bool available = false;
 };
 
 inline bool parse_strict_env_bool(const char* name, bool default_value = false) {
@@ -30,21 +37,45 @@ inline bool parse_strict_env_bool(const char* name, bool default_value = false) 
     throw std::runtime_error(std::string("invalid boolean policy value for ") + name);
 }
 
+inline std::string requested_pqc_provider_from_env() {
+    const char* raw = std::getenv("SMARTCAR_CPP_PQC_PROVIDER");
+    std::string provider = raw == nullptr || *raw == '\0' ? kSoftwarePqcProvider : std::string(raw);
+    std::transform(provider.begin(), provider.end(), provider.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
+    if (provider != kSoftwarePqcProvider && provider != kTpm2PqcProvider &&
+        provider != kPkcs11PqcProvider && provider != kHsmPqcProvider) {
+        throw std::runtime_error("SMARTCAR_CPP_PQC_PROVIDER must be software_encrypted_file, tpm2, pkcs11, or hsm");
+    }
+    return provider;
+}
+
+inline PqcProviderCapabilities pqc_provider_capabilities(const std::string& provider) {
+    if (provider == kSoftwarePqcProvider) {
+        return {provider, false, false, true, true, true};
+    }
+    // Hardware provider names are explicit policy requests only. No software
+    // emulation or exportable-key fallback is presented as hardware-backed.
+    return {provider, true, true, false, false, false};
+}
+
 inline PqcProviderCapabilities software_pqc_provider_capabilities() {
-    return {
-        kSoftwarePqcProvider,
-        false,
-        false,
-        true,
-    };
+    return pqc_provider_capabilities(kSoftwarePqcProvider);
 }
 
 inline PqcProviderCapabilities enforce_pqc_provider_policy(bool hardware_required) {
-    const PqcProviderCapabilities capabilities = software_pqc_provider_capabilities();
+    const std::string requested = requested_pqc_provider_from_env();
+    const PqcProviderCapabilities capabilities = pqc_provider_capabilities(requested);
+    if (!capabilities.implemented || !capabilities.available) {
+        throw std::runtime_error(
+            "requested PQC provider '" + requested +
+            "' is not implemented/available in this build; hardware provider fallback is never simulated"
+        );
+    }
     if (hardware_required && !capabilities.hardware_backed) {
         throw std::runtime_error(
-            "hardware-backed PQC provider is required, but only " + capabilities.provider +
-            " is implemented; TPM2/PKCS#11/HSM fallback is not simulated"
+            "hardware-backed PQC provider is required, but active provider '" + capabilities.provider +
+            "' is software-backed; TPM2/PKCS#11/HSM fallback is not simulated"
         );
     }
     return capabilities;

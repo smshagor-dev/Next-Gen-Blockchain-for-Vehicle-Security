@@ -1,18 +1,18 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(SmartCarBlockchain VERSION 3.0.2 LANGUAGES CXX)
+project(SmartCarBlockchain VERSION 3.0.3 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(SMARTCAR_BUILD_BLOCKCHAIN "Build the hardened native blockchain target" ON)
+option(SMARTCAR_BUILD_BLOCKCHAIN "Build the hardened v3.0.3 native blockchain runtime" ON)
 option(SMARTCAR_BUILD_PQC_KEYSTORE_SELFTEST "Build the durable PQC keystore validation target" OFF)
 option(SMARTCAR_BUILD_PQC_KEY_ADMIN "Build the local guarded PQC key administration tool" OFF)
 option(SMARTCAR_BUILD_PQC_TRUST_ADMIN "Build the explicit PQC trust-keyring administration tool" OFF)
 option(SMARTCAR_BUILD_PQC_HISTORY_VERIFY "Build the persisted historical PQC ledger verifier" OFF)
-option(SMARTCAR_BUILD_LEGACY_CPP_DEMO "Build historical blockchain.cpp as an explicitly legacy/lab-only target" OFF)
+option(SMARTCAR_BUILD_PQC_STATE_ADMIN "Build local PQC rollback/recovery state administration" OFF)
 option(SMARTCAR_BUILD_CAMERA_MODULE "Build camera_emergency_brake.cpp (OpenCV required)" OFF)
 option(SMARTCAR_ENABLE_WARNINGS "Enable extra compiler warnings" ON)
 option(SMARTCAR_ENABLE_NATIVE_OPT "Enable host-specific -march=native Release optimizations" OFF)
@@ -20,23 +20,22 @@ option(SMARTCAR_ENABLE_UNSAFE_FAST_MATH "Enable -ffast-math for controlled perfo
 option(SMARTCAR_ENABLE_IPO "Enable interprocedural optimization/LTO when supported" OFF)
 option(SMARTCAR_FETCH_PINNED_LIBOQS "Fetch pinned liboqs 0.16.0 when no system package is available" OFF)
 option(SMARTCAR_FORCE_PQC_UNAVAILABLE_FOR_TESTS "Pretend liboqs is unavailable to validate fail-closed CMake behavior" OFF)
-
-# Backward-compatible v3.1 lab flag. It no longer weakens the production target;
-# it only enables the explicitly named legacy demo target.
-option(SMARTCAR_ALLOW_SIMULATED_PQC_BUILD "Deprecated alias for SMARTCAR_BUILD_LEGACY_CPP_DEMO" OFF)
-if(SMARTCAR_ALLOW_SIMULATED_PQC_BUILD)
-    message(WARNING
-        "SMARTCAR_ALLOW_SIMULATED_PQC_BUILD is deprecated. "
-        "It now enables only smartcar_blockchain_legacy_demo; the production target remains real-PQC-only."
-    )
-    set(SMARTCAR_BUILD_LEGACY_CPP_DEMO ON)
-endif()
+option(SMARTCAR_ENFORCE_VALIDATION_TOOLCHAIN "Require the hosted validation compiler family/version" OFF)
 
 set(SMARTCAR_LIBOQS_VERSION "0.16.0")
 set(SMARTCAR_LIBOQS_COMMIT "5a1a854b0dc9f2141bdc771c555ee60c37950183")
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
+if(SMARTCAR_ENFORCE_VALIDATION_TOOLCHAIN)
+    if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        message(FATAL_ERROR "Validation toolchain requires GNU C++.")
+    endif()
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS "13.3" OR CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "14")
+        message(FATAL_ERROR "Validation toolchain requires GCC 13.3.x.")
+    endif()
 endif()
 
 if(SMARTCAR_ENABLE_WARNINGS)
@@ -101,20 +100,15 @@ if(NOT nlohmann_json_FOUND)
     FetchContent_MakeAvailable(nlohmann_json)
 endif()
 
-# OpenSSL provides authenticated AES-256-GCM storage and digest implementations
-# used by the secure native core, durable PQC keystore, local key operator, and
-# historical trust verification tooling.
 if(SMARTCAR_BUILD_BLOCKCHAIN OR
    SMARTCAR_BUILD_PQC_KEYSTORE_SELFTEST OR
    SMARTCAR_BUILD_PQC_KEY_ADMIN OR
    SMARTCAR_BUILD_PQC_TRUST_ADMIN OR
-   SMARTCAR_BUILD_PQC_HISTORY_VERIFY)
+   SMARTCAR_BUILD_PQC_HISTORY_VERIFY OR
+   SMARTCAR_BUILD_PQC_STATE_ADMIN)
     find_package(OpenSSL 3.0 REQUIRED COMPONENTS Crypto)
 endif()
 
-# Prefer a system liboqs package. CI/reproducible source builds may explicitly
-# fetch the fully pinned 0.16.0 release commit. The minimal build contains only
-# ML-KEM-512 and ML-DSA-44, which are the algorithms used by the secure core.
 if(NOT SMARTCAR_FORCE_PQC_UNAVAILABLE_FOR_TESTS)
     find_package(liboqs CONFIG QUIET)
 endif()
@@ -149,19 +143,24 @@ if(NOT SMARTCAR_LIBOQS_TARGET AND SMARTCAR_FETCH_PINNED_LIBOQS AND NOT SMARTCAR_
     endif()
 endif()
 
-if(SMARTCAR_BUILD_BLOCKCHAIN)
+function(smartcar_require_real_pqc target_label)
     if(NOT SMARTCAR_LIBOQS_TARGET)
         message(FATAL_ERROR
-            "Real liboqs is required for the hardened native blockchain target. "
+            "Real liboqs is required for ${target_label}. "
             "Install liboqs ${SMARTCAR_LIBOQS_VERSION}, or set SMARTCAR_FETCH_PINNED_LIBOQS=ON to fetch commit ${SMARTCAR_LIBOQS_COMMIT}. "
-            "Simulated PQC is not compiled into smartcar_blockchain."
+            "Simulated PQC is not available in the supported v3.0.3 build graph."
         )
     endif()
+endfunction()
 
+if(SMARTCAR_BUILD_BLOCKCHAIN)
+    smartcar_require_real_pqc("the hardened native blockchain target")
     add_executable(
         smartcar_blockchain
-        native/secure_blockchain.cpp
+        native/secure_blockchain_v303.cpp
         native/pqc_key_store.cpp
+        native/pqc_trust_keyring.cpp
+        native/pqc_state_guard.cpp
     )
     target_include_directories(smartcar_blockchain PRIVATE native)
     target_link_libraries(
@@ -179,66 +178,37 @@ if(SMARTCAR_BUILD_BLOCKCHAIN)
     )
     smartcar_apply_release_options(smartcar_blockchain)
     message(STATUS
-        "Hardened native target ${PROJECT_VERSION}: OpenSSL AES-256-GCM + liboqs ML-DSA-44/ML-KEM-512; durable PQC keystore module compiled; simulated PQC excluded."
+        "Hardened native target ${PROJECT_VERSION}: persisted mixed-generation verification + AES-256-GCM + real ML-DSA-44/ML-KEM-512 + optional authenticated rollback anchor."
     )
 endif()
 
 if(SMARTCAR_BUILD_PQC_KEYSTORE_SELFTEST)
-    if(NOT SMARTCAR_LIBOQS_TARGET)
-        message(FATAL_ERROR
-            "Real liboqs is required for smartcar_pqc_keystore_selftest. "
-            "Install liboqs ${SMARTCAR_LIBOQS_VERSION}, or set SMARTCAR_FETCH_PINNED_LIBOQS=ON."
-        )
-    endif()
+    smartcar_require_real_pqc("smartcar_pqc_keystore_selftest")
     add_executable(
         smartcar_pqc_keystore_selftest
         native/pqc_key_store.cpp
         native/pqc_key_store_selftest.cpp
     )
     target_include_directories(smartcar_pqc_keystore_selftest PRIVATE native)
-    target_link_libraries(
-        smartcar_pqc_keystore_selftest
-        PRIVATE
-            nlohmann_json::nlohmann_json
-            OpenSSL::Crypto
-            ${SMARTCAR_LIBOQS_TARGET}
-    )
+    target_link_libraries(smartcar_pqc_keystore_selftest PRIVATE nlohmann_json::nlohmann_json OpenSSL::Crypto ${SMARTCAR_LIBOQS_TARGET})
     smartcar_apply_release_options(smartcar_pqc_keystore_selftest)
 endif()
 
 if(SMARTCAR_BUILD_PQC_KEY_ADMIN)
-    if(NOT SMARTCAR_LIBOQS_TARGET)
-        message(FATAL_ERROR
-            "Real liboqs is required for smartcar_pqc_key_admin. "
-            "Install liboqs ${SMARTCAR_LIBOQS_VERSION}, or set SMARTCAR_FETCH_PINNED_LIBOQS=ON."
-        )
-    endif()
+    smartcar_require_real_pqc("smartcar_pqc_key_admin")
     add_executable(
         smartcar_pqc_key_admin
         native/pqc_key_store.cpp
         native/pqc_key_admin.cpp
     )
     target_include_directories(smartcar_pqc_key_admin PRIVATE native)
-    target_link_libraries(
-        smartcar_pqc_key_admin
-        PRIVATE
-            nlohmann_json::nlohmann_json
-            OpenSSL::Crypto
-            ${SMARTCAR_LIBOQS_TARGET}
-    )
+    target_link_libraries(smartcar_pqc_key_admin PRIVATE nlohmann_json::nlohmann_json OpenSSL::Crypto ${SMARTCAR_LIBOQS_TARGET})
     smartcar_apply_release_options(smartcar_pqc_key_admin)
-    message(STATUS
-        "Building local smartcar_pqc_key_admin: explicit operator rotation only; no remote key-rotation API; software provider metadata remains non-hardware-backed."
-    )
+    message(STATUS "Building local smartcar_pqc_key_admin: explicit operator rotation only; no remote key-rotation API.")
 endif()
 
 if(SMARTCAR_BUILD_PQC_TRUST_ADMIN)
-    if(NOT SMARTCAR_LIBOQS_TARGET)
-        message(FATAL_ERROR
-            "Real liboqs is required for smartcar_pqc_trust_admin. "
-            "Install liboqs ${SMARTCAR_LIBOQS_VERSION}, or set SMARTCAR_FETCH_PINNED_LIBOQS=ON."
-        )
-    endif()
+    smartcar_require_real_pqc("smartcar_pqc_trust_admin")
     add_executable(
         smartcar_pqc_trust_admin
         native/pqc_key_store.cpp
@@ -246,26 +216,13 @@ if(SMARTCAR_BUILD_PQC_TRUST_ADMIN)
         native/pqc_trust_admin.cpp
     )
     target_include_directories(smartcar_pqc_trust_admin PRIVATE native)
-    target_link_libraries(
-        smartcar_pqc_trust_admin
-        PRIVATE
-            nlohmann_json::nlohmann_json
-            OpenSSL::Crypto
-            ${SMARTCAR_LIBOQS_TARGET}
-    )
+    target_link_libraries(smartcar_pqc_trust_admin PRIVATE nlohmann_json::nlohmann_json OpenSSL::Crypto ${SMARTCAR_LIBOQS_TARGET})
     smartcar_apply_release_options(smartcar_pqc_trust_admin)
-    message(STATUS
-        "Building local smartcar_pqc_trust_admin: explicit self-signed root and dual-signed historical key admission; no remote trust mutation API."
-    )
+    message(STATUS "Building local smartcar_pqc_trust_admin: explicit signed trust mutation only; no remote trust API.")
 endif()
 
 if(SMARTCAR_BUILD_PQC_HISTORY_VERIFY)
-    if(NOT SMARTCAR_LIBOQS_TARGET)
-        message(FATAL_ERROR
-            "Real liboqs is required for smartcar_pqc_history_verify. "
-            "Install liboqs ${SMARTCAR_LIBOQS_VERSION}, or set SMARTCAR_FETCH_PINNED_LIBOQS=ON."
-        )
-    endif()
+    smartcar_require_real_pqc("smartcar_pqc_history_verify")
     add_executable(
         smartcar_pqc_history_verify
         native/pqc_key_store.cpp
@@ -273,32 +230,24 @@ if(SMARTCAR_BUILD_PQC_HISTORY_VERIFY)
         native/pqc_history_verifier.cpp
     )
     target_include_directories(smartcar_pqc_history_verify PRIVATE native)
-    target_link_libraries(
-        smartcar_pqc_history_verify
-        PRIVATE
-            nlohmann_json::nlohmann_json
-            OpenSSL::Crypto
-            ${SMARTCAR_LIBOQS_TARGET}
-    )
+    target_link_libraries(smartcar_pqc_history_verify PRIVATE nlohmann_json::nlohmann_json OpenSSL::Crypto ${SMARTCAR_LIBOQS_TARGET})
     smartcar_apply_release_options(smartcar_pqc_history_verify)
-    message(STATUS
-        "Building smartcar_pqc_history_verify: persisted ledger/hash/AES-GCM/ML-DSA trust-history verification; historical ML-KEM private keys are not retained."
-    )
 endif()
 
-# Historical source remains available only as an explicitly named lab/demo
-# target. This target contains the legacy XOR storage helper and historical
-# simulated-PQC fallback and is outside the hardened production build profile.
-if(SMARTCAR_BUILD_LEGACY_CPP_DEMO)
-    add_executable(smartcar_blockchain_legacy_demo blockchain.cpp)
-    target_link_libraries(smartcar_blockchain_legacy_demo PRIVATE nlohmann_json::nlohmann_json)
-    if(SMARTCAR_LIBOQS_TARGET)
-        target_link_libraries(smartcar_blockchain_legacy_demo PRIVATE ${SMARTCAR_LIBOQS_TARGET})
-    endif()
-    smartcar_apply_release_options(smartcar_blockchain_legacy_demo)
-    message(WARNING
-        "Building smartcar_blockchain_legacy_demo: LAB/COMPATIBILITY ONLY. "
-        "It is not the supported v3.2 security target."
+if(SMARTCAR_BUILD_PQC_STATE_ADMIN)
+    smartcar_require_real_pqc("smartcar_pqc_state_admin")
+    add_executable(
+        smartcar_pqc_state_admin
+        native/pqc_key_store.cpp
+        native/pqc_trust_keyring.cpp
+        native/pqc_state_guard.cpp
+        native/pqc_state_admin.cpp
+    )
+    target_include_directories(smartcar_pqc_state_admin PRIVATE native)
+    target_link_libraries(smartcar_pqc_state_admin PRIVATE nlohmann_json::nlohmann_json OpenSSL::Crypto ${SMARTCAR_LIBOQS_TARGET})
+    smartcar_apply_release_options(smartcar_pqc_state_admin)
+    message(STATUS
+        "Building smartcar_pqc_state_admin: local authenticated rollback-anchor and recovery-check tooling; automatic historical-key restore is prohibited."
     )
 endif()
 

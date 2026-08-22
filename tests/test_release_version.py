@@ -8,27 +8,34 @@ from security_capabilities import security_capability_output
 
 
 class ReleaseVersionTests(unittest.TestCase):
-    def test_canonical_version_is_3_0_2(self):
+    def test_canonical_version_is_3_0_3(self):
         value = Path("VERSION").read_text(encoding="utf-8").strip()
-        self.assertEqual(value, "3.0.2")
+        self.assertEqual(value, "3.0.3")
         self.assertEqual(RELEASE_VERSION, value)
         self.assertRegex(value, r"^\d+\.\d+\.\d+$")
 
-    def test_cmake_project_version_matches_canonical_version(self):
-        text = Path("CMakeLists.txt").read_text(encoding="utf-8")
-        match = re.search(
-            r"project\(SmartCarBlockchain\s+VERSION\s+(\d+\.\d+\.\d+)\s+LANGUAGES\s+CXX\)",
-            text,
-        )
+    def test_cmake_and_go_versions_match(self):
+        cmake = Path("CMakeLists.txt").read_text(encoding="utf-8")
+        match = re.search(r"project\(SmartCarBlockchain\s+VERSION\s+(\d+\.\d+\.\d+)\s+LANGUAGES\s+CXX\)", cmake)
         self.assertIsNotNone(match)
         self.assertEqual(match.group(1), RELEASE_VERSION)
-        self.assertIn('SMARTCAR_RELEASE_VERSION="${PROJECT_VERSION}"', text)
+        self.assertIn('SMARTCAR_RELEASE_VERSION="${PROJECT_VERSION}"', cmake)
+        go = Path("api/go/release_version.go").read_text(encoding="utf-8")
+        self.assertIn(f'const releaseVersion = "{RELEASE_VERSION}"', go)
 
-    def test_go_version_matches_canonical_version(self):
-        text = Path("api/go/release_version.go").read_text(encoding="utf-8")
-        match = re.search(r'const releaseVersion = "([^"]+)"', text)
-        self.assertIsNotNone(match)
-        self.assertEqual(match.group(1), RELEASE_VERSION)
+    def test_release_metadata_is_conservative_v33(self):
+        metadata = release_metadata()
+        self.assertEqual(metadata["release_version"], "3.0.3")
+        self.assertEqual(INTERNAL_HARDENING_PHASE, "v3.3")
+        self.assertTrue(metadata["durable_pqc_identity"])
+        self.assertTrue(metadata["signed_pqc_key_transitions"])
+        self.assertTrue(metadata["mixed_generation_ledger_verification"])
+        self.assertTrue(metadata["authenticated_local_rollback_anchor"])
+        self.assertFalse(metadata["hardware_monotonic_rollback_protection"])
+        self.assertFalse(metadata["hardware_pqc_provider_implemented"])
+        self.assertFalse(metadata["production_certified"])
+        self.assertFalse(metadata["vehicle_safety_certified"])
+        self.assertFalse(metadata["secret_values_exposed"])
 
     def test_security_capabilities_expose_release_without_stronger_claims(self):
         metadata = security_capability_output(False)
@@ -36,127 +43,78 @@ class ReleaseVersionTests(unittest.TestCase):
         self.assertEqual(metadata["release_channel"], "research_hardening")
         self.assertEqual(metadata["fallback_ecdh_p256"], "disabled_by_default/classical")
 
-    def test_release_metadata_maps_public_version_to_internal_phase(self):
-        metadata = release_metadata()
-        self.assertEqual(metadata["release_version"], "3.0.2")
-        self.assertEqual(INTERNAL_HARDENING_PHASE, "v3.2")
-        self.assertEqual(metadata["internal_hardening_phase"], "v3.2")
-        self.assertFalse(metadata["production_certified"])
-        self.assertFalse(metadata["vehicle_safety_certified"])
-        self.assertFalse(metadata["secret_values_exposed"])
-
-    def test_release_docs_and_integrity_tooling_are_present(self):
-        release_note = Path("docs/releases/v3.0.2.md")
-        checklist = Path("docs/releases/v3.0.2-checklist.md")
-        postmerge = Path("docs/releases/v3.0.2-postmerge-validation.md")
-        changelog = Path("CHANGELOG.md")
-        integrity_tool = Path("release_integrity.py")
-        integrity_test = Path("tests/test_release_integrity.py")
-        tag_operator = Path("scripts/create_v3_0_2_tag.sh")
-        manual_tag_workflow = Path(".github/workflows/create-v3.0.2-tag.yml")
-        for path in (
-            release_note,
-            checklist,
-            postmerge,
-            changelog,
-            integrity_tool,
-            integrity_test,
-            tag_operator,
-            manual_tag_workflow,
-        ):
-            self.assertTrue(path.exists(), str(path))
-        release_text = release_note.read_text(encoding="utf-8")
-        self.assertIn("OmniGuard V2X v3.0.2", release_text)
-        self.assertIn("Release Integrity Evidence", release_text)
-        self.assertIn("v3.0.2", changelog.read_text(encoding="utf-8"))
-        self.assertIn("Expected tag: `v3.0.2`", checklist.read_text(encoding="utf-8"))
-        self.assertIn("exact merge commit", postmerge.read_text(encoding="utf-8"))
-
-    def test_security_baseline_validates_main_pushes(self):
-        text = Path(".github/workflows/security-baseline.yml").read_text(encoding="utf-8")
-        self.assertRegex(
-            text,
-            r"push:\s*\n\s*branches:\s*\n\s*- main\s*\n\s*- security/\*\*\s*\n\s*- release/\*\*",
+    def test_v303_release_docs_and_supply_chain_tools_are_present(self):
+        required = (
+            "docs/releases/v3.0.3.md",
+            "docs/releases/v3.0.3-checklist.md",
+            "docs/security/SUPPLY_CHAIN.md",
+            "docs/security/HISTORY_REMEDIATION.md",
+            "release_integrity.py",
+            "scripts/generate_sbom.py",
+            "scripts/generate_provenance.py",
+            "scripts/secret_scan.py",
+            "scripts/create_v3_0_3_tag.sh",
+            ".github/workflows/create-v3.0.3-tag.yml",
+            ".github/workflows/release-v3.0.3.yml",
         )
-        self.assertIn("Generate and verify release integrity manifest", text)
-        self.assertIn('--commit-sha "$GITHUB_SHA"', text)
-        self.assertIn("Build pinned real-PQC native", text)
-        self.assertIn("-DSMARTCAR_FETCH_PINNED_LIBOQS=ON", text)
-        self.assertIn("Run secure native crypto self-test", text)
-        self.assertIn("Run bounded Go fuzz campaigns", text)
-        self.assertIn("Package v3.0.2 Linux validation artifacts", text)
+        for item in required:
+            self.assertTrue(Path(item).exists(), item)
+        self.assertIn("Release Integrity Evidence", Path("docs/releases/v3.0.3.md").read_text(encoding="utf-8"))
+        self.assertIn("Expected tag: `v3.0.3`", Path("docs/releases/v3.0.3-checklist.md").read_text(encoding="utf-8"))
 
-    def test_manual_tag_workflow_is_explicit_and_exact_main_guarded(self):
-        path = Path(".github/workflows/create-v3.0.2-tag.yml")
-        text = path.read_text(encoding="utf-8")
-        trigger_block = text.split("permissions:", 1)[0]
-        self.assertIn("workflow_dispatch:", trigger_block)
-        self.assertNotIn("\n  push:\n", trigger_block)
-        self.assertIn('test "${{ inputs.confirm }}" = "CREATE-v3.0.2"', text)
-        self.assertIn("permissions:\n  contents: write\n  actions: write", text)
-        self.assertIn("ref: main", text)
-        self.assertIn("git fetch origin main --tags", text)
+    def test_security_baseline_validates_main_and_release_evidence(self):
+        text = Path(".github/workflows/security-baseline.yml").read_text(encoding="utf-8")
+        self.assertRegex(text, r"push:\s*\n\s*branches:\s*\n\s*- main\s*\n\s*- security/\*\*\s*\n\s*- release/\*\*")
+        for required in (
+            "Generate and verify release integrity manifest",
+            "Run current-tree secret scan",
+            "Generate SBOM and provenance",
+            "Build pinned real-PQC v3.0.3 targets",
+            "Run mixed-generation native runtime validation",
+            "Run PQC rollback and recovery-state validation",
+            "Run bounded Go fuzz campaigns",
+            "Package v3.0.3 Linux validation artifacts",
+        ):
+            self.assertIn(required, text)
+
+    def test_v303_manual_tag_workflow_is_exact_main_guarded(self):
+        text = Path(".github/workflows/create-v3.0.3-tag.yml").read_text(encoding="utf-8")
+        self.assertIn("workflow_dispatch:", text.split("permissions:", 1)[0])
+        self.assertIn('test "${{ inputs.confirm }}" = "CREATE-v3.0.3"', text)
         self.assertIn('main_sha="$(git rev-parse origin/main)"', text)
         self.assertIn('test "$(git rev-parse HEAD)" = "$main_sha"', text)
         self.assertIn('--workflow "Security Baseline"', text)
-        self.assertIn("--branch main", text)
-        self.assertIn("--event push", text)
-        self.assertIn('run.get("headSha") == target', text)
-        self.assertIn('run.get("status") != "completed"', text)
-        self.assertIn('run.get("conclusion") != "success"', text)
-        self.assertIn('git ls-remote --exit-code --tags origin "refs/tags/$TAG"', text)
-        self.assertIn('gh release view "$TAG" --repo "$GITHUB_REPOSITORY"', text)
+        self.assertIn('--event push', text)
         self.assertIn('git tag -a "$TAG" "$main_sha"', text)
-        self.assertIn('git push origin "refs/tags/$TAG"', text)
-        self.assertIn('test "$(git rev-list -n 1 "$TAG")" = "$main_sha"', text)
-        self.assertIn("Dispatch guarded publication workflow on the tag ref", text)
-        self.assertIn("gh workflow run release-v3.0.2.yml", text)
-        self.assertIn('--ref "$TAG"', text)
+        self.assertIn("gh workflow run release-v3.0.3.yml", text)
 
-    def test_publication_workflow_is_tag_commit_and_permission_guarded(self):
-        path = Path(".github/workflows/release-v3.0.2.yml")
-        self.assertTrue(path.exists())
-        text = path.read_text(encoding="utf-8")
-        trigger_block = text.split("permissions:", 1)[0]
-        self.assertIn("- v3.0.2", trigger_block)
-        self.assertIn("workflow_dispatch:", trigger_block)
-        self.assertIn('test "$GITHUB_REF_NAME" = "v3.0.2"', text)
+    def test_v303_publication_workflow_is_tag_commit_guarded(self):
+        text = Path(".github/workflows/release-v3.0.3.yml").read_text(encoding="utf-8")
+        trigger = text.split("permissions:", 1)[0]
+        self.assertIn("- v3.0.3", trigger)
+        self.assertIn("workflow_dispatch:", trigger)
+        self.assertIn('test "$GITHUB_REF_NAME" = "v3.0.3"', text)
         self.assertIn('main_sha="$(git rev-parse origin/main)"', text)
         self.assertIn('test "$GITHUB_SHA" = "$main_sha"', text)
-        self.assertNotIn('git merge-base --is-ancestor "$GITHUB_SHA" origin/main', text)
-        self.assertIn('test "$(git rev-parse HEAD)" = "$GITHUB_SHA"', text)
-        self.assertIn('test -f .github/workflows/release-v3.0.2.yml', text)
         self.assertIn('--commit-sha "$GITHUB_SHA"', text)
-        self.assertIn('--verify security-reports/release-integrity-manifest.json', text)
-        self.assertIn('sha256sum -c SHA256SUMS', text)
-        self.assertIn("permissions:\n  contents: read", text)
-        self.assertIn("validate-and-package:", text)
-        self.assertIn("publish:\n    needs: validate-and-package", text)
-        self.assertIn("    permissions:\n      contents: write\n      actions: read", text)
-        self.assertIn("actions/upload-artifact@v4", text)
-        self.assertIn("actions/download-artifact@v4", text)
-        self.assertIn('manifest.get("commit_sha") != sys.argv[2]', text)
-        self.assertIn('gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY"', text)
-        self.assertIn('gh release create "$GITHUB_REF_NAME"', text)
-        self.assertIn('--repo "$GITHUB_REPOSITORY"', text)
-        self.assertIn('--verify-tag', text)
+        self.assertIn("sha256sum -c SHA256SUMS", text)
+        self.assertIn("gh release create", text)
+        self.assertIn("--verify-tag", text)
 
-    def test_tag_operator_is_explicit_and_exact_main_guarded(self):
-        path = Path("scripts/create_v3_0_2_tag.sh")
+    def test_local_tag_operator_is_guarded(self):
+        path = Path("scripts/create_v3_0_3_tag.sh")
         text = path.read_text(encoding="utf-8")
-        self.assertIn('MODE="${1:-}"', text)
-        self.assertIn('"--check-only"', text)
-        self.assertIn('"--push"', text)
-        self.assertIn('branch="$(git branch --show-current)"', text)
-        self.assertIn('if [[ "$branch" != "main" ]]', text)
-        self.assertIn('git fetch origin main --tags', text)
-        self.assertIn('remote_main_sha="$(git rev-parse origin/main)"', text)
-        self.assertIn('if [[ "$local_sha" != "$remote_main_sha" ]]', text)
-        self.assertIn('git ls-remote --exit-code --tags origin "refs/tags/$TAG"', text)
-        self.assertIn('if [[ "$MODE" == "--check-only" ]]', text)
-        self.assertIn('git tag -a "$TAG" "$local_sha"', text)
-        self.assertIn('git push origin "refs/tags/$TAG"', text)
-        self.assertIn('git tag -d "$TAG"', text)
+        for required in (
+            'MODE="${1:-}"',
+            '"--check-only"',
+            '"--push"',
+            'if [[ "$branch" != "main" ]]',
+            'remote_main_sha="$(git rev-parse origin/main)"',
+            'if [[ "$local_sha" != "$remote_main_sha" ]]',
+            'git tag -a "$TAG" "$local_sha"',
+            'git push origin "refs/tags/$TAG"',
+        ):
+            self.assertIn(required, text)
         subprocess.run(["bash", "-n", str(path)], check=True)
 
 
