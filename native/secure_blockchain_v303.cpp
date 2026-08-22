@@ -2,6 +2,7 @@
 // Persisted mixed-generation ledger verification with durable ML-DSA/ML-KEM identity,
 // authenticated data-at-rest, explicit trust history, and optional rollback anchor.
 
+#include "pqc_kem_commitment.h"
 #include "pqc_key_store.h"
 #include "pqc_runtime_provider_factory.h"
 #include "pqc_software_active_operations.h"
@@ -36,9 +37,9 @@ namespace {
 using json = nlohmann::json;
 using omniguard::PqcActivePrivateOperations;
 using omniguard::PqcActivePublicState;
+using omniguard::PqcKemCommitment;
 using omniguard::PqcKeyMaterial;
 using omniguard::PqcRollbackAnchor;
-using omniguard::PqcSensitiveBytes;
 using omniguard::PqcTrustKeyring;
 using omniguard::SoftwarePqcActivePrivateOperations;
 
@@ -201,6 +202,54 @@ std::string require_string(const json& object, const char* key) {
         throw std::runtime_error(std::string("native ledger field is empty: ") + key);
     }
     return value;
+}
+
+std::string commitment_scheme_for_block(const json& block) {
+    if (!block.contains("pqc_shared_secret_commitment_scheme")) {
+        return omniguard::kKemCommitmentLegacyV1;
+    }
+    const std::string scheme = require_string(block, "pqc_shared_secret_commitment_scheme");
+    if (scheme != omniguard::kKemCommitmentLegacyV1 && scheme != omniguard::kKemCommitmentRawV2) {
+        throw std::runtime_error("native runtime ML-KEM commitment scheme is unsupported");
+    }
+    return scheme;
+}
+
+std::string pqc_message_for(
+    const std::string& key_id,
+    const std::string& block_hash,
+    const std::string& dual_hash,
+    const std::string& previous_hash,
+    const std::string& timestamp,
+    const std::string& commitment_scheme
+) {
+    std::string message = std::string(kPqcDomain) + "\n" + key_id + "\n" + block_hash + "\n" +
+        dual_hash + "\n" + previous_hash + "\n" + timestamp;
+    if (commitment_scheme == omniguard::kKemCommitmentRawV2) {
+        message += "\n" + commitment_scheme;
+    } else if (commitment_scheme != omniguard::kKemCommitmentLegacyV1) {
+        throw std::runtime_error("native runtime cannot construct message for unsupported ML-KEM commitment scheme");
+    }
+    return message;
+}
+
+std::string pqc_binding_hash_for(
+    const std::string& key_id,
+    const std::string& message,
+    const std::string& signature_hex,
+    const std::string& ciphertext_hex,
+    const std::string& shared_secret_hash,
+    const std::string& commitment_scheme
+) {
+    std::string input = std::string(kPqcDomain) + "\n" + key_id + "\n" + message + "\n" +
+        signature_hex + "\n" + ciphertext_hex;
+    if (commitment_scheme == omniguard::kKemCommitmentRawV2) {
+        input += "\n" + commitment_scheme;
+    } else if (commitment_scheme != omniguard::kKemCommitmentLegacyV1) {
+        throw std::runtime_error("native runtime cannot bind unsupported ML-KEM commitment scheme");
+    }
+    input += "\n" + shared_secret_hash;
+    return sha3_256_hex(input);
 }
 
 std::size_t require_index(const json& object) {
@@ -424,7 +473,7 @@ public:
     std::size_t signature_size() const { return public_state_.signature_max_size; }
     std::size_t kem_ciphertext_size() const { return public_state_.kem_ciphertext_size; }
 
-    json create_artifact(const std::string& message) const {
+    json create_artifact(const std::string& message, const std::string& commitment_scheme) const {
         const std::vector<unsigned char> message_bytes(message.begin(), message.end());
         std::vector<unsigned char> signature = private_operations_->sign_ml_dsa_44(message_bytes);
         if (signature.empty() || signature.size() > public_state_.signature_max_size) {
@@ -440,36 +489,45 @@ public:
             throw std::runtime_error("ML-KEM encapsulation failed");
         }
 
-        PqcSensitiveBytes receiver_secret;
+        const std::string commitment_prefix = std::string(kPqcDomain) + "\n" + public_state_.key_id + "\n";
+        PqcKemCommitment sender_commitment;
+        PqcKemCommitment receiver_commitment;
         try {
-            receiver_secret = private_operations_->decapsulate_ml_kem_512(ciphertext);
+            sender_commitment = omniguard::make_kem_commitment(
+                commitment_scheme,
+                commitment_prefix,
+                sender_secret.data(),
+                sender_secret.size()
+            );
+            receiver_commitment = private_operations_->decapsulate_ml_kem_512_commitment(
+                ciphertext,
+                commitment_prefix,
+                commitment_scheme
+            );
+            omniguard::validate_kem_commitment(sender_commitment);
+            omniguard::validate_kem_commitment(receiver_commitment);
         } catch (...) {
             OPENSSL_cleanse(sender_secret.data(), sender_secret.size());
             throw;
         }
-        const bool kem_ok = receiver_secret.size() == sender_secret.size() &&
-                            receiver_secret.size() == public_state_.kem_shared_secret_size &&
-                            CRYPTO_memcmp(sender_secret.data(), receiver_secret.data(), sender_secret.size()) == 0;
-        if (!kem_ok) {
-            OPENSSL_cleanse(sender_secret.data(), sender_secret.size());
-            receiver_secret.clear();
-            throw std::runtime_error("ML-KEM encapsulation/decapsulation provider round-trip failed");
+        OPENSSL_cleanse(sender_secret.data(), sender_secret.size());
+        if (sender_commitment.scheme != commitment_scheme || receiver_commitment.scheme != commitment_scheme ||
+            sender_commitment.digest_hex != receiver_commitment.digest_hex) {
+            throw std::runtime_error("ML-KEM encapsulation/decapsulation commitment round-trip failed");
         }
 
-        const std::string shared_secret_hash = sha3_256_hex(
-            std::string(kPqcDomain) + "\n" + public_state_.key_id + "\n" +
-            to_hex(receiver_secret.data(), receiver_secret.size())
-        );
-        OPENSSL_cleanse(sender_secret.data(), sender_secret.size());
-        receiver_secret.clear();
-
+        const std::string shared_secret_hash = receiver_commitment.digest_hex;
         const std::string signature_hex = to_hex(signature.data(), signature.size());
         const std::string ciphertext_hex = to_hex(ciphertext.data(), ciphertext.size());
-        const std::string binding_hash = sha3_256_hex(
-            std::string(kPqcDomain) + "\n" + public_state_.key_id + "\n" + message + "\n" +
-            signature_hex + "\n" + ciphertext_hex + "\n" + shared_secret_hash
+        const std::string binding_hash = pqc_binding_hash_for(
+            public_state_.key_id,
+            message,
+            signature_hex,
+            ciphertext_hex,
+            shared_secret_hash,
+            commitment_scheme
         );
-        return {
+        json artifact = {
             {"pqc_algorithm", "ML-DSA-44+ML-KEM-512"},
             {"pqc_key_id", public_state_.key_id},
             {"pqc_signature_hex", signature_hex},
@@ -479,6 +537,10 @@ public:
             {"pqc_shared_secret_hash", shared_secret_hash},
             {"pqc_binding_hash", binding_hash},
         };
+        if (commitment_scheme == omniguard::kKemCommitmentRawV2) {
+            artifact["pqc_shared_secret_commitment_scheme"] = commitment_scheme;
+        }
+        return artifact;
     }
 
     bool verify_current(
@@ -487,7 +549,8 @@ public:
         const std::vector<unsigned char>& embedded_signature_public_key,
         const std::vector<unsigned char>& ciphertext,
         const std::vector<unsigned char>& embedded_kem_public_key,
-        const std::string& shared_secret_hash
+        const std::string& shared_secret_hash,
+        const std::string& commitment_scheme
     ) const {
         if (embedded_signature_public_key != public_state_.signature_public_key ||
             embedded_kem_public_key != public_state_.kem_public_key) {
@@ -502,16 +565,14 @@ public:
         }
         if (ciphertext.size() != public_state_.kem_ciphertext_size) return false;
 
-        PqcSensitiveBytes secret = private_operations_->decapsulate_ml_kem_512(ciphertext);
-        if (secret.size() != public_state_.kem_shared_secret_size) {
-            secret.clear();
-            return false;
-        }
-        const std::string expected = sha3_256_hex(
-            std::string(kPqcDomain) + "\n" + public_state_.key_id + "\n" + to_hex(secret.data(), secret.size())
+        const std::string commitment_prefix = std::string(kPqcDomain) + "\n" + public_state_.key_id + "\n";
+        const PqcKemCommitment commitment = private_operations_->decapsulate_ml_kem_512_commitment(
+            ciphertext,
+            commitment_prefix,
+            commitment_scheme
         );
-        secret.clear();
-        return expected == shared_secret_hash;
+        omniguard::validate_kem_commitment(commitment);
+        return commitment.scheme == commitment_scheme && commitment.digest_hex == shared_secret_hash;
     }
 
 private:
@@ -676,6 +737,8 @@ public:
         if (ledger_.empty() || ledger_.size() > kMaxBlocks) throw std::runtime_error("native runtime ledger is empty/oversized");
         std::size_t historical_blocks = 0;
         std::size_t current_blocks = 0;
+        std::size_t commitment_v1_blocks = 0;
+        std::size_t commitment_v2_blocks = 0;
         std::string previous_block_hash(64, '0');
         for (std::size_t i = 0; i < ledger_.size(); ++i) {
             const json& block = ledger_.at(i);
@@ -719,6 +782,12 @@ public:
             const std::string shared_secret_hash = require_string(block, "pqc_shared_secret_hash");
             const std::string binding_hash = require_string(block, "pqc_binding_hash");
             const std::string pqc_digest = require_string(block, "pqc_digest");
+            const std::string commitment_scheme = commitment_scheme_for_block(block);
+            if (commitment_scheme == omniguard::kKemCommitmentRawV2) {
+                ++commitment_v2_blocks;
+            } else {
+                ++commitment_v1_blocks;
+            }
             if (!is_sha3_hex(shared_secret_hash) || !is_sha3_hex(binding_hash) || !is_sha3_hex(pqc_digest)) {
                 throw std::runtime_error("native runtime PQC digest field is malformed");
             }
@@ -730,12 +799,24 @@ public:
                 require_string(block, "pqc_kem_public_key_hex"), active_.kem_public_key().size()
             );
             const auto ciphertext = from_hex_exact(ciphertext_hex, active_.kem_ciphertext_size());
-            const std::string message = std::string(kPqcDomain) + "\n" + key_id + "\n" + block_hash + "\n" +
-                dual_hash + "\n" + previous_hash + "\n" + timestamp;
+            const std::string message = pqc_message_for(
+                key_id,
+                block_hash,
+                dual_hash,
+                previous_hash,
+                timestamp,
+                commitment_scheme
+            );
 
             if (key_id == active_.key_id()) {
                 if (!active_.verify_current(
-                        message, signature, signature_public_key, ciphertext, kem_public_key, shared_secret_hash
+                        message,
+                        signature,
+                        signature_public_key,
+                        ciphertext,
+                        kem_public_key,
+                        shared_secret_hash,
+                        commitment_scheme
                     )) {
                     throw std::runtime_error("native runtime active-generation PQC verification failed");
                 }
@@ -757,9 +838,13 @@ public:
                 ++historical_blocks;
             }
 
-            const std::string expected_binding = sha3_256_hex(
-                std::string(kPqcDomain) + "\n" + key_id + "\n" + message + "\n" +
-                signature_hex + "\n" + ciphertext_hex + "\n" + shared_secret_hash
+            const std::string expected_binding = pqc_binding_hash_for(
+                key_id,
+                message,
+                signature_hex,
+                ciphertext_hex,
+                shared_secret_hash,
+                commitment_scheme
             );
             if (binding_hash != expected_binding) throw std::runtime_error("native runtime PQC binding hash validation failed");
             const std::string expected_pqc_digest = sha3_256_hex(
@@ -776,6 +861,9 @@ public:
             {"block_count", ledger_.size()},
             {"current_generation_blocks", current_blocks},
             {"historical_generation_blocks", historical_blocks},
+            {"kem_commitment_v1_blocks", commitment_v1_blocks},
+            {"kem_commitment_v2_blocks", commitment_v2_blocks},
+            {"new_block_kem_commitment_scheme", omniguard::kKemCommitmentRawV2},
             {"migration_state", historical_blocks > 0 ? "MIXED_GENERATION_VERIFIED" : "ACTIVE_ONLY"},
             {"active_key_id", active_.key_id()},
             {"active_pqc_provider", active_.provider()},
@@ -820,9 +908,16 @@ private:
         const std::string dual_hash = sha256_hex(block_hash) + ":" + sha3_256_hex(block_hash);
         const std::string aad = "OMNIGUARD_DUAL_HASH_AAD_V1|" + vehicle_id_ + "|" +
             std::to_string(index) + "|" + block_hash;
-        const std::string message = std::string(kPqcDomain) + "\n" + active_.key_id() + "\n" + block_hash + "\n" +
-            dual_hash + "\n" + previous_hash + "\n" + timestamp;
-        json artifact = active_.create_artifact(message);
+        const std::string commitment_scheme = omniguard::kKemCommitmentRawV2;
+        const std::string message = pqc_message_for(
+            active_.key_id(),
+            block_hash,
+            dual_hash,
+            previous_hash,
+            timestamp,
+            commitment_scheme
+        );
+        json artifact = active_.create_artifact(message, commitment_scheme);
         const std::string pqc_digest = sha3_256_hex(
             std::string(kPqcDomain) + "\n" + active_.key_id() + "\n" +
             artifact.at("pqc_binding_hash").get<std::string>() + "\n" + dual_hash
@@ -880,6 +975,9 @@ int run_self_test(
         runtime.save(ledger_path);
         const json report = runtime.verify();
         if (!report.at("verified").get<bool>() || report.at("block_count").get<std::size_t>() != 2 ||
+            report.at("kem_commitment_v1_blocks").get<std::size_t>() != 0 ||
+            report.at("kem_commitment_v2_blocks").get<std::size_t>() != 2 ||
+            report.at("new_block_kem_commitment_scheme").get<std::string>() != omniguard::kKemCommitmentRawV2 ||
             report.at("active_pqc_provider").get<std::string>() != omniguard::kSoftwarePqcProvider ||
             report.at("active_pqc_hardware_backed").get<bool>() ||
             report.at("active_pqc_non_exportable").get<bool>() ||
@@ -892,7 +990,8 @@ int run_self_test(
         NativeRuntime reloaded(identity, data_key, keystore_path, keystore_key);
         reloaded.load(ledger_path);
         const json report = reloaded.verify();
-        if (!report.at("verified").get<bool>() || report.at("historical_generation_blocks").get<std::size_t>() != 0) return 3;
+        if (!report.at("verified").get<bool>() || report.at("historical_generation_blocks").get<std::size_t>() != 0 ||
+            report.at("kem_commitment_v2_blocks").get<std::size_t>() != 2) return 3;
     }
     bool wrong_key_rejected = false;
     try {
@@ -905,7 +1004,7 @@ int run_self_test(
     }
     if (!wrong_key_rejected) return 4;
     std::filesystem::remove(ledger_path, ignored);
-    std::cout << "[SELF-TEST] PASS: v3.0.3 persisted runtime + opaque PQC private operations + durable ML-DSA-44/ML-KEM-512 + AES-256-GCM\n";
+    std::cout << "[SELF-TEST] PASS: v3.0.3 versioned ML-KEM V2 commitments + opaque PQC private operations + durable ML-DSA-44/ML-KEM-512 + AES-256-GCM\n";
     return 0;
 }
 
