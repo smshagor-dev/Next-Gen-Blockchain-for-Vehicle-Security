@@ -4,16 +4,17 @@
 
 This document defines the activation boundary for hardware-backed ML-DSA-44 and ML-KEM-512 private keys in OmniGuard V2X.
 
-The current production runtime remains `software_encrypted_file`. TPM2, PKCS#11, and HSM provider names are policy intents only until a concrete adapter passes the runtime capability probe and the main runtime is fully wired through the opaque operation boundary. No provider may report `hardware_backed=true` or `non_exportable=true` merely because a hardware provider name was configured.
+The current production provider remains `software_encrypted_file`. TPM2, PKCS#11, and HSM provider names are policy intents only until a concrete adapter passes the runtime capability probe and is selected by the runtime. No provider may report `hardware_backed=true` or `non_exportable=true` merely because a hardware provider name was configured.
 
-The v3.0.3 hardening branch now contains the runtime-facing provider split:
+The v3.0.3 runtime is now wired through the provider-facing private-operation split:
 
 - `native/pqc_active_operations.h`: provider-agnostic public state plus private `sign`/`decapsulate` operations;
 - `native/pqc_software_active_operations.h`: the existing software provider implemented through the same private-operation interface;
 - `native/pqc_sensitive_bytes.h`: move-only, zeroizing derived-secret storage;
-- `native/pqc_hardware_provider.h`: non-exportable hardware provider contract and fail-closed capability probe.
+- `native/pqc_hardware_provider.h`: non-exportable hardware provider contract and fail-closed capability probe;
+- `native/secure_blockchain_v303.cpp`: active ML-DSA signing and ML-KEM decapsulation are routed through `PqcActivePrivateOperations`; the main runtime no longer owns software private-key vectors or calls private-key liboqs sign/decapsulation APIs directly.
 
-`native/secure_blockchain_v303.cpp` still has to be switched from its legacy direct secret-vector operations to this interface before runtime hardware-backed PQC can be claimed.
+This completes the runtime operation-boundary refactor. It does **not** mean a TPM2, PKCS#11, or HSM adapter exists yet. Hardware-backed PQC must not be claimed until a concrete adapter is implemented and validated on real hardware.
 
 ## Standards baseline
 
@@ -70,22 +71,28 @@ If `SMARTCAR_CPP_PQC_HARDWARE_REQUIRED=1`, startup must fail unless the selected
 
 Software fallback may only be introduced behind a separate explicit operator policy. It must never be enabled automatically and must never preserve a `hardware_backed` claim after falling back.
 
-## Runtime integration still required
+## Runtime integration status
 
-The current `ActivePqcEngine` in `native/secure_blockchain_v303.cpp` still owns ML-DSA and ML-KEM software secret-key vectors and calls liboqs directly. The provider classes added during v3.0.3 make the intended replacement explicit, but the runtime switch is not complete yet.
+The native runtime operation boundary is integrated:
 
-The integration must:
+- active signing uses `PqcActivePrivateOperations::sign_ml_dsa_44`;
+- active ML-KEM decapsulation uses `PqcActivePrivateOperations::decapsulate_ml_kem_512`;
+- ML-KEM encapsulation and ML-DSA public verification remain local liboqs operations;
+- the runtime consumes `PqcActivePublicState` for provider identity, public keys, algorithm sizes, and protection claims;
+- software secret vectors live only inside `SoftwarePqcActivePrivateOperations` and are stored in zeroizing sensitive containers;
+- mixed-generation historical ML-DSA verification remains based on public trust history;
+- historical ML-KEM claims remain explicitly non-authoritative unless the relevant protected private generation is available.
 
-- construct a `PqcActivePrivateOperations` implementation from the selected provider;
-- route active signing through `sign_ml_dsa_44`;
-- route active ML-KEM decapsulation through `decapsulate_ml_kem_512`;
-- keep encapsulation and public signature verification local when appropriate;
-- consume only `PqcActivePublicState` outside private-operation code;
-- keep provider name, opaque key identifier, generation, public keys, and verified evidence metadata outside hardware;
-- preserve mixed-generation historical ML-DSA verification through public trust history;
-- keep historical ML-KEM claims explicitly non-authoritative unless the relevant protected private generation remains available.
+The verification report exposes the active provider and protection truth-state. With the current software provider it must report software-backed, not non-exportable, while still confirming that the private-operation boundary is active.
 
-Until this switch and at least one concrete hardware adapter are complete and validated on real hardware, OmniGuard must describe TPM2/PKCS#11/HSM support as fail-closed integration groundwork, not hardware-backed PQC key storage.
+Remaining hardware work is deliberately separate:
+
+- implement at least one concrete TPM2 / PKCS#11 / HSM adapter;
+- add runtime provider construction/selection for that concrete adapter;
+- validate non-exportability, device identity, operation sizes, restart persistence, hot-swap detection, and guarded rotation on real hardware;
+- only then allow a hardware provider to report `hardware_backed=true` and `non_exportable=true`.
+
+Until those concrete adapter requirements are satisfied, OmniGuard must describe TPM2/PKCS#11/HSM support as fail-closed hardware integration groundwork, not deployed hardware-backed PQC key storage.
 
 ## Validation requirements for concrete adapters
 

@@ -36,6 +36,25 @@ class V303FinalHardeningTests(unittest.TestCase):
         self.assertIn("(void)verify();", self.runtime)
         self.assertIn("refusing to overwrite an existing native ledger", self.runtime)
 
+    def test_runtime_private_pqc_operations_use_provider_boundary(self):
+        for required in (
+            '#include "pqc_software_active_operations.h"',
+            "PqcActivePrivateOperations",
+            "SoftwarePqcActivePrivateOperations",
+            "private_operations_->sign_ml_dsa_44",
+            "private_operations_->decapsulate_ml_kem_512",
+            "active_pqc_provider",
+            "active_pqc_hardware_backed",
+            "active_pqc_non_exportable",
+            "active_pqc_runtime_probe_verified",
+            "active_pqc_private_operations_opaque",
+        ):
+            self.assertIn(required, self.runtime)
+        self.assertNotIn("signature_secret_key_", self.runtime)
+        self.assertNotIn("kem_secret_key_", self.runtime)
+        self.assertNotIn("OQS_SIG_sign(", self.runtime)
+        self.assertNotIn("OQS_KEM_decaps(", self.runtime)
+
     def test_rollback_anchor_is_authenticated_and_not_overclaimed(self):
         self.assertIn("OMNIGUARD_PQC_ROLLBACK_ANCHOR_V1", self.anchor_header)
         self.assertIn("OMNIGUARD_PQC_ROLLBACK_ANCHOR_HMAC_V1", self.anchor_header)
