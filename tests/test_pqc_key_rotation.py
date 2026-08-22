@@ -52,7 +52,7 @@ class PqcKeyRotationTests(unittest.TestCase):
     def test_hardware_required_mode_fails_closed_for_software_provider(self):
         self.assertIn("SMARTCAR_CPP_PQC_HARDWARE_REQUIRED", self.policy)
         self.assertIn("hardware-backed PQC provider is required", self.policy)
-        self.assertIn("TPM2/PKCS#11/HSM fallback is not simulated", self.policy)
+        self.assertIn("fallback is never simulated", self.policy)
         self.assertIn('kSoftwarePqcProvider = "software_encrypted_file"', self.policy)
         self.assertIn("bool hardware_backed = false", self.policy)
         self.assertIn("bool non_exportable = false", self.policy)
@@ -71,8 +71,11 @@ class PqcKeyRotationTests(unittest.TestCase):
         self.assertIn("SMARTCAR_BUILD_PQC_KEY_ADMIN", self.cmake)
         self.assertIn("smartcar_pqc_key_admin", self.cmake)
         self.assertIn("tests.test_pqc_key_rotation", self.workflow)
-        self.assertIn("Run guarded PQC key administration self-test", self.workflow)
-        self.assertIn("Verify supported native runtime rejects hardware-required software PQC", self.workflow)
+        self.assertIn("Build pinned real-PQC v3.0.3 targets", self.workflow)
+        self.assertIn("smartcar_pqc_key_admin --self-test", self.workflow)
+        self.assertIn("Run mixed-generation native runtime validation", self.workflow)
+        self.assertIn("smartcar_pqc_key_admin rotate", self.workflow)
+        self.assertIn("Verify hardware-provider modes fail closed when unavailable", self.workflow)
         self.assertIn("SMARTCAR_CPP_PQC_HARDWARE_REQUIRED=1", self.workflow)
 
     def test_configuration_defaults_are_conservative(self):
