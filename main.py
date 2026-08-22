@@ -18,9 +18,10 @@ install_runtime_backend_hardening()
 # from dashboard_reference_ui import SmartCarDashboard
 # from dashboard_pixel_ui import SmartCarDashboard
 # from dashboard_live_ui import SmartCarDashboard
-# The active shell adds stable in-place feed rendering and a source-backed
-# transaction graph on top of the authenticated live-socket dashboard.
-from dashboard_live_stable_ui import SmartCarDashboard
+# from dashboard_live_stable_ui import SmartCarDashboard
+# Active shell: stable live rendering plus exact-reference Vehicle Status and
+# Network Status overview panels. All backend/security/navigation behavior is inherited.
+from dashboard_reference_panels_ui import SmartCarDashboard
 
 
 def main():
