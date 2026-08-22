@@ -187,11 +187,39 @@ class V303FinalHardeningTests(unittest.TestCase):
             "scripts/generate_sbom.py",
             "scripts/generate_provenance.py",
             "scripts/secret_scan.py",
+            "scripts/ci_windows_go_backend_smoke.py",
             "docs/security/SUPPLY_CHAIN.md",
             "docs/security/HISTORY_REMEDIATION.md",
         ):
             self.assertTrue(Path(path).exists(), path)
-        subprocess.run(["python", "-m", "py_compile", "scripts/generate_sbom.py", "scripts/generate_provenance.py", "scripts/secret_scan.py"], check=True)
+        subprocess.run(
+            [
+                "python",
+                "-m",
+                "py_compile",
+                "scripts/generate_sbom.py",
+                "scripts/generate_provenance.py",
+                "scripts/secret_scan.py",
+                "scripts/ci_windows_go_backend_smoke.py",
+            ],
+            check=True,
+        )
+
+    def test_final_tag_paths_require_all_exact_main_release_gates(self):
+        tag_workflow = Path(".github/workflows/create-v3.0.3-tag.yml").read_text(encoding="utf-8")
+        tag_script = Path("scripts/create_v3_0_3_tag.sh").read_text(encoding="utf-8")
+        windows_workflow = Path(".github/workflows/windows-runtime-smoke.yml").read_text(encoding="utf-8")
+        for workflow in ("Security Baseline", "PKCS11 Source Conformance", "Windows Runtime Smoke"):
+            self.assertIn(workflow, tag_workflow)
+            self.assertIn(workflow, tag_script)
+        self.assertIn("headSha", tag_workflow)
+        self.assertIn("headSha", tag_script)
+        self.assertIn("--event push", tag_workflow)
+        self.assertIn("--event push", tag_script)
+        self.assertIn("windows-latest", windows_workflow)
+        self.assertIn("tests.test_local_env_bootstrap", windows_workflow)
+        self.assertIn("tests.test_runtime_backend_readiness", windows_workflow)
+        self.assertIn("scripts/ci_windows_go_backend_smoke.py", windows_workflow)
 
     def test_sbom_resolves_multiline_go_mod_directive(self):
         sbom = build_sbom()
@@ -212,6 +240,7 @@ class V303FinalHardeningTests(unittest.TestCase):
         self.assertTrue(Path("docs/releases/v3.0.3-checklist.md").exists())
         self.assertTrue(Path("scripts/create_v3_0_3_tag.sh").exists())
         self.assertTrue(Path(".github/workflows/create-v3.0.3-tag.yml").exists())
+        self.assertTrue(Path(".github/workflows/windows-runtime-smoke.yml").exists())
 
 
 if __name__ == "__main__":
