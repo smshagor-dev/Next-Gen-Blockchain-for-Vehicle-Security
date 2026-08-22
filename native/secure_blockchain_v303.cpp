@@ -3,6 +3,7 @@
 // authenticated data-at-rest, explicit trust history, and optional rollback anchor.
 
 #include "pqc_key_store.h"
+#include "pqc_software_active_operations.h"
 #include "pqc_state_guard.h"
 #include "pqc_trust_keyring.h"
 
@@ -32,10 +33,14 @@
 namespace {
 
 using json = nlohmann::json;
+using omniguard::PqcActivePrivateOperations;
+using omniguard::PqcActivePublicState;
 using omniguard::PqcKeyMaterial;
 using omniguard::PqcKeyStore;
 using omniguard::PqcRollbackAnchor;
+using omniguard::PqcSensitiveBytes;
 using omniguard::PqcTrustKeyring;
+using omniguard::SoftwarePqcActivePrivateOperations;
 
 constexpr const char* kBlockDomain = "OMNIGUARD_NATIVE_BLOCK_V3_2";
 constexpr const char* kAeadDomain = "OMNIGUARD_CPP_DATA_KEY_V1";
@@ -385,80 +390,92 @@ using KemPtr = std::unique_ptr<OQS_KEM, KemDeleter>;
 
 class ActivePqcEngine {
 public:
-    explicit ActivePqcEngine(PqcKeyMaterial material) {
+    explicit ActivePqcEngine(PqcKeyMaterial material)
+        : ActivePqcEngine(std::make_unique<SoftwarePqcActivePrivateOperations>(std::move(material))) {}
+
+    explicit ActivePqcEngine(std::unique_ptr<PqcActivePrivateOperations> private_operations)
+        : private_operations_(std::move(private_operations)) {
+        if (!private_operations_) {
+            throw std::runtime_error("active PQC engine requires a private-operation provider");
+        }
         signature_.reset(OQS_SIG_new(OQS_SIG_alg_ml_dsa_44));
         kem_.reset(OQS_KEM_new(OQS_KEM_alg_ml_kem_512));
         if (!signature_ || !kem_) throw std::runtime_error("required liboqs algorithms are unavailable");
-        if (material.identity.empty() || material.key_id.empty() ||
-            material.signature_public_key.size() != signature_->length_public_key ||
-            material.signature_secret_key.size() != signature_->length_secret_key ||
-            material.kem_public_key.size() != kem_->length_public_key ||
-            material.kem_secret_key.size() != kem_->length_secret_key) {
-            throw std::runtime_error("durable PQC keystore material is incomplete or incompatible");
+
+        public_state_ = private_operations_->public_state();
+        omniguard::validate_active_public_state(public_state_);
+        if (public_state_.signature_public_key.size() != signature_->length_public_key ||
+            public_state_.kem_public_key.size() != kem_->length_public_key ||
+            public_state_.signature_max_size != signature_->length_signature ||
+            public_state_.kem_ciphertext_size != kem_->length_ciphertext ||
+            public_state_.kem_shared_secret_size != kem_->length_shared_secret) {
+            throw std::runtime_error("active PQC provider state is incompatible with ML-DSA-44/ML-KEM-512 runtime parameters");
         }
-        identity_ = std::move(material.identity);
-        key_id_ = std::move(material.key_id);
-        signature_public_key_ = std::move(material.signature_public_key);
-        signature_secret_key_ = std::move(material.signature_secret_key);
-        kem_public_key_ = std::move(material.kem_public_key);
-        kem_secret_key_ = std::move(material.kem_secret_key);
     }
 
-    ~ActivePqcEngine() {
-        if (!signature_secret_key_.empty()) OPENSSL_cleanse(signature_secret_key_.data(), signature_secret_key_.size());
-        if (!kem_secret_key_.empty()) OPENSSL_cleanse(kem_secret_key_.data(), kem_secret_key_.size());
-    }
-
-    const std::string& identity() const { return identity_; }
-    const std::string& key_id() const { return key_id_; }
-    const std::vector<unsigned char>& signature_public_key() const { return signature_public_key_; }
-    const std::vector<unsigned char>& kem_public_key() const { return kem_public_key_; }
-    std::size_t signature_size() const { return signature_->length_signature; }
-    std::size_t kem_ciphertext_size() const { return kem_->length_ciphertext; }
+    const std::string& identity() const { return public_state_.identity; }
+    const std::string& key_id() const { return public_state_.key_id; }
+    const std::string& provider() const { return public_state_.provider; }
+    bool hardware_backed() const { return public_state_.hardware_backed; }
+    bool non_exportable() const { return public_state_.non_exportable; }
+    bool runtime_probe_verified() const { return public_state_.runtime_probe_verified; }
+    const std::vector<unsigned char>& signature_public_key() const { return public_state_.signature_public_key; }
+    const std::vector<unsigned char>& kem_public_key() const { return public_state_.kem_public_key; }
+    std::size_t signature_size() const { return public_state_.signature_max_size; }
+    std::size_t kem_ciphertext_size() const { return public_state_.kem_ciphertext_size; }
 
     json create_artifact(const std::string& message) const {
-        std::vector<unsigned char> signature(signature_->length_signature);
-        std::size_t signature_len = 0;
-        if (OQS_SIG_sign(
-                signature_.get(), signature.data(), &signature_len,
-                reinterpret_cast<const unsigned char*>(message.data()), message.size(), signature_secret_key_.data()
-            ) != OQS_SUCCESS) {
-            throw std::runtime_error("ML-DSA signing failed");
+        const std::vector<unsigned char> message_bytes(message.begin(), message.end());
+        std::vector<unsigned char> signature = private_operations_->sign_ml_dsa_44(message_bytes);
+        if (signature.empty() || signature.size() > public_state_.signature_max_size) {
+            throw std::runtime_error("active ML-DSA-44 provider returned an invalid signature size");
         }
-        signature.resize(signature_len);
 
         std::vector<unsigned char> ciphertext(kem_->length_ciphertext);
         std::vector<unsigned char> sender_secret(kem_->length_shared_secret);
-        std::vector<unsigned char> receiver_secret(kem_->length_shared_secret);
-        const bool kem_ok = OQS_KEM_encaps(
-                                kem_.get(), ciphertext.data(), sender_secret.data(), kem_public_key_.data()) == OQS_SUCCESS &&
-                            OQS_KEM_decaps(
-                                kem_.get(), receiver_secret.data(), ciphertext.data(), kem_secret_key_.data()) == OQS_SUCCESS &&
-                            sender_secret.size() == receiver_secret.size() &&
+        if (OQS_KEM_encaps(
+                kem_.get(), ciphertext.data(), sender_secret.data(), public_state_.kem_public_key.data()
+            ) != OQS_SUCCESS) {
+            OPENSSL_cleanse(sender_secret.data(), sender_secret.size());
+            throw std::runtime_error("ML-KEM encapsulation failed");
+        }
+
+        PqcSensitiveBytes receiver_secret;
+        try {
+            receiver_secret = private_operations_->decapsulate_ml_kem_512(ciphertext);
+        } catch (...) {
+            OPENSSL_cleanse(sender_secret.data(), sender_secret.size());
+            throw;
+        }
+        const bool kem_ok = receiver_secret.size() == sender_secret.size() &&
+                            receiver_secret.size() == public_state_.kem_shared_secret_size &&
                             CRYPTO_memcmp(sender_secret.data(), receiver_secret.data(), sender_secret.size()) == 0;
         if (!kem_ok) {
             OPENSSL_cleanse(sender_secret.data(), sender_secret.size());
-            OPENSSL_cleanse(receiver_secret.data(), receiver_secret.size());
-            throw std::runtime_error("ML-KEM encapsulation/decapsulation failed");
+            receiver_secret.clear();
+            throw std::runtime_error("ML-KEM encapsulation/decapsulation provider round-trip failed");
         }
+
         const std::string shared_secret_hash = sha3_256_hex(
-            std::string(kPqcDomain) + "\n" + key_id_ + "\n" + to_hex(receiver_secret.data(), receiver_secret.size())
+            std::string(kPqcDomain) + "\n" + public_state_.key_id + "\n" +
+            to_hex(receiver_secret.data(), receiver_secret.size())
         );
         OPENSSL_cleanse(sender_secret.data(), sender_secret.size());
-        OPENSSL_cleanse(receiver_secret.data(), receiver_secret.size());
+        receiver_secret.clear();
+
         const std::string signature_hex = to_hex(signature.data(), signature.size());
         const std::string ciphertext_hex = to_hex(ciphertext.data(), ciphertext.size());
         const std::string binding_hash = sha3_256_hex(
-            std::string(kPqcDomain) + "\n" + key_id_ + "\n" + message + "\n" +
+            std::string(kPqcDomain) + "\n" + public_state_.key_id + "\n" + message + "\n" +
             signature_hex + "\n" + ciphertext_hex + "\n" + shared_secret_hash
         );
         return {
             {"pqc_algorithm", "ML-DSA-44+ML-KEM-512"},
-            {"pqc_key_id", key_id_},
+            {"pqc_key_id", public_state_.key_id},
             {"pqc_signature_hex", signature_hex},
-            {"pqc_signature_public_key_hex", to_hex(signature_public_key_.data(), signature_public_key_.size())},
+            {"pqc_signature_public_key_hex", to_hex(public_state_.signature_public_key.data(), public_state_.signature_public_key.size())},
             {"pqc_kem_ciphertext_hex", ciphertext_hex},
-            {"pqc_kem_public_key_hex", to_hex(kem_public_key_.data(), kem_public_key_.size())},
+            {"pqc_kem_public_key_hex", to_hex(public_state_.kem_public_key.data(), public_state_.kem_public_key.size())},
             {"pqc_shared_secret_hash", shared_secret_hash},
             {"pqc_binding_hash", binding_hash},
         };
@@ -472,36 +489,36 @@ public:
         const std::vector<unsigned char>& embedded_kem_public_key,
         const std::string& shared_secret_hash
     ) const {
-        if (embedded_signature_public_key != signature_public_key_ || embedded_kem_public_key != kem_public_key_) return false;
+        if (embedded_signature_public_key != public_state_.signature_public_key ||
+            embedded_kem_public_key != public_state_.kem_public_key) {
+            return false;
+        }
         if (OQS_SIG_verify(
                 signature_.get(),
                 reinterpret_cast<const unsigned char*>(message.data()), message.size(),
-                signature.data(), signature.size(), signature_public_key_.data()
+                signature.data(), signature.size(), public_state_.signature_public_key.data()
             ) != OQS_SUCCESS) {
             return false;
         }
-        if (ciphertext.size() != kem_->length_ciphertext) return false;
-        std::vector<unsigned char> secret(kem_->length_shared_secret);
-        if (OQS_KEM_decaps(kem_.get(), secret.data(), ciphertext.data(), kem_secret_key_.data()) != OQS_SUCCESS) {
-            OPENSSL_cleanse(secret.data(), secret.size());
+        if (ciphertext.size() != public_state_.kem_ciphertext_size) return false;
+
+        PqcSensitiveBytes secret = private_operations_->decapsulate_ml_kem_512(ciphertext);
+        if (secret.size() != public_state_.kem_shared_secret_size) {
+            secret.clear();
             return false;
         }
         const std::string expected = sha3_256_hex(
-            std::string(kPqcDomain) + "\n" + key_id_ + "\n" + to_hex(secret.data(), secret.size())
+            std::string(kPqcDomain) + "\n" + public_state_.key_id + "\n" + to_hex(secret.data(), secret.size())
         );
-        OPENSSL_cleanse(secret.data(), secret.size());
+        secret.clear();
         return expected == shared_secret_hash;
     }
 
 private:
     SigPtr signature_;
     KemPtr kem_;
-    std::string identity_;
-    std::string key_id_;
-    std::vector<unsigned char> signature_public_key_;
-    std::vector<unsigned char> signature_secret_key_;
-    std::vector<unsigned char> kem_public_key_;
-    std::vector<unsigned char> kem_secret_key_;
+    std::unique_ptr<PqcActivePrivateOperations> private_operations_;
+    PqcActivePublicState public_state_;
 };
 
 std::string canonical_telemetry(const json& telemetry) {
@@ -761,6 +778,11 @@ public:
             {"historical_generation_blocks", historical_blocks},
             {"migration_state", historical_blocks > 0 ? "MIXED_GENERATION_VERIFIED" : "ACTIVE_ONLY"},
             {"active_key_id", active_.key_id()},
+            {"active_pqc_provider", active_.provider()},
+            {"active_pqc_hardware_backed", active_.hardware_backed()},
+            {"active_pqc_non_exportable", active_.non_exportable()},
+            {"active_pqc_runtime_probe_verified", active_.runtime_probe_verified()},
+            {"active_pqc_private_operations_opaque", true},
             {"trust_keyring_verified", keyring_ != nullptr},
             {"rollback_anchor_verified", anchor_verified_},
             {"current_ml_kem_decapsulation_verified", current_blocks > 0},
@@ -857,7 +879,14 @@ int run_self_test(
         runtime.append("SELFTEST:TELEMETRY");
         runtime.save(ledger_path);
         const json report = runtime.verify();
-        if (!report.at("verified").get<bool>() || report.at("block_count").get<std::size_t>() != 2) return 2;
+        if (!report.at("verified").get<bool>() || report.at("block_count").get<std::size_t>() != 2 ||
+            report.at("active_pqc_provider").get<std::string>() != omniguard::kSoftwarePqcProvider ||
+            report.at("active_pqc_hardware_backed").get<bool>() ||
+            report.at("active_pqc_non_exportable").get<bool>() ||
+            !report.at("active_pqc_runtime_probe_verified").get<bool>() ||
+            !report.at("active_pqc_private_operations_opaque").get<bool>()) {
+            return 2;
+        }
     }
     {
         NativeRuntime reloaded(identity, data_key, keystore_path, keystore_key);
@@ -876,7 +905,7 @@ int run_self_test(
     }
     if (!wrong_key_rejected) return 4;
     std::filesystem::remove(ledger_path, ignored);
-    std::cout << "[SELF-TEST] PASS: v3.0.3 persisted runtime + durable ML-DSA-44/ML-KEM-512 + AES-256-GCM\n";
+    std::cout << "[SELF-TEST] PASS: v3.0.3 persisted runtime + opaque PQC private operations + durable ML-DSA-44/ML-KEM-512 + AES-256-GCM\n";
     return 0;
 }
 
