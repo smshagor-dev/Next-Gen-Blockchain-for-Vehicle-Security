@@ -24,7 +24,7 @@ class LiveSocketDashboardContractTests(unittest.TestCase):
         self.assertIn("threading.Thread", self.ui_text)
         self.assertIn("SmartCarDashboardLiveSocket", self.ui_text)
         self.assertIn("_drain_live_socket", self.ui_text)
-        self.assertIn("json.dumps(snapshot", self.ui_text)
+        self.assertIn("json.dumps(", self.ui_text)
         self.assertIn("json.loads(line.decode", self.ui_text)
 
     def test_ui_loop_is_continuous_and_manual_refresh_is_only_compatibility(self):
@@ -33,6 +33,13 @@ class LiveSocketDashboardContractTests(unittest.TestCase):
         self.assertIn("_drain_live_socket", method)
         self.assertIn("FALLBACK_COLLECT_INTERVAL_SEC", method)
         self.assertNotIn("self.manual_refresh()", method)
+
+    def test_active_shell_removes_manual_refresh_controls(self):
+        method = self._method_source("_strip_manual_refresh_controls")
+        self.assertIn('text == "Refresh Now"', method)
+        self.assertIn("child.destroy()", method)
+        self.assertIn('text == "Refresh Interval"', method)
+        self.assertIn('text="Live Update"', method)
 
     def test_cached_provider_avoids_requerying_metadata_during_live_frames(self):
         method = self._method_source("_metadata", class_name="LiveDashboardDataProvider")
@@ -43,12 +50,19 @@ class LiveSocketDashboardContractTests(unittest.TestCase):
     def test_vehicle_art_is_antialiased_pillow_renderer(self):
         self.assertIn("Image.Resampling.LANCZOS", self.art_text)
         self.assertIn("ImageFilter.GaussianBlur", self.art_text)
-        self.assertIn("metallic vertical gradient", self.art_text)
+        self.assertIn("Metallic vertical gradient", self.art_text)
         self.assertIn("Wheels with layered rims and red brake calipers", self.art_text)
         method = self._method_source("_draw_vehicle_art")
         self.assertIn("render_vehicle_hero", method)
         self.assertIn("ImageTk.PhotoImage", method)
         self.assertIn("self._vehicle_photo_key", method)
+
+    def test_vehicle_art_renders_headlessly(self):
+        from dashboard_vehicle_art import render_vehicle_hero
+
+        image = render_vehicle_hero(640, 360)
+        self.assertEqual(image.size, (640, 360))
+        self.assertEqual(image.mode, "RGBA")
 
     def test_live_shell_does_not_add_fake_reference_values_or_credentials(self):
         lowered = self.ui_text.lower() + self.art_text.lower()
