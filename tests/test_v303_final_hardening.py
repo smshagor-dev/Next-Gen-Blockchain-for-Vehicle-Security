@@ -1,5 +1,6 @@
 import re
 import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -88,6 +89,12 @@ class V303FinalHardeningTests(unittest.TestCase):
         self.assertNotIn("signature_secret_key", self.hardware_provider)
         self.assertNotIn("kem_secret_key", self.hardware_provider)
         self.assertNotIn("export_private", self.hardware_provider)
+
+    def test_hardware_provider_contract_suite_runs_in_security_baseline(self):
+        subprocess.run(
+            [sys.executable, "-m", "unittest", "-v", "tests.test_pqc_hardware_provider"],
+            check=True,
+        )
 
     def test_rollback_key_has_independent_credential_domain(self):
         policy = secret_policy("SMARTCAR_CPP_PQC_ROLLBACK_KEY")
