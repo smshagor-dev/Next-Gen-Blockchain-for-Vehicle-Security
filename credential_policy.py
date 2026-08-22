@@ -34,6 +34,7 @@ _SECRET_POLICIES: Dict[str, SecretPolicy] = {
     "SMARTCAR_STORAGE_PASSPHRASE": SecretPolicy("storage_encryption", 32),
     "SMARTCAR_CPP_DATA_KEY": SecretPolicy("native_cpp_data", 32),
     "SMARTCAR_CPP_PQC_KEYSTORE_KEY": SecretPolicy("native_cpp_pqc_keystore", 32),
+    "SMARTCAR_CPP_PQC_ROLLBACK_KEY": SecretPolicy("native_cpp_pqc_rollback", 32),
     "SMARTCAR_FORENSIC_ACCESS_KEY": SecretPolicy("forensic_wrap", 32),
     "SMARTCAR_INSURANCE_ACCESS_KEY": SecretPolicy("insurance_wrap", 32),
     "SMARTCAR_INCIDENT_EVIDENCE_KEY": SecretPolicy("incident_evidence", 32),
