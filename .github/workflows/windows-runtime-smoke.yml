@@ -47,6 +47,7 @@ jobs:
         env:
           PYTHONPATH: .
         run: |
+          $env:SMARTCAR_V2X_SHARED_SECRET = python -c "import secrets; print(secrets.token_urlsafe(48))"
           python -m unittest -v tests.test_local_env_bootstrap
           python -m unittest -v tests.test_runtime_backend_readiness
           python -m unittest -v tests.test_security_claims
