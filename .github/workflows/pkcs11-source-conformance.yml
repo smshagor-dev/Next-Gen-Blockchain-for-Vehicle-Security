@@ -21,19 +21,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Fetch OASIS PKCS11 v3.2 standard headers
+      - name: Fetch canonical OASIS PKCS11 v3.2 release headers
         shell: bash
         run: |
           set -euo pipefail
+          archive="$RUNNER_TEMP/pkcs11-spec-v3.2-os.zip"
+          extract_dir="$RUNNER_TEMP/pkcs11-v3.2-release"
           include_dir="$RUNNER_TEMP/pkcs11-v3.2"
-          base="https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.2/os/include/pkcs11-v3.2"
-          mkdir -p "$include_dir"
-          for header in pkcs11.h pkcs11t.h pkcs11f.h; do
-            curl --fail --show-error --silent --location --proto '=https' --tlsv1.2 --retry 3 \
-              "$base/$header" \
-              --output "$include_dir/$header"
-            test -s "$include_dir/$header"
-          done
+          release_url="https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.2/os/pkcs11-spec-v3.2-os.zip"
+
+          curl --fail --show-error --silent --location --proto '=https' --tlsv1.2 --retry 3 \
+            --user-agent 'OmniGuard-PKCS11-Conformance/3.0.3' \
+            "$release_url" \
+            --output "$archive"
+
+          # OASIS Standard 03 June 2026 release manifest SHA-1 for the canonical ZIP.
+          echo 'c5c814f09a64c79c9cdcd001a96b64f9cd546d9f  '"$archive" | sha1sum --check --strict
+
+          mkdir -p "$extract_dir" "$include_dir"
+          unzip -q "$archive" \
+            'include/pkcs11-v3.2/pkcs11.h' \
+            'include/pkcs11-v3.2/pkcs11t.h' \
+            'include/pkcs11-v3.2/pkcs11f.h' \
+            -d "$extract_dir"
+          cp "$extract_dir/include/pkcs11-v3.2/"*.h "$include_dir/"
+
           grep -Eq '^#define[[:space:]]+CRYPTOKI_VERSION_MAJOR[[:space:]]+3([[:space:]]|$)' "$include_dir/pkcs11t.h"
           grep -Eq '^#define[[:space:]]+CRYPTOKI_VERSION_MINOR[[:space:]]+2([[:space:]]|$)' "$include_dir/pkcs11t.h"
           grep -F 'CKM_ML_DSA_KEY_PAIR_GEN' "$include_dir/pkcs11t.h"
