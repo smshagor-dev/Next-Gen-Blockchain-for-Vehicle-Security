@@ -32,7 +32,11 @@ class ReleaseVersionTests(unittest.TestCase):
         self.assertTrue(metadata["mixed_generation_ledger_verification"])
         self.assertTrue(metadata["authenticated_local_rollback_anchor"])
         self.assertFalse(metadata["hardware_monotonic_rollback_protection"])
-        self.assertFalse(metadata["hardware_pqc_provider_implemented"])
+        self.assertTrue(metadata["hardware_pqc_provider_implemented"])
+        self.assertTrue(metadata["pkcs11_v32_provider_adapter_implemented"])
+        self.assertFalse(metadata["pkcs11_production_token_validated"])
+        self.assertFalse(metadata["tpm2_pqc_provider_implemented"])
+        self.assertFalse(metadata["generic_hsm_pqc_provider_implemented"])
         self.assertFalse(metadata["production_certified"])
         self.assertFalse(metadata["vehicle_safety_certified"])
         self.assertFalse(metadata["secret_values_exposed"])
@@ -54,8 +58,10 @@ class ReleaseVersionTests(unittest.TestCase):
             "scripts/generate_provenance.py",
             "scripts/secret_scan.py",
             "scripts/create_v3_0_3_tag.sh",
+            "scripts/ci_windows_go_backend_smoke.py",
             ".github/workflows/create-v3.0.3-tag.yml",
             ".github/workflows/release-v3.0.3.yml",
+            ".github/workflows/windows-runtime-smoke.yml",
         )
         for item in required:
             self.assertTrue(Path(item).exists(), item)
@@ -83,8 +89,14 @@ class ReleaseVersionTests(unittest.TestCase):
         self.assertIn('test "${{ inputs.confirm }}" = "CREATE-v3.0.3"', text)
         self.assertIn('main_sha="$(git rev-parse origin/main)"', text)
         self.assertIn('test "$(git rev-parse HEAD)" = "$main_sha"', text)
-        self.assertIn('--workflow "Security Baseline"', text)
+        for workflow in ("Security Baseline", "PKCS11 Source Conformance", "Windows Runtime Smoke"):
+            self.assertIn(workflow, text)
+        self.assertIn('--workflow "$workflow"', text)
         self.assertIn('--event push', text)
+        self.assertIn("headSha,status,conclusion,url", text)
+        self.assertIn('run.get("headSha") == target', text)
+        self.assertIn('run.get("status") != "completed"', text)
+        self.assertIn('run.get("conclusion") != "success"', text)
         self.assertIn('git tag -a "$TAG" "$main_sha"', text)
         self.assertIn("gh workflow run release-v3.0.3.yml", text)
 
@@ -111,10 +123,16 @@ class ReleaseVersionTests(unittest.TestCase):
             'if [[ "$branch" != "main" ]]',
             'remote_main_sha="$(git rev-parse origin/main)"',
             'if [[ "$local_sha" != "$remote_main_sha" ]]',
+            'command -v gh',
+            'gh auth status',
+            '--workflow "$workflow"',
+            '--event push',
             'git tag -a "$TAG" "$local_sha"',
             'git push origin "refs/tags/$TAG"',
         ):
             self.assertIn(required, text)
+        for workflow in ("Security Baseline", "PKCS11 Source Conformance", "Windows Runtime Smoke"):
+            self.assertIn(workflow, text)
         subprocess.run(["bash", "-n", str(path)], check=True)
 
 

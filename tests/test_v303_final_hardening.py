@@ -16,11 +16,14 @@ class V303FinalHardeningTests(unittest.TestCase):
         cls.provider = Path("native/pqc_provider_policy.h").read_text(encoding="utf-8")
         cls.provider_factory = Path("native/pqc_runtime_provider_factory.h").read_text(encoding="utf-8")
         cls.hardware_provider = Path("native/pqc_hardware_provider.h").read_text(encoding="utf-8")
+        cls.pkcs11_provider = Path("native/pqc_pkcs11_provider.cpp").read_text(encoding="utf-8")
         cls.anchor_header = Path("native/pqc_state_guard.h").read_text(encoding="utf-8")
         cls.anchor = Path("native/pqc_state_guard.cpp").read_text(encoding="utf-8")
         cls.state_admin = Path("native/pqc_state_admin.cpp").read_text(encoding="utf-8")
         cls.cmake = Path("CMakeLists.txt").read_text(encoding="utf-8")
         cls.contracts = Path("smart_contracts.py").read_text(encoding="utf-8")
+        cls.release_notes = Path("docs/releases/v3.0.3.md").read_text(encoding="utf-8")
+        cls.env_example = Path(".env.example").read_text(encoding="utf-8")
 
     def test_runtime_load_verify_append_is_fail_closed(self):
         for required in (
@@ -94,7 +97,7 @@ class V303FinalHardeningTests(unittest.TestCase):
         self.assertNotIn("copy_file(backup", self.state_admin)
         self.assertNotIn("rename(backup", self.state_admin)
 
-    def test_hardware_provider_names_fail_closed_until_real_backend_exists(self):
+    def test_pkcs11_is_opt_in_implemented_while_tpm2_and_hsm_remain_fail_closed(self):
         for provider in ("tpm2", "pkcs11", "hsm"):
             self.assertIn(f'"{provider}"', self.provider)
         self.assertIn("implemented = false", self.provider)
@@ -102,7 +105,23 @@ class V303FinalHardeningTests(unittest.TestCase):
         self.assertIn("hardware provider fallback is never simulated", self.provider)
         self.assertIn("SMARTCAR_CPP_PQC_PROVIDER", self.provider)
         self.assertIn("runtime_probe_verified", self.provider)
-        self.assertIn("every positive hardware capability stays false", self.provider)
+
+        self.assertIn("SMARTCAR_ENABLE_PKCS11_PROVIDER", self.cmake)
+        self.assertIn("native/pqc_pkcs11_provider.cpp", self.cmake)
+        self.assertIn("make_pkcs11_hardware_provider_from_env", self.provider_factory)
+        self.assertIn("provider == kPkcs11PqcProvider", self.provider_factory)
+        self.assertIn("C_GetInterface(PKCS 11 v3.2)", self.pkcs11_provider)
+        self.assertIn("CKM_ML_DSA", self.pkcs11_provider)
+        self.assertIn("CKM_ML_KEM", self.pkcs11_provider)
+        self.assertIn("private_keys_non_exportable", self.pkcs11_provider)
+        self.assertIn("ml_kem_512_derived_secret_non_exportable", self.pkcs11_provider)
+
+        self.assertIn("opt-in PKCS#11 v3.2 adapter implemented", self.release_notes)
+        self.assertIn("no concrete runtime adapter is implemented in v3.0.3", self.release_notes)
+        self.assertNotIn("`pkcs11` — declared but not implemented", self.release_notes)
+        self.assertIn("SMARTCAR_CPP_PQC_PROVIDER=software_encrypted_file", self.env_example)
+        self.assertIn("SMARTCAR_CPP_PKCS11_MODULE=", self.env_example)
+        self.assertIn("SMARTCAR_CPP_PKCS11_PIN=", self.env_example)
 
     def test_hardware_provider_contract_is_non_exportable_and_probe_gated(self):
         for required in (
@@ -168,11 +187,39 @@ class V303FinalHardeningTests(unittest.TestCase):
             "scripts/generate_sbom.py",
             "scripts/generate_provenance.py",
             "scripts/secret_scan.py",
+            "scripts/ci_windows_go_backend_smoke.py",
             "docs/security/SUPPLY_CHAIN.md",
             "docs/security/HISTORY_REMEDIATION.md",
         ):
             self.assertTrue(Path(path).exists(), path)
-        subprocess.run(["python", "-m", "py_compile", "scripts/generate_sbom.py", "scripts/generate_provenance.py", "scripts/secret_scan.py"], check=True)
+        subprocess.run(
+            [
+                "python",
+                "-m",
+                "py_compile",
+                "scripts/generate_sbom.py",
+                "scripts/generate_provenance.py",
+                "scripts/secret_scan.py",
+                "scripts/ci_windows_go_backend_smoke.py",
+            ],
+            check=True,
+        )
+
+    def test_final_tag_paths_require_all_exact_main_release_gates(self):
+        tag_workflow = Path(".github/workflows/create-v3.0.3-tag.yml").read_text(encoding="utf-8")
+        tag_script = Path("scripts/create_v3_0_3_tag.sh").read_text(encoding="utf-8")
+        windows_workflow = Path(".github/workflows/windows-runtime-smoke.yml").read_text(encoding="utf-8")
+        for workflow in ("Security Baseline", "PKCS11 Source Conformance", "Windows Runtime Smoke"):
+            self.assertIn(workflow, tag_workflow)
+            self.assertIn(workflow, tag_script)
+        self.assertIn("headSha", tag_workflow)
+        self.assertIn("headSha", tag_script)
+        self.assertIn("--event push", tag_workflow)
+        self.assertIn("--event push", tag_script)
+        self.assertIn("windows-latest", windows_workflow)
+        self.assertIn("tests.test_local_env_bootstrap", windows_workflow)
+        self.assertIn("tests.test_runtime_backend_readiness", windows_workflow)
+        self.assertIn("scripts/ci_windows_go_backend_smoke.py", windows_workflow)
 
     def test_sbom_resolves_multiline_go_mod_directive(self):
         sbom = build_sbom()
@@ -193,6 +240,7 @@ class V303FinalHardeningTests(unittest.TestCase):
         self.assertTrue(Path("docs/releases/v3.0.3-checklist.md").exists())
         self.assertTrue(Path("scripts/create_v3_0_3_tag.sh").exists())
         self.assertTrue(Path(".github/workflows/create-v3.0.3-tag.yml").exists())
+        self.assertTrue(Path(".github/workflows/windows-runtime-smoke.yml").exists())
 
 
 if __name__ == "__main__":

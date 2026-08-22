@@ -1,0 +1,82 @@
+name: Windows Runtime Smoke
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - main
+      - release/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-runtime:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+          cache-dependency-path: api/go/go.mod
+
+      - name: Compile Windows runtime smoke modules
+        shell: pwsh
+        run: |
+          python -m py_compile runtime_backend_patch.py smartcar_backend.py scripts/bootstrap_local_env.py scripts/ci_windows_go_backend_smoke.py
+
+      - name: Run local bootstrap and Go readiness regressions
+        shell: pwsh
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest -v tests.test_local_env_bootstrap
+          python -m unittest -v tests.test_runtime_backend_readiness
+
+      - name: Run Go tests and build fresh Windows backend
+        shell: pwsh
+        working-directory: api/go
+        run: |
+          gofmt -w .
+          go test ./... -count=1
+          New-Item -ItemType Directory -Force -Path ..\..\build | Out-Null
+          go build -trimpath -o ..\..\build\smartcar_go_backend.exe .
+
+      - name: Run authenticated real-process Windows smoke
+        shell: pwsh
+        env:
+          PYTHONPATH: .
+        run: python scripts/ci_windows_go_backend_smoke.py
+
+      - name: Verify loopback backend was cleaned up
+        if: always()
+        shell: pwsh
+        run: |
+          $listener = Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue
+          if ($listener) {
+            Write-Error "Port 8787 is still listening after the Windows runtime smoke."
+            Get-CimInstance Win32_Process -Filter "ProcessId=$($listener.OwningProcess)" |
+              Select-Object ProcessId, Name, ExecutablePath, CommandLine
+            exit 1
+          }
+
+      - name: Show backend diagnostics on failure
+        if: failure()
+        shell: pwsh
+        run: |
+          if (Test-Path .\logs\processes\go-backend.log) {
+            Get-Content .\logs\processes\go-backend.log -Tail 120
+          }
