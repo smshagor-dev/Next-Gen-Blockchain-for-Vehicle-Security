@@ -114,6 +114,7 @@ public:
 
     // Only public key material and opaque identifiers may cross this boundary.
     // Implementations must create or locate private keys inside the TPM/HSM/token.
+    // Private key bytes must never be returned to the runtime or written to the filesystem.
     virtual PqcHardwarePublicMaterial load_or_create_public(const std::string& identity) = 0;
 
     virtual std::vector<unsigned char> sign_ml_dsa_44(
