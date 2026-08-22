@@ -9,10 +9,12 @@ exception text, credentials, and request payloads are never retained.
 from __future__ import annotations
 
 import os
+import socket
 import subprocess
 import time
 from pathlib import Path
 from typing import Any, Dict
+from urllib.parse import urlparse
 
 from consensus_security import consensus_security_metadata
 from identity_security import identity_security_metadata
@@ -51,9 +53,65 @@ def _isolated_spawn_environment(self: GoBackend, root: Path) -> Dict[str, str]:
     return environment
 
 
+def _startup_timeout_seconds() -> float:
+    """Return a bounded startup timeout suitable for cold Windows Go builds."""
+    raw = os.getenv("SMARTCAR_GO_STARTUP_TIMEOUT_SEC", "45").strip()
+    try:
+        timeout = float(raw)
+    except (TypeError, ValueError):
+        timeout = 45.0
+    return max(5.0, min(timeout, 120.0))
+
+
+def _loopback_endpoint_is_listening(base_url: str, timeout: float = 0.20) -> bool:
+    """Probe TCP reachability only; authentication is still decided by _health()."""
+    try:
+        parsed = urlparse(base_url)
+        host = parsed.hostname or ""
+        port = parsed.port
+        if host not in {"127.0.0.1", "localhost", "::1"} or port is None:
+            return False
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except (OSError, ValueError):
+        return False
+
+
+def _terminate_spawned_backend(proc: subprocess.Popen) -> None:
+    """Best-effort cleanup for only the child process created by this runtime."""
+    if proc.poll() is not None:
+        return
+    try:
+        proc.terminate()
+        proc.wait(timeout=3.0)
+        return
+    except Exception:
+        pass
+    try:
+        proc.kill()
+        proc.wait(timeout=3.0)
+    except Exception:
+        pass
+
+
 def _isolated_ensure_service(self: GoBackend):
     if self._health():
         return
+
+    # A reachable endpoint that fails authenticated health is deliberately not
+    # trusted or killed. This is commonly a stale backend after local credential
+    # rotation, but it could be any process. Fail clearly instead of spawning a
+    # second backend that cannot own the same loopback port.
+    if _loopback_endpoint_is_listening(self.base_url):
+        get_runtime_security_monitor().observe(
+            "control_api",
+            "BACKEND_LOOPBACK_ENDPOINT_AUTHENTICATION_MISMATCH",
+            subject=getattr(self, "vehicle_id", ""),
+        )
+        raise RuntimeError(
+            "Configured Go backend loopback endpoint is already in use but failed authenticated health; "
+            "stop the stale local backend or choose another loopback endpoint before retrying"
+        )
 
     root = Path(__file__).resolve().parent
     go_root = root / "api" / "go"
@@ -65,33 +123,53 @@ def _isolated_ensure_service(self: GoBackend):
         cmd = ["go", "run", "."]
         cwd = str(go_root)
 
+    log_dir = root / "logs" / "processes"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = log_dir / "go-backend.log"
+    self._backend_log_path = str(log_path)
+
     popen_kwargs: Dict[str, Any] = {
         "cwd": cwd,
-        "stdout": subprocess.DEVNULL,
-        "stderr": subprocess.DEVNULL,
         "env": self._spawn_environment(root),
     }
     popen_kwargs.update(subprocess_isolation_kwargs())
-    self._proc = subprocess.Popen(cmd, **popen_kwargs)
 
-    deadline = time.time() + 12.0
-    while time.time() < deadline:
+    # Keep backend diagnostics local and separate from the GUI log. The Go
+    # backend never logs credential values; exceptions expose only this path.
+    with open(log_path, mode="a", encoding="utf-8", buffering=1) as backend_log:
+        backend_log.write(f"\n--- backend start {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n")
+        backend_log.flush()
+        popen_kwargs["stdout"] = backend_log
+        popen_kwargs["stderr"] = subprocess.STDOUT
+        self._proc = subprocess.Popen(cmd, **popen_kwargs)
+
+    timeout = _startup_timeout_seconds()
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
         if self._health():
             return
-        if self._proc.poll() is not None:
+        return_code = self._proc.poll()
+        if return_code is not None:
             get_runtime_security_monitor().observe(
                 "control_api",
                 "BACKEND_PROCESS_EXITED_BEFORE_AUTHENTICATED_HEALTH",
                 subject=getattr(self, "vehicle_id", ""),
             )
-            raise RuntimeError("Go backend exited before authenticated health verification")
+            raise RuntimeError(
+                f"Go backend exited before authenticated health verification "
+                f"(exit_code={return_code}); see {log_path}"
+            )
         time.sleep(0.25)
+
+    _terminate_spawned_backend(self._proc)
     get_runtime_security_monitor().observe(
         "control_api",
         "BACKEND_CONNECTION_UNAVAILABLE",
         subject=getattr(self, "vehicle_id", ""),
     )
-    raise RuntimeError("Authenticated Go backend did not become ready on isolated loopback runtime")
+    raise RuntimeError(
+        f"Authenticated Go backend did not become ready within {timeout:.0f}s; see {log_path}"
+    )
 
 
 def _monitored_request(
