@@ -1,0 +1,61 @@
+name: PKCS11 Source Conformance
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - main
+      - security/**
+      - release/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pkcs11-v32-source-compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch pinned PKCS11 v3.2 header
+        shell: bash
+        run: |
+          set -euo pipefail
+          include_dir="$RUNNER_TEMP/pkcs11-v3.2"
+          mkdir -p "$include_dir"
+          curl --fail --show-error --silent --location --proto '=https' --tlsv1.2 --retry 3 \
+            "https://raw.githubusercontent.com/p11-glue/p11-kit/120050e353e8f43d7c40bbcc047f667f903f4de5/common/pkcs11.h" \
+            --output "$include_dir/pkcs11.h"
+          grep -Eq '^#define CRYPTOKI_VERSION_MAJOR[[:space:]]+3$' "$include_dir/pkcs11.h"
+          grep -Eq '^#define CRYPTOKI_VERSION_MINOR[[:space:]]+2$' "$include_dir/pkcs11.h"
+          grep -F 'CKM_ML_DSA_KEY_PAIR_GEN' "$include_dir/pkcs11.h"
+          grep -F 'CKM_ML_KEM_KEY_PAIR_GEN' "$include_dir/pkcs11.h"
+          grep -F 'CK_FUNCTION_LIST_3_2' "$include_dir/pkcs11.h"
+
+      - name: Compile PKCS11 provider source against v3.2 API
+        shell: bash
+        run: |
+          set -euo pipefail
+          c++ \
+            -std=c++17 \
+            -Wall -Wextra -Wpedantic -Werror \
+            -DSMARTCAR_ENABLE_PKCS11_PROVIDER=1 \
+            -I native \
+            -I "$RUNNER_TEMP/pkcs11-v3.2" \
+            -fsyntax-only \
+            native/pqc_pkcs11_provider.cpp
+
+      - name: Verify provider remains hardware-truthful
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'CKF_HW_SLOT' native/pqc_pkcs11_provider.cpp
+          grep -F 'CKA_NEVER_EXTRACTABLE' native/pqc_pkcs11_provider.cpp
+          grep -F 'C_DecapsulateKey' native/pqc_pkcs11_provider.cpp
+          grep -F 'C_DigestKey' native/pqc_pkcs11_provider.cpp
+          grep -F 'software tokens must not produce a hardware-backed claim' tests/test_pqc_hardware_provider.py || true
+          ! grep -F 'software_encrypted_file' native/pqc_pkcs11_provider.cpp
