@@ -1,0 +1,72 @@
+name: Repair v3.0.3 source fallback
+
+on:
+  push:
+    branches:
+      - ci/v3.0.3-repair
+
+permissions:
+  contents: write
+
+jobs:
+  patch-source:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: ci/v3.0.3-repair
+          fetch-depth: 0
+
+      - name: Remove legacy PoA fallback exactly
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("blockchain.py")
+          text = path.read_text(encoding="utf-8-sig")
+
+          import_line = "from env_config import load_project_env_once, get_env, get_int, get_bool"
+          if text.count(import_line) != 2:
+              raise SystemExit("unexpected env_config import count")
+          text = text.replace(
+              import_line,
+              "from env_config import load_project_env_once, get_env, get_int, get_bool, get_required_secret",
+          )
+
+          legacy_decl = 'DEFAULT_POA_AUTHORITY_KEY = "SmartCarPoAKey_2024_Node1"\n'
+          if text.count(legacy_decl) != 1:
+              raise SystemExit("unexpected legacy PoA declaration count")
+          text = text.replace(
+              legacy_decl,
+              "# PoA validator keys must be explicitly configured or supplied by an authority registry.\n",
+          )
+
+          legacy_use = 'validator_key = validator_key or get_env("SMARTCAR_VALIDATOR_KEY", DEFAULT_POA_AUTHORITY_KEY)'
+          if text.count(legacy_use) != 1:
+              raise SystemExit("unexpected legacy PoA fallback use count")
+          text = text.replace(
+              legacy_use,
+              'validator_key = validator_key or get_required_secret("SMARTCAR_VALIDATOR_KEY")',
+          )
+
+          path.write_text(text, encoding="utf-8")
+          PY
+
+          python -m py_compile blockchain.py
+          python scripts/secret_scan.py
+
+      - name: Remove one-shot workflow and commit repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/repair-v303-patch.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add blockchain.py .github/workflows/repair-v303-patch.yml
+          git diff --cached --check
+          git commit -m "security: remove legacy PoA fallback literal"
+          git push origin HEAD:ci/v3.0.3-repair
