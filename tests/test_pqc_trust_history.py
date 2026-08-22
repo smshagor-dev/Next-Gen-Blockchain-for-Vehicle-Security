@@ -81,13 +81,17 @@ class PqcTrustHistoryTests(unittest.TestCase):
         self.assertIn("SMARTCAR_CPP_PQC_TRUST_MAX_GENERATIONS", self.env_example)
         self.assertTrue(DOC.exists())
 
-    def test_ci_runs_real_historical_rotation_flow(self):
+    def test_ci_runs_real_mixed_generation_trust_flow(self):
         self.assertIn("tests.test_pqc_trust_history", self.workflow)
-        self.assertIn("Run PQC historical trust end-to-end validation", self.workflow)
+        self.assertIn("Run mixed-generation native runtime validation", self.workflow)
         self.assertIn("smartcar_pqc_trust_admin init", self.workflow)
         self.assertIn("smartcar_pqc_key_admin rotate", self.workflow)
         self.assertIn("smartcar_pqc_trust_admin admit", self.workflow)
-        self.assertIn("smartcar_pqc_history_verify verify", self.workflow)
+        self.assertIn("smartcar_blockchain verify", self.workflow)
+        self.assertIn("smartcar_blockchain append", self.workflow)
+        self.assertIn("MIXED_GENERATION_VERIFIED", self.workflow)
+        self.assertIn("historical_ml_kem_decapsulation_verified", self.workflow)
+        self.assertIn("historical_kem_claim_is_authoritative", self.workflow)
 
 
 if __name__ == "__main__":
