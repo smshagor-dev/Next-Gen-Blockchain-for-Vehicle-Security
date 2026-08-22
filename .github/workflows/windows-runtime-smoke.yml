@@ -41,9 +41,9 @@ jobs:
       - name: Compile Windows runtime smoke modules
         shell: pwsh
         run: |
-          python -m py_compile dashboard.py dashboard_modern_ui.py runtime_backend_patch.py smartcar_backend.py scripts/bootstrap_local_env.py scripts/ci_windows_go_backend_smoke.py
+          python -m py_compile dashboard.py dashboard_modern_ui.py dashboard_production_ui.py runtime_backend_patch.py smartcar_backend.py scripts/bootstrap_local_env.py scripts/ci_windows_go_backend_smoke.py
 
-      - name: Run local bootstrap, readiness, and dashboard navigation regressions
+      - name: Run local bootstrap, readiness, and dashboard UI regressions
         shell: pwsh
         env:
           PYTHONPATH: .
@@ -51,6 +51,7 @@ jobs:
           python -m unittest -v tests.test_local_env_bootstrap
           python -m unittest -v tests.test_runtime_backend_readiness
           python -m unittest -v tests.test_dashboard_navigation
+          python -m unittest -v tests.test_dashboard_overview_contract
 
       - name: Run Go tests and build fresh Windows backend
         shell: pwsh
