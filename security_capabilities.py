@@ -44,6 +44,7 @@ CONTRIBUTION_BOUNDARY_METADATA = {
         "security capability reporting",
         "assumption-aware dashboard/API metadata",
         "validation-plan scaffolding",
+        "source-backed runtime security strength posture",
     ],
 }
 
@@ -87,6 +88,9 @@ def security_capability_output(ecdh_enabled: bool = False) -> dict:
         "commitment_binding": "Pedersen - classical discrete-log assumption",
         "range_proof_soundness": "Schnorr/classical assumption",
         "fallback_ecdh_p256": fallback_state,
+        "runtime_security_strength": "source-backed categorical posture: STRONG/GUARDED/DEGRADED/RISK",
+        "runtime_security_strength_numeric_score": False,
+        "runtime_security_strength_certification_claim": False,
     }
 
 

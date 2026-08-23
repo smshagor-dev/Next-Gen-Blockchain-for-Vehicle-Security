@@ -23,6 +23,14 @@ from typing import Any, Iterable, Sequence
 import tkinter as tk
 
 from dashboard_reference_panels_ui import ExactReferencePanelsDashboard
+from release_metadata import RELEASE_VERSION
+from runtime_security_strength import (
+    STRENGTH_DEGRADED,
+    STRENGTH_GUARDED,
+    STRENGTH_RISK,
+    STRENGTH_STRONG,
+    evaluate_security_strength,
+)
 
 
 _ASSET_ROOT = Path(__file__).resolve().parent / "assets" / "dashboard" / "reference"
@@ -38,6 +46,12 @@ _RISK_LABELS = {
     "protected": "PROTECTED",
     "warning": "WARNING",
     "risk": "RISK",
+}
+_STRENGTH_COLORS = {
+    STRENGTH_STRONG: "#24d18b",
+    STRENGTH_GUARDED: "#f6c343",
+    STRENGTH_DEGRADED: "#f5a524",
+    STRENGTH_RISK: "#ff5c6c",
 }
 
 
@@ -124,6 +138,23 @@ class RasterReferenceDashboard(ExactReferencePanelsDashboard):
         self._raster_network_key = None
         self._vehicle_risk_state = "warning"
         super().__init__()
+        self._apply_v4_security_labels(self)
+
+    def _apply_v4_security_labels(self, widget: tk.Widget) -> None:
+        """Replace legacy score/status copy without changing the inherited layout."""
+        for child in widget.winfo_children():
+            if isinstance(child, tk.Label):
+                try:
+                    text = str(child.cget("text"))
+                except Exception:
+                    text = ""
+                if text == "Security Score":
+                    child.configure(text="Security Strength")
+                elif text == "System Status":
+                    child.configure(text="Security Strength")
+                elif text == "v3.0.3":
+                    child.configure(text=f"v{RELEASE_VERSION}")
+            self._apply_v4_security_labels(child)
 
     # ---------------------------------------------------------------- vehicle
 
@@ -235,8 +266,6 @@ class RasterReferenceDashboard(ExactReferencePanelsDashboard):
                 anchor="center",
             )
 
-            # The reference artwork remains visible regardless of peer count.
-            # This status text is live/source-backed and does not invent peers.
             status = (
                 f"{peer_count} observed V2X peer{'s' if peer_count != 1 else ''}"
                 if peer_count
@@ -260,37 +289,37 @@ class RasterReferenceDashboard(ExactReferencePanelsDashboard):
                 anchor="w",
             )
         except Exception:
-            # Existing code-drawn world map is still a nonblank fail-safe.
             super()._draw_peer_map(canvas, peers)
 
     # --------------------------------------------------------------- live risk
 
     def _derive_vehicle_risk_state(self, data: dict[str, Any]) -> str:
-        levels: list[str] = []
-        for key in ("alerts", "security_alerts", "runtime_alerts"):
-            if key in data:
-                levels.extend(_explicit_alert_levels(data.get(key)))
-
-        severe = {"critical", "high", "danger", "risk"}
-        caution = {"medium", "warning", "warn", "degraded"}
-        if any(level in severe for level in levels):
-            return "risk"
-        if any(level in caution for level in levels):
-            return "warning"
-
-        try:
-            connection = self._point_value(data.get("connection_status", {}), "Not Connected")
-        except Exception:
-            connection = "Not Connected"
-        return "protected" if str(connection).strip().lower() == "connected" else "warning"
+        strength = evaluate_security_strength(data)
+        return {
+            STRENGTH_STRONG: "protected",
+            STRENGTH_GUARDED: "warning",
+            STRENGTH_DEGRADED: "warning",
+            STRENGTH_RISK: "risk",
+        }.get(strength["level"], "warning")
 
     def _render_snapshot(self, data: dict[str, Any]) -> None:
+        strength = evaluate_security_strength(data)
         new_risk = self._derive_vehicle_risk_state(data)
         if new_risk != self._vehicle_risk_state:
             self._vehicle_risk_state = new_risk
             self._raster_vehicle_key = None
 
         super()._render_snapshot(data)
+
+        level = str(strength["level"])
+        color = _STRENGTH_COLORS.get(level, _STRENGTH_COLORS[STRENGTH_DEGRADED])
+        if hasattr(self, "dashboard_metrics") and "security" in self.dashboard_metrics:
+            self.dashboard_metrics["security"]["value"].configure(text=level, fg=color)
+            self.dashboard_metrics["security"]["note"].configure(text="source-backed runtime posture")
+        if hasattr(self, "system_status_icon"):
+            self.system_status_icon.configure(fg=color)
+        if hasattr(self, "system_status_label"):
+            self.system_status_label.configure(text=level, fg=color)
 
 
 SmartCarDashboard = RasterReferenceDashboard

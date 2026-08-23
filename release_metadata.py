@@ -22,8 +22,8 @@ def _load_release_version() -> str:
 
 RELEASE_VERSION = _load_release_version()
 RELEASE_SERIES = ".".join(RELEASE_VERSION.split(".")[:2])
-INTERNAL_HARDENING_PHASE = "v3.3"
-RELEASE_NAME = "Durable PQC Identity, Historical Trust & Runtime Recovery Hardening"
+INTERNAL_HARDENING_PHASE = "v4.0"
+RELEASE_NAME = "Unified Security Runtime, Post-Quantum Trust & Live Operations"
 RELEASE_CHANNEL = "research_hardening"
 
 
@@ -34,6 +34,7 @@ def release_metadata() -> Dict[str, object]:
         "release_name": RELEASE_NAME,
         "release_channel": RELEASE_CHANNEL,
         "internal_hardening_phase": INTERNAL_HARDENING_PHASE,
+        "cumulative_security_line_from": "2.0.1",
         "real_pqc_native_validation": True,
         "durable_pqc_identity": True,
         "signed_pqc_key_transitions": True,
@@ -48,6 +49,17 @@ def release_metadata() -> Dict[str, object]:
         "native_data_at_rest": "AES-256-GCM",
         "native_signature": "ML-DSA-44",
         "native_key_encapsulation": "ML-KEM-512",
+        "authenticated_go_control_api": True,
+        "authenticated_live_runtime_stream": True,
+        "live_runtime_loopback_only": True,
+        "live_runtime_hmac_authenticated": True,
+        "non_destructive_live_dashboard_feeds": True,
+        "source_backed_runtime_security_strength": True,
+        "source_backed_dashboard_values": True,
+        "release_integrity_manifest": True,
+        "deterministic_sbom_and_provenance": True,
+        "current_tree_secret_scan": True,
+        "windows_runtime_smoke": True,
         "production_certified": False,
         "vehicle_safety_certified": False,
         "secret_values_exposed": False,
