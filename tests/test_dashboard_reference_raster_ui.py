@@ -15,7 +15,7 @@ class ReferenceRasterDashboardTests(unittest.TestCase):
         cls.module_tree = ast.parse(cls.module_text)
         cls.main_text = Path("main.py").read_text(encoding="utf-8-sig")
         cls.asset_root = Path("assets/dashboard/reference")
-        cls.compose_reference = cls._load_isolated_function("_compose_reference")
+        cls.compose_reference = staticmethod(cls._load_isolated_function("_compose_reference"))
 
     @classmethod
     def _load_isolated_function(cls, name: str):
