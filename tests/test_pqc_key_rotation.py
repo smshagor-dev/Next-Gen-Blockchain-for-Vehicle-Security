@@ -1,6 +1,8 @@
 import unittest
 from pathlib import Path
 
+from release_metadata import RELEASE_VERSION
+
 
 ADMIN = Path("native/pqc_key_admin.cpp")
 POLICY = Path("native/pqc_provider_policy.h")
@@ -71,7 +73,7 @@ class PqcKeyRotationTests(unittest.TestCase):
         self.assertIn("SMARTCAR_BUILD_PQC_KEY_ADMIN", self.cmake)
         self.assertIn("smartcar_pqc_key_admin", self.cmake)
         self.assertIn("tests.test_pqc_key_rotation", self.workflow)
-        self.assertIn("Build pinned real-PQC v3.0.3 targets", self.workflow)
+        self.assertIn(f"Build pinned real-PQC v{RELEASE_VERSION} targets", self.workflow)
         self.assertIn("smartcar_pqc_key_admin --self-test", self.workflow)
         self.assertIn("Run mixed-generation native runtime validation", self.workflow)
         self.assertIn("smartcar_pqc_key_admin rotate", self.workflow)
