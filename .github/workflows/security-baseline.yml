@@ -242,7 +242,9 @@ jobs:
           new_id="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["new_key_id"])' "$root/rotation.json")"
           ./build/native-real/smartcar_pqc_trust_admin admit --identity "$vehicle" --previous-keystore "$backup" --reason "v4.0.0 rollback validation" --confirm "ADMIT:$new_id" >/dev/null
           ./build/native-real/smartcar_pqc_state_admin recovery-check --identity "$vehicle" --previous-keystore "$backup" > "$root/recovery.json"
-          ./build/native-real/smartcar_pqc_state_admin anchor-advance --identity "$vehicle" --confirm "ADVANCE:$new_id" > "$root/anchor.json"
+          ./build/native-real/smartcar_pqc_state_admin anchor-advance --identity "$vehicle" --confirm "ADVANCE:$new_id" > "$root/anchor-advance-report.json"
+          test -s "$SMARTCAR_CPP_PQC_ROLLBACK_ANCHOR_PATH"
+          test -s "$root/anchor-advance-report.json"
           python - "$root/recovery.json" <<'PY'
           import json, sys
           report=json.load(open(sys.argv[1], encoding='utf-8'))
@@ -252,7 +254,7 @@ jobs:
           PY
           mkdir -p security-reports/v400
           cp "$root/recovery.json" security-reports/v400/recovery-check.json
-          cp "$root/anchor.json" security-reports/v400/rollback-anchor.json
+          cp "$root/anchor-advance-report.json" security-reports/v400/rollback-anchor.json
 
       - name: Verify hardware-provider modes fail closed when unavailable
         shell: bash

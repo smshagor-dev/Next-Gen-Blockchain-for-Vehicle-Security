@@ -176,7 +176,9 @@ jobs:
           ./build/native-real/smartcar_pqc_trust_admin admit --identity "$vehicle" --previous-keystore "$backup" --reason "v4.0.0 release validation" --confirm "ADMIT:$new_id" > "$root/admission.json"
           ./build/native-real/smartcar_blockchain append --identity "$vehicle" --ledger "$root/ledger.json" --event "V4.0.0:MIXED" > "$root/mixed.json"
           ./build/native-real/smartcar_pqc_state_admin recovery-check --identity "$vehicle" --previous-keystore "$backup" > "$root/recovery.json"
-          ./build/native-real/smartcar_pqc_state_admin anchor-advance --identity "$vehicle" --confirm "ADVANCE:$new_id" > "$root/anchor.json"
+          ./build/native-real/smartcar_pqc_state_admin anchor-advance --identity "$vehicle" --confirm "ADVANCE:$new_id" > "$root/anchor-advance-report.json"
+          test -s "$SMARTCAR_CPP_PQC_ROLLBACK_ANCHOR_PATH"
+          test -s "$root/anchor-advance-report.json"
           python - "$root/mixed.json" "$root/recovery.json" <<'PY'
           import json, sys
           mixed=json.load(open(sys.argv[1], encoding='utf-8'))
@@ -191,7 +193,7 @@ jobs:
           cp "$root/mixed.json" security-reports/v400/mixed-generation-runtime.json
           cp "$root/admission.json" security-reports/v400/trust-admission.json
           cp "$root/recovery.json" security-reports/v400/recovery-check.json
-          cp "$root/anchor.json" security-reports/v400/rollback-anchor.json
+          cp "$root/anchor-advance-report.json" security-reports/v400/rollback-anchor.json
 
       - name: Verify unavailable hardware providers fail closed
         shell: bash
