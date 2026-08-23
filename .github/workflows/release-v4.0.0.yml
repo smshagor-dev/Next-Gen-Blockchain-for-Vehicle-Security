@@ -1,0 +1,314 @@
+name: Publish OmniGuard V2X v4.0.0
+
+on:
+  push:
+    tags:
+      - v4.0.0
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: omniguard-v4.0.0-publication
+  cancel-in-progress: false
+
+jobs:
+  validate-and-package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout tagged commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify tag identity and exact main target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_TYPE" = "tag"
+          test "$GITHUB_REF_NAME" = "v4.0.0"
+          test "$(tr -d '\r\n' < VERSION)" = "4.0.0"
+          git fetch origin main --no-tags
+          main_sha="$(git rev-parse origin/main)"
+          test "$GITHUB_SHA" = "$main_sha"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+          cache-dependency-path: api/go/go.mod
+
+      - name: Compile release modules
+        run: |
+          python -m py_compile release_metadata.py release_integrity.py runtime_security_strength.py security_capabilities.py credential_policy.py key_provider.py runtime_isolation.py runtime_security_monitor.py runtime_backend_security.py runtime_backend_patch.py incident_response.py incident_response_runtime.py incident_response_validation.py env_config.py replay_security.py permissioned_consensus.py consensus_security.py identity_security.py sync_protocol_legacy.py sync_protocol.py did_identity.py v2x_protocol.py control_api_security.py ledger_integrity.py adversarial_validation.py hil_security_validation.py smartcar_backend.py smart_contracts.py dashboard_reference_raster_ui.py main.py
+          python -m py_compile scripts/generate_sbom.py scripts/generate_provenance.py scripts/secret_scan.py scripts/ci_windows_go_backend_smoke.py
+
+      - name: Run release regression suites
+        env:
+          PYTHONPATH: .
+          SMARTCAR_V2X_SHARED_SECRET: release-validation-only-randomized-by-tests-not-runtime
+        run: |
+          python -m unittest -v tests.test_release_version
+          python -m unittest -v tests.test_release_integrity
+          python -m unittest -v tests.test_runtime_security_strength
+          python -m unittest -v tests.test_v400_dashboard_security_strength
+          python -m unittest -v tests.test_security_baseline
+          python -m unittest -v tests.test_credential_policy
+          python -m unittest -v tests.test_key_runtime_security
+          python -m unittest -v tests.test_permissioned_consensus
+          python -m unittest -v tests.test_consensus_security
+          python -m unittest -v tests.test_identity_security
+          python -m unittest -v tests.test_sync_protocol_security
+          python -m unittest -v tests.test_replay_flood_security
+          python -m unittest -v tests.test_runtime_security_monitor
+          python -m unittest -v tests.test_runtime_security_hooks
+          python -m unittest -v tests.test_incident_response
+          python -m unittest -v tests.test_did_one_time_security
+          python -m unittest -v tests.test_v2x_security
+          python -m unittest -v tests.test_control_api_security
+          python -m unittest -v tests.test_ledger_integrity
+          python -m unittest -v tests.test_adversarial_validation
+          python -m unittest -v tests.test_hil_security_validation
+          python -m unittest -v tests.test_native_build_security
+          python -m unittest -v tests.test_pqc_keystore_foundation
+          python -m unittest -v tests.test_pqc_keystore_integration
+          python -m unittest -v tests.test_pqc_key_rotation
+          python -m unittest -v tests.test_pqc_trust_history
+
+      - name: Run current-tree secret scan
+        run: python scripts/secret_scan.py
+
+      - name: Generate deterministic security reports
+        env:
+          PYTHONPATH: .
+        run: |
+          python adversarial_validation.py --seed 168938023 --iterations 256 --max-duration-sec 20 --output security-reports/adversarial-validation.json
+          python hil_security_validation.py --output security-reports/hil-security-validation.json
+          python incident_response_validation.py --output security-reports/incident-response-validation.json
+
+      - name: Verify hardened native target fails closed without liboqs
+        shell: bash
+        run: |
+          set +e
+          cmake -S . -B build/native-strict \
+            -DSMARTCAR_FORCE_PQC_UNAVAILABLE_FOR_TESTS=ON \
+            -DSMARTCAR_FETCH_PINNED_LIBOQS=OFF \
+            -DSMARTCAR_BUILD_PQC_KEYSTORE_SELFTEST=OFF \
+            -DSMARTCAR_BUILD_PQC_KEY_ADMIN=OFF \
+            -DSMARTCAR_BUILD_PQC_TRUST_ADMIN=OFF \
+            -DSMARTCAR_BUILD_PQC_HISTORY_VERIFY=OFF \
+            -DSMARTCAR_BUILD_PQC_STATE_ADMIN=OFF \
+            -DSMARTCAR_BUILD_CAMERA_MODULE=OFF > build/native-strict.log 2>&1
+          status=$?
+          set -e
+          cat build/native-strict.log
+          test "$status" -ne 0
+          grep -F "Real liboqs is required for the hardened native blockchain target" build/native-strict.log
+
+      - name: Build pinned real-PQC v4.0.0 targets
+        run: |
+          cmake -S . -B build/native-real \
+            -DSMARTCAR_FETCH_PINNED_LIBOQS=ON \
+            -DSMARTCAR_BUILD_PQC_KEYSTORE_SELFTEST=ON \
+            -DSMARTCAR_BUILD_PQC_KEY_ADMIN=ON \
+            -DSMARTCAR_BUILD_PQC_TRUST_ADMIN=ON \
+            -DSMARTCAR_BUILD_PQC_HISTORY_VERIFY=ON \
+            -DSMARTCAR_BUILD_PQC_STATE_ADMIN=ON \
+            -DSMARTCAR_ENABLE_NATIVE_OPT=OFF \
+            -DSMARTCAR_ENABLE_UNSAFE_FAST_MATH=OFF \
+            -DSMARTCAR_ENABLE_IPO=OFF \
+            -DSMARTCAR_ENFORCE_VALIDATION_TOOLCHAIN=ON \
+            -DSMARTCAR_BUILD_CAMERA_MODULE=OFF
+          grep -F "CMAKE_PROJECT_VERSION:STATIC=4.0.0" build/native-real/CMakeCache.txt
+          cmake --build build/native-real --config Release --target \
+            smartcar_blockchain smartcar_pqc_keystore_selftest smartcar_pqc_key_admin \
+            smartcar_pqc_trust_admin smartcar_pqc_history_verify smartcar_pqc_state_admin --parallel 2
+
+      - name: Run native v4.0.0 self-tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/v400-native"
+          rm -rf "$root" && mkdir -p "$root"
+          export SMARTCAR_CPP_DATA_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          export SMARTCAR_AUTH_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          export SMARTCAR_CPP_PQC_KEYSTORE_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          export SMARTCAR_CPP_PQC_KEYSTORE_PATH="$root/identity.json"
+          export SMARTCAR_CPP_PQC_PROVIDER=software_encrypted_file
+          export SMARTCAR_CPP_PQC_HARDWARE_REQUIRED=0
+          ./build/native-real/smartcar_blockchain --self-test
+          ./build/native-real/smartcar_pqc_keystore_selftest
+          ./build/native-real/smartcar_pqc_key_admin --self-test
+          ./build/native-real/smartcar_pqc_trust_admin --self-test
+
+      - name: Run mixed-generation and rollback validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/v400-state"
+          vehicle="SMARTCAR_V400_RELEASE"
+          rm -rf "$root" && mkdir -p "$root"
+          export SMARTCAR_CPP_DATA_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          export SMARTCAR_AUTH_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          export SMARTCAR_CPP_PQC_KEYSTORE_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          export SMARTCAR_CPP_PQC_KEYSTORE_PATH="$root/identity.json"
+          export SMARTCAR_CPP_PQC_TRUST_KEYRING_PATH="$root/trust.json"
+          export SMARTCAR_CPP_PQC_TRUST_MAX_GENERATIONS=8
+          export SMARTCAR_CPP_PQC_ROTATION_ENABLED=1
+          export SMARTCAR_CPP_PQC_ROTATION_DIR="$root/rotations"
+          export SMARTCAR_CPP_PQC_ROLLBACK_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          export SMARTCAR_CPP_PQC_ROLLBACK_ANCHOR_PATH="$root/anchor.json"
+          export SMARTCAR_CPP_PQC_PROVIDER=software_encrypted_file
+          export SMARTCAR_CPP_PQC_HARDWARE_REQUIRED=0
+          ./build/native-real/smartcar_pqc_trust_admin init --identity "$vehicle" >/dev/null
+          ./build/native-real/smartcar_blockchain init --identity "$vehicle" --ledger "$root/ledger.json" >/dev/null
+          active="$(./build/native-real/smartcar_pqc_key_admin inspect --identity "$vehicle" | python -c 'import json,sys; print(json.load(sys.stdin)["key_id"])')"
+          ./build/native-real/smartcar_pqc_state_admin anchor-init --identity "$vehicle" --confirm "ANCHOR:$active" >/dev/null
+          ./build/native-real/smartcar_pqc_key_admin rotate --identity "$vehicle" --reason "v4.0.0 release validation" --confirm "ROTATE:$active" --rotation-dir "$root/rotations" > "$root/rotation.json"
+          backup="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["backup_path"])' "$root/rotation.json")"
+          new_id="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["new_key_id"])' "$root/rotation.json")"
+          ./build/native-real/smartcar_pqc_trust_admin admit --identity "$vehicle" --previous-keystore "$backup" --reason "v4.0.0 release validation" --confirm "ADMIT:$new_id" > "$root/admission.json"
+          ./build/native-real/smartcar_blockchain append --identity "$vehicle" --ledger "$root/ledger.json" --event "V4.0.0:MIXED" > "$root/mixed.json"
+          ./build/native-real/smartcar_pqc_state_admin recovery-check --identity "$vehicle" --previous-keystore "$backup" > "$root/recovery.json"
+          ./build/native-real/smartcar_pqc_state_admin anchor-advance --identity "$vehicle" --confirm "ADVANCE:$new_id" > "$root/anchor.json"
+          python - "$root/mixed.json" "$root/recovery.json" <<'PY'
+          import json, sys
+          mixed=json.load(open(sys.argv[1], encoding='utf-8'))
+          recovery=json.load(open(sys.argv[2], encoding='utf-8'))
+          assert mixed['verified'] is True
+          assert mixed['migration_state']=='MIXED_GENERATION_VERIFIED'
+          assert mixed['historical_ml_kem_decapsulation_verified'] is False
+          assert recovery['candidate_admitted_historical'] is True
+          assert recovery['automatic_restore_allowed'] is False
+          PY
+          mkdir -p security-reports/v400
+          cp "$root/mixed.json" security-reports/v400/mixed-generation-runtime.json
+          cp "$root/admission.json" security-reports/v400/trust-admission.json
+          cp "$root/recovery.json" security-reports/v400/recovery-check.json
+          cp "$root/anchor.json" security-reports/v400/rollback-anchor.json
+
+      - name: Verify unavailable hardware providers fail closed
+        shell: bash
+        run: |
+          set -euo pipefail
+          for provider in tpm2 pkcs11 hsm; do
+            set +e
+            SMARTCAR_CPP_PQC_PROVIDER="$provider" SMARTCAR_CPP_PQC_HARDWARE_REQUIRED=1 \
+              SMARTCAR_CPP_DATA_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')" \
+              SMARTCAR_AUTH_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')" \
+              SMARTCAR_CPP_PQC_KEYSTORE_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')" \
+              SMARTCAR_CPP_PQC_KEYSTORE_PATH="$RUNNER_TEMP/$provider.json" \
+              ./build/native-real/smartcar_blockchain --self-test >/dev/null 2>&1
+            status=$?
+            set -e
+            test "$status" -ne 0
+            test ! -e "$RUNNER_TEMP/$provider.json"
+          done
+
+      - name: Run Go tests and bounded fuzz campaigns
+        working-directory: api/go
+        run: |
+          gofmt -w .
+          go test ./... -count=1
+          go test -run=^$ -fuzz=FuzzSafeChainPathConfined -fuzztime=2s -timeout=30s
+          go test -run=^$ -fuzz=FuzzControlAPIMalformedEmergency -fuzztime=2s -timeout=30s
+          go test -run=^$ -fuzz=FuzzHealthChallengeParser -fuzztime=2s -timeout=30s
+          go test -run=^$ -fuzz=FuzzControlAPIUnsignedMutation -fuzztime=2s -timeout=30s
+          go build -trimpath -o ../../build/smartcar_go_backend-v4.0.0-linux-amd64 .
+
+      - name: Generate release integrity, SBOM and provenance
+        env:
+          PYTHONPATH: .
+        run: |
+          python release_integrity.py --commit-sha "$GITHUB_SHA" --output security-reports/release-integrity-manifest.json
+          python release_integrity.py --verify security-reports/release-integrity-manifest.json
+          python scripts/generate_sbom.py --output security-reports/sbom-v4.0.0.cdx.json
+          python scripts/generate_provenance.py --commit-sha "$GITHUB_SHA" --output security-reports/provenance-v4.0.0.json
+
+      - name: Package and verify publication payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          package_dir="dist/omniguard-v4.0.0-linux-amd64-validation"
+          mkdir -p "$package_dir"
+          cp build/native-real/smartcar_blockchain "$package_dir/smartcar_blockchain-v4.0.0-linux-amd64"
+          cp build/smartcar_go_backend-v4.0.0-linux-amd64 "$package_dir/"
+          cp VERSION "$package_dir/"
+          cp docs/releases/v4.0.0.md "$package_dir/RELEASE_NOTES.md"
+          cp security-reports/release-integrity-manifest.json "$package_dir/"
+          cp security-reports/sbom-v4.0.0.cdx.json "$package_dir/"
+          cp security-reports/provenance-v4.0.0.json "$package_dir/"
+          cp security-reports/adversarial-validation.json "$package_dir/"
+          cp security-reports/hil-security-validation.json "$package_dir/"
+          cp security-reports/incident-response-validation.json "$package_dir/"
+          cp -r security-reports/v400 "$package_dir/"
+          (cd "$package_dir" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS && sha256sum -c SHA256SUMS)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: omniguard-v4.0.0-publication-payload
+          path: dist/omniguard-v4.0.0-linux-amd64-validation/
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    needs: validate-and-package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: omniguard-v4.0.0-publication-payload
+          path: dist/omniguard-v4.0.0-linux-amd64-validation
+
+      - name: Re-verify payload and tag binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_TYPE" = "tag"
+          test "$GITHUB_REF_NAME" = "v4.0.0"
+          package_dir="dist/omniguard-v4.0.0-linux-amd64-validation"
+          test "$(tr -d '\r\n' < "$package_dir/VERSION")" = "4.0.0"
+          (cd "$package_dir" && sha256sum -c SHA256SUMS)
+          python3 - "$package_dir/release-integrity-manifest.json" "$GITHUB_SHA" <<'PY'
+          import json, sys
+          from pathlib import Path
+          manifest=json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+          if manifest.get('release_version')!='4.0.0': raise SystemExit('release manifest version mismatch')
+          if manifest.get('release_tag')!='v4.0.0': raise SystemExit('release manifest tag mismatch')
+          if manifest.get('commit_sha')!=sys.argv[2]: raise SystemExit('release manifest commit mismatch')
+          PY
+
+      - name: Refuse duplicate GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          package_dir="dist/omniguard-v4.0.0-linux-amd64-validation"
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "OmniGuard V2X v4.0.0" --notes-file "$package_dir/RELEASE_NOTES.md" \
+            "$package_dir/smartcar_blockchain-v4.0.0-linux-amd64#Hardened native C++ validation binary (Linux amd64)" \
+            "$package_dir/smartcar_go_backend-v4.0.0-linux-amd64#Go control backend validation binary (Linux amd64)" \
+            "$package_dir/SHA256SUMS#SHA-256 checksums" \
+            "$package_dir/release-integrity-manifest.json#Commit-bound release integrity manifest" \
+            "$package_dir/sbom-v4.0.0.cdx.json#Repository-declared SBOM" \
+            "$package_dir/provenance-v4.0.0.json#Build validation provenance" \
+            "$package_dir/adversarial-validation.json#Adversarial validation report" \
+            "$package_dir/hil-security-validation.json#Software-HIL validation report" \
+            "$package_dir/incident-response-validation.json#Incident-response validation report"
