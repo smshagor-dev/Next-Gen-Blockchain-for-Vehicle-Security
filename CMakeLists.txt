@@ -1,13 +1,13 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(SmartCarBlockchain VERSION 3.0.3 LANGUAGES CXX)
+project(SmartCarBlockchain VERSION 4.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(SMARTCAR_BUILD_BLOCKCHAIN "Build the hardened v3.0.3 native blockchain runtime" ON)
+option(SMARTCAR_BUILD_BLOCKCHAIN "Build the hardened v4.0.0 native blockchain runtime" ON)
 option(SMARTCAR_BUILD_PQC_KEYSTORE_SELFTEST "Build the durable PQC keystore validation target" OFF)
 option(SMARTCAR_BUILD_PQC_KEY_ADMIN "Build the local guarded PQC key administration tool" OFF)
 option(SMARTCAR_BUILD_PQC_TRUST_ADMIN "Build the explicit PQC trust-keyring administration tool" OFF)
@@ -163,7 +163,7 @@ function(smartcar_require_real_pqc target_label)
         message(FATAL_ERROR
             "Real liboqs is required for ${target_label}. "
             "Install liboqs ${SMARTCAR_LIBOQS_VERSION}, or set SMARTCAR_FETCH_PINNED_LIBOQS=ON to fetch commit ${SMARTCAR_LIBOQS_COMMIT}. "
-            "Simulated PQC is not available in the supported v3.0.3 build graph."
+            "Simulated PQC is not available in the supported v4.0.0 build graph."
         )
     endif()
 endfunction()
