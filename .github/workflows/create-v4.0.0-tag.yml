@@ -1,0 +1,81 @@
+name: Create OmniGuard V2X v4.0.0 Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type CREATE-v4.0.0 to create the release tag from the exact current main commit"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: omniguard-v4.0.0-tag-operator
+  cancel-in-progress: false
+
+jobs:
+  create-tag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Verify operator confirmation and exact main
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ inputs.confirm }}" = "CREATE-v4.0.0"
+          git fetch origin main --tags
+          main_sha="$(git rev-parse origin/main)"
+          test "$(git rev-parse HEAD)" = "$main_sha"
+          test "$(tr -d '\r\n' < VERSION)" = "4.0.0"
+          test -f .github/workflows/release-v4.0.0.yml
+          grep -Fq 'test "$GITHUB_SHA" = "$main_sha"' .github/workflows/release-v4.0.0.yml
+          printf '%s\n' "$main_sha" > "$RUNNER_TEMP/v4-main-sha"
+      - name: Require exact-main release gates
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          main_sha="$(cat "$RUNNER_TEMP/v4-main-sha")"
+          for workflow in "Security Baseline" "PKCS11 Source Conformance" "Windows Runtime Smoke"; do
+            runs="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --branch main --event push --limit 30 --json headSha,status,conclusion,url)"
+            RUNS_JSON="$runs" python3 - "$main_sha" "$workflow" <<'PY'
+          import json, os, sys
+          target, workflow = sys.argv[1], sys.argv[2]
+          matches=[r for r in json.loads(os.environ['RUNS_JSON']) if r.get('headSha')==target]
+          if not matches: raise SystemExit(f'no {workflow} push run for exact main')
+          run=matches[0]
+          if run.get('status')!='completed' or run.get('conclusion')!='success': raise SystemExit(f'{workflow} not successful')
+          print(f'exact-main {workflow}: PASS {run.get("url", "")}')
+          PY
+          done
+      - name: Refuse duplicate tag or release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG=v4.0.0
+          ! git show-ref --verify --quiet "refs/tags/$TAG"
+          ! git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1
+          ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1
+      - name: Create annotated tag and publish trigger
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          main_sha="$(cat "$RUNNER_TEMP/v4-main-sha")"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a v4.0.0 "$main_sha" -m "OmniGuard V2X v4.0.0"
+          git push origin refs/tags/v4.0.0
+          test "$(git rev-list -n 1 v4.0.0)" = "$main_sha"
+          gh workflow run release-v4.0.0.yml --repo "$GITHUB_REPOSITORY" --ref v4.0.0
