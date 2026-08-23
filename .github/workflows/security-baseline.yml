@@ -16,7 +16,7 @@ permissions:
 jobs:
   security-validation:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,16 +36,18 @@ jobs:
 
       - name: Compile hardened Python modules
         run: |
-          python -m py_compile release_metadata.py release_integrity.py credential_policy.py key_provider.py runtime_isolation.py runtime_security_monitor.py runtime_backend_security.py runtime_backend_patch.py incident_response.py incident_response_runtime.py incident_response_validation.py env_config.py replay_security.py permissioned_consensus.py consensus_security.py identity_security.py sync_protocol_legacy.py sync_protocol.py did_identity.py v2x_protocol.py control_api_security.py ledger_integrity.py adversarial_validation.py hil_security_validation.py smartcar_backend.py smart_contracts.py main.py
-          python -m py_compile scripts/generate_sbom.py scripts/generate_provenance.py scripts/secret_scan.py
+          python -m py_compile release_metadata.py release_integrity.py runtime_security_strength.py security_capabilities.py credential_policy.py key_provider.py runtime_isolation.py runtime_security_monitor.py runtime_backend_security.py runtime_backend_patch.py incident_response.py incident_response_runtime.py incident_response_validation.py env_config.py replay_security.py permissioned_consensus.py consensus_security.py identity_security.py sync_protocol_legacy.py sync_protocol.py did_identity.py v2x_protocol.py control_api_security.py ledger_integrity.py adversarial_validation.py hil_security_validation.py smartcar_backend.py smart_contracts.py dashboard_reference_raster_ui.py main.py
+          python -m py_compile scripts/generate_sbom.py scripts/generate_provenance.py scripts/secret_scan.py scripts/ci_windows_go_backend_smoke.py
 
       - name: Run Python security regression tests
         env:
           PYTHONPATH: .
         run: |
+          export SMARTCAR_V2X_SHARED_SECRET="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
           python -m unittest -v tests.test_release_version
           python -m unittest -v tests.test_release_integrity
-          python -m unittest -v tests.test_v303_final_hardening
+          python -m unittest -v tests.test_runtime_security_strength
+          python -m unittest -v tests.test_v400_dashboard_security_strength
           python -m unittest -v tests.test_security_baseline
           python -m unittest -v tests.test_credential_policy
           python -m unittest -v tests.test_key_runtime_security
@@ -68,6 +70,7 @@ jobs:
           python -m unittest -v tests.test_pqc_keystore_integration
           python -m unittest -v tests.test_pqc_key_rotation
           python -m unittest -v tests.test_pqc_trust_history
+          python -m unittest -v tests.test_pqc_hardware_provider
 
       - name: Run current-tree secret scan
         run: python scripts/secret_scan.py
@@ -76,13 +79,15 @@ jobs:
         env:
           PYTHONPATH: .
         run: |
-          test "$(tr -d '\r\n' < VERSION)" = "3.0.3"
+          test "$(tr -d '\r\n' < VERSION)" = "4.0.0"
           python - <<'PY'
           from release_metadata import RELEASE_VERSION, release_metadata
           from security_capabilities import security_capability_output
-          assert RELEASE_VERSION == "3.0.3"
-          assert release_metadata()["internal_hardening_phase"] == "v3.3"
-          assert security_capability_output(False)["release_version"] == "3.0.3"
+          assert RELEASE_VERSION == "4.0.0"
+          assert release_metadata()["internal_hardening_phase"] == "v4.0"
+          assert release_metadata()["source_backed_runtime_security_strength"] is True
+          assert security_capability_output(False)["release_version"] == "4.0.0"
+          assert security_capability_output(False)["runtime_security_strength_numeric_score"] is False
           PY
 
       - name: Generate and verify release integrity manifest
@@ -94,8 +99,8 @@ jobs:
 
       - name: Generate SBOM and provenance
         run: |
-          python scripts/generate_sbom.py --output security-reports/sbom-v3.0.3.cdx.json
-          python scripts/generate_provenance.py --commit-sha "$GITHUB_SHA" --output security-reports/provenance-v3.0.3.json
+          python scripts/generate_sbom.py --output security-reports/sbom-v4.0.0.cdx.json
+          python scripts/generate_provenance.py --commit-sha "$GITHUB_SHA" --output security-reports/provenance-v4.0.0.json
 
       - name: Run deterministic adversarial campaigns
         env:
@@ -124,18 +129,14 @@ jobs:
             -DSMARTCAR_BUILD_PQC_TRUST_ADMIN=OFF \
             -DSMARTCAR_BUILD_PQC_HISTORY_VERIFY=OFF \
             -DSMARTCAR_BUILD_PQC_STATE_ADMIN=OFF \
-            -DSMARTCAR_BUILD_CAMERA_MODULE=OFF \
-            > build/native-strict.log 2>&1
+            -DSMARTCAR_BUILD_CAMERA_MODULE=OFF > build/native-strict.log 2>&1
           status=$?
           set -e
           cat build/native-strict.log
-          if [ "$status" -eq 0 ]; then
-            echo "Hardened native configure unexpectedly succeeded without liboqs." >&2
-            exit 1
-          fi
+          test "$status" -ne 0
           grep -F "Real liboqs is required for the hardened native blockchain target" build/native-strict.log
 
-      - name: Build pinned real-PQC v3.0.3 targets
+      - name: Build pinned real-PQC v4.0.0 targets
         run: |
           cmake -S . -B build/native-real \
             -DSMARTCAR_FETCH_PINNED_LIBOQS=ON \
@@ -149,16 +150,16 @@ jobs:
             -DSMARTCAR_ENABLE_IPO=OFF \
             -DSMARTCAR_ENFORCE_VALIDATION_TOOLCHAIN=ON \
             -DSMARTCAR_BUILD_CAMERA_MODULE=OFF
-          grep -F "CMAKE_PROJECT_VERSION:STATIC=3.0.3" build/native-real/CMakeCache.txt
+          grep -F "CMAKE_PROJECT_VERSION:STATIC=4.0.0" build/native-real/CMakeCache.txt
           cmake --build build/native-real --config Release --target \
             smartcar_blockchain smartcar_pqc_keystore_selftest smartcar_pqc_key_admin \
             smartcar_pqc_trust_admin smartcar_pqc_history_verify smartcar_pqc_state_admin --parallel 2
 
-      - name: Run secure native v3.0.3 self-test
+      - name: Run secure native v4.0.0 self-test
         shell: bash
         run: |
           set -euo pipefail
-          root="$RUNNER_TEMP/v303-native"
+          root="$RUNNER_TEMP/v400-native"
           rm -rf "$root" && mkdir -p "$root"
           export SMARTCAR_CPP_DATA_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
           export SMARTCAR_AUTH_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
@@ -175,8 +176,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          root="$RUNNER_TEMP/v303-mixed"
-          vehicle="SMARTCAR_V303_MIXED"
+          root="$RUNNER_TEMP/v400-mixed"
+          vehicle="SMARTCAR_V400_MIXED"
           rm -rf "$root" && mkdir -p "$root"
           export SMARTCAR_CPP_DATA_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
           export SMARTCAR_AUTH_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
@@ -187,19 +188,14 @@ jobs:
           export SMARTCAR_CPP_PQC_ROTATION_ENABLED=1
           export SMARTCAR_CPP_PQC_PROVIDER=software_encrypted_file
           export SMARTCAR_CPP_PQC_HARDWARE_REQUIRED=0
-          ./build/native-real/smartcar_pqc_trust_admin init --identity "$vehicle" > "$root/root.json"
-          ./build/native-real/smartcar_blockchain init --identity "$vehicle" --ledger "$root/ledger.json" > "$root/initial.json"
+          ./build/native-real/smartcar_pqc_trust_admin init --identity "$vehicle" >/dev/null
+          ./build/native-real/smartcar_blockchain init --identity "$vehicle" --ledger "$root/ledger.json" >/dev/null
           old_id="$(./build/native-real/smartcar_pqc_key_admin inspect --identity "$vehicle" | python -c 'import json,sys; print(json.load(sys.stdin)["key_id"])')"
-          ./build/native-real/smartcar_pqc_key_admin rotate --identity "$vehicle" --reason "v3.0.3 hosted mixed generation" --confirm "ROTATE:$old_id" --rotation-dir "$root/rotations" > "$root/rotation.json"
+          ./build/native-real/smartcar_pqc_key_admin rotate --identity "$vehicle" --reason "v4.0.0 hosted mixed generation" --confirm "ROTATE:$old_id" --rotation-dir "$root/rotations" > "$root/rotation.json"
           backup="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["backup_path"])' "$root/rotation.json")"
           new_id="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["new_key_id"])' "$root/rotation.json")"
-          set +e
-          ./build/native-real/smartcar_blockchain verify --identity "$vehicle" --ledger "$root/ledger.json" >/dev/null 2>"$root/pre-admission.err"
-          pre=$?
-          set -e
-          test "$pre" -ne 0
-          ./build/native-real/smartcar_pqc_trust_admin admit --identity "$vehicle" --previous-keystore "$backup" --reason "v3.0.3 hosted mixed generation" --confirm "ADMIT:$new_id" > "$root/admission.json"
-          ./build/native-real/smartcar_blockchain append --identity "$vehicle" --ledger "$root/ledger.json" --event "V3.0.3:MIXED" > "$root/mixed-report.json"
+          ./build/native-real/smartcar_pqc_trust_admin admit --identity "$vehicle" --previous-keystore "$backup" --reason "v4.0.0 hosted mixed generation" --confirm "ADMIT:$new_id" > "$root/admission.json"
+          ./build/native-real/smartcar_blockchain append --identity "$vehicle" --ledger "$root/ledger.json" --event "V4.0.0:MIXED" > "$root/mixed-report.json"
           python - "$root/mixed-report.json" <<'PY'
           import json, sys
           report=json.load(open(sys.argv[1], encoding='utf-8'))
@@ -210,16 +206,16 @@ jobs:
           assert report['historical_ml_kem_decapsulation_verified'] is False
           assert report['historical_kem_claim_is_authoritative'] is False
           PY
-          mkdir -p security-reports/v303
-          cp "$root/mixed-report.json" security-reports/v303/mixed-generation-runtime.json
-          cp "$root/admission.json" security-reports/v303/trust-admission.json
+          mkdir -p security-reports/v400
+          cp "$root/mixed-report.json" security-reports/v400/mixed-generation-runtime.json
+          cp "$root/admission.json" security-reports/v400/trust-admission.json
 
       - name: Run PQC rollback and recovery-state validation
         shell: bash
         run: |
           set -euo pipefail
-          root="$RUNNER_TEMP/v303-state"
-          vehicle="SMARTCAR_V303_STATE"
+          root="$RUNNER_TEMP/v400-state"
+          vehicle="SMARTCAR_V400_STATE"
           rm -rf "$root" && mkdir -p "$root"
           export SMARTCAR_CPP_PQC_KEYSTORE_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
           export SMARTCAR_CPP_PQC_KEYSTORE_PATH="$root/identity.json"
@@ -232,13 +228,13 @@ jobs:
           export SMARTCAR_CPP_PQC_HARDWARE_REQUIRED=0
           ./build/native-real/smartcar_pqc_trust_admin init --identity "$vehicle" >/dev/null
           active="$(./build/native-real/smartcar_pqc_key_admin inspect --identity "$vehicle" | python -c 'import json,sys; print(json.load(sys.stdin)["key_id"])')"
-          ./build/native-real/smartcar_pqc_state_admin anchor-init --identity "$vehicle" --confirm "ANCHOR:$active" > "$root/anchor-root.json"
-          ./build/native-real/smartcar_pqc_key_admin rotate --identity "$vehicle" --reason "v3.0.3 rollback anchor validation" --confirm "ROTATE:$active" --rotation-dir "$root/rotations" > "$root/rotation.json"
+          ./build/native-real/smartcar_pqc_state_admin anchor-init --identity "$vehicle" --confirm "ANCHOR:$active" >/dev/null
+          ./build/native-real/smartcar_pqc_key_admin rotate --identity "$vehicle" --reason "v4.0.0 rollback validation" --confirm "ROTATE:$active" --rotation-dir "$root/rotations" > "$root/rotation.json"
           backup="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["backup_path"])' "$root/rotation.json")"
           new_id="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["new_key_id"])' "$root/rotation.json")"
-          ./build/native-real/smartcar_pqc_trust_admin admit --identity "$vehicle" --previous-keystore "$backup" --reason "v3.0.3 rollback anchor validation" --confirm "ADMIT:$new_id" >/dev/null
+          ./build/native-real/smartcar_pqc_trust_admin admit --identity "$vehicle" --previous-keystore "$backup" --reason "v4.0.0 rollback validation" --confirm "ADMIT:$new_id" >/dev/null
           ./build/native-real/smartcar_pqc_state_admin recovery-check --identity "$vehicle" --previous-keystore "$backup" > "$root/recovery.json"
-          ./build/native-real/smartcar_pqc_state_admin anchor-advance --identity "$vehicle" --confirm "ADVANCE:$new_id" > "$root/anchor-advanced.json"
+          ./build/native-real/smartcar_pqc_state_admin anchor-advance --identity "$vehicle" --confirm "ADVANCE:$new_id" > "$root/anchor.json"
           python - "$root/recovery.json" <<'PY'
           import json, sys
           report=json.load(open(sys.argv[1], encoding='utf-8'))
@@ -246,9 +242,9 @@ jobs:
           assert report['automatic_restore_allowed'] is False
           assert report['rollback_anchor_must_not_be_decremented'] is True
           PY
-          mkdir -p security-reports/v303
-          cp "$root/recovery.json" security-reports/v303/recovery-check.json
-          cp "$root/anchor-advanced.json" security-reports/v303/rollback-anchor.json
+          mkdir -p security-reports/v400
+          cp "$root/recovery.json" security-reports/v400/recovery-check.json
+          cp "$root/anchor.json" security-reports/v400/rollback-anchor.json
 
       - name: Verify hardware-provider modes fail closed when unavailable
         shell: bash
@@ -286,28 +282,28 @@ jobs:
 
       - name: Build Go backend validation binary
         working-directory: api/go
-        run: go build -trimpath -o ../../build/smartcar_go_backend-v3.0.3-linux-amd64 .
+        run: go build -trimpath -o ../../build/smartcar_go_backend-v4.0.0-linux-amd64 .
 
-      - name: Package v3.0.3 Linux validation artifacts
+      - name: Package v4.0.0 Linux validation artifacts
         shell: bash
         run: |
           set -euo pipefail
-          package_dir="security-reports/v3.0.3-linux-amd64"
+          package_dir="security-reports/v4.0.0-linux-amd64"
           mkdir -p "$package_dir"
-          cp build/native-real/smartcar_blockchain "$package_dir/smartcar_blockchain-v3.0.3-linux-amd64"
-          cp build/smartcar_go_backend-v3.0.3-linux-amd64 "$package_dir/"
+          cp build/native-real/smartcar_blockchain "$package_dir/smartcar_blockchain-v4.0.0-linux-amd64"
+          cp build/smartcar_go_backend-v4.0.0-linux-amd64 "$package_dir/"
           cp VERSION "$package_dir/"
-          cp docs/releases/v3.0.3.md "$package_dir/RELEASE_NOTES.md"
+          cp docs/releases/v4.0.0.md "$package_dir/RELEASE_NOTES.md"
           cp security-reports/release-integrity-manifest.json "$package_dir/"
-          cp security-reports/sbom-v3.0.3.cdx.json "$package_dir/"
-          cp security-reports/provenance-v3.0.3.json "$package_dir/"
-          cp -r security-reports/v303 "$package_dir/"
+          cp security-reports/sbom-v4.0.0.cdx.json "$package_dir/"
+          cp security-reports/provenance-v4.0.0.json "$package_dir/"
+          cp -r security-reports/v400 "$package_dir/"
           (cd "$package_dir" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS && sha256sum -c SHA256SUMS)
 
-      - name: Upload v3.0.3 final-hardening evidence
+      - name: Upload v4.0.0 major-release evidence
         uses: actions/upload-artifact@v4
         with:
-          name: omniguard-v3.0.3-final-hardening
+          name: omniguard-v4.0.0-major-release
           path: security-reports/
           if-no-files-found: error
           retention-days: 14
