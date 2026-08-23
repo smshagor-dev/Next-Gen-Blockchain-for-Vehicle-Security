@@ -2,6 +2,22 @@
 
 This changelog summarizes the public release sequence for the research hardening line. Internal engineering phase labels are noted where they differ from public patch-version numbering.
 
+## v4.0.0 — Unified Security Runtime, Post-Quantum Trust & Live Operations
+
+Internal hardening phase: `v4.0`.
+
+- Consolidates the complete public hardening line from `v2.0.1` through `v3.0.3` under a new major release identity while preserving the explicit research/non-certification boundary.
+- Replaces the dashboard's optional numeric Security Score presentation with source-backed categorical **Security Strength**: `STRONG`, `GUARDED`, `DEGRADED`, or `RISK`; no synthetic percentage is generated.
+- Unifies the vehicle green/yellow/red risk badge with the same runtime Security Strength evaluator.
+- Adds authenticated push-first Go→dashboard live streaming on loopback port `8788` using challenge/HMAC authentication and the independently managed Go API secret; authenticated control API remains on `8787`.
+- Keeps authenticated HTTP status collection only as a bounded fallback when the live stream is unavailable.
+- Adds non-destructive live feed rendering so blockchain activity and security-alert widgets update in place without reload-style blinking.
+- Upgrades Transaction Overview to a cached timestamp-based graph derived from real `backend.chain` history, with no fabricated points when history is insufficient.
+- Completes production-style multi-page dashboard navigation, source-backed values, resizable desktop sidebar, and explicit unavailable/no-data states.
+- Keeps Vehicle Status and Network Status presentation always visible using local bundled artwork; zero-peer network state remains visually complete while metrics stay source-backed.
+- Carries forward real liboqs ML-DSA-44 / ML-KEM-512 validation, durable PQC identity, signed key transitions, mixed-generation historical trust, rollback/recovery safeguards, and the opt-in PKCS#11 v3.2 provider.
+- Carries forward commit-bound release integrity manifests, deterministic SBOM/provenance, current-tree secret scanning, SHA-256 publication checksums, deterministic adversarial/HIL/incident validation, Go fuzzing, and Windows authenticated real-process smoke testing.
+
 ## v3.0.3 — Durable PQC Identity, Historical Trust & Runtime Recovery Hardening
 
 Internal hardening phase: `v3.3`.
@@ -129,4 +145,4 @@ Internal hardening phase: `v3.1`.
 
 ## Security Scope
 
-OmniGuard V2X remains a research and validation framework. These releases improve fail-closed behavior, authentication, integrity, isolation, adversarial testing, and cryptographic implementation quality, but they do not constitute production automotive certification, ISO 26262/ASIL certification, formal verification, or a guarantee against all cyberattacks.
+OmniGuard V2X remains a research and validation framework. These releases improve fail-closed behavior, authentication, integrity, isolation, adversarial testing, cryptographic implementation quality, runtime observability, and operational safety boundaries, but they do not constitute production automotive certification, ISO 26262/ASIL certification, formal verification, or a guarantee against all cyberattacks.
