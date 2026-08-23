@@ -37,7 +37,7 @@ jobs:
       - name: Compile hardened Python modules
         run: |
           python -m py_compile release_metadata.py release_integrity.py runtime_security_strength.py security_capabilities.py credential_policy.py key_provider.py runtime_isolation.py runtime_security_monitor.py runtime_backend_security.py runtime_backend_patch.py incident_response.py incident_response_runtime.py incident_response_validation.py env_config.py replay_security.py permissioned_consensus.py consensus_security.py identity_security.py sync_protocol_legacy.py sync_protocol.py did_identity.py v2x_protocol.py control_api_security.py ledger_integrity.py adversarial_validation.py hil_security_validation.py smartcar_backend.py smart_contracts.py dashboard_reference_raster_ui.py main.py
-          python -m py_compile scripts/generate_sbom.py scripts/generate_provenance.py scripts/secret_scan.py scripts/ci_windows_go_backend_smoke.py
+          python -m py_compile scripts/bootstrap_local_env.py scripts/generate_sbom.py scripts/generate_provenance.py scripts/secret_scan.py scripts/ci_windows_go_backend_smoke.py
 
       - name: Run Python security regression tests
         env:
@@ -48,6 +48,8 @@ jobs:
           python -m unittest -v tests.test_release_integrity
           python -m unittest -v tests.test_runtime_security_strength
           python -m unittest -v tests.test_v400_dashboard_security_strength
+          python -m unittest -v tests.test_local_env_bootstrap
+          python -m unittest -v tests.test_runtime_backend_readiness
           python -m unittest -v tests.test_security_baseline
           python -m unittest -v tests.test_credential_policy
           python -m unittest -v tests.test_key_runtime_security
@@ -194,6 +196,11 @@ jobs:
           ./build/native-real/smartcar_pqc_key_admin rotate --identity "$vehicle" --reason "v4.0.0 hosted mixed generation" --confirm "ROTATE:$old_id" --rotation-dir "$root/rotations" > "$root/rotation.json"
           backup="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["backup_path"])' "$root/rotation.json")"
           new_id="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["new_key_id"])' "$root/rotation.json")"
+          set +e
+          ./build/native-real/smartcar_blockchain verify --identity "$vehicle" --ledger "$root/ledger.json" >/dev/null 2>"$root/pre-admission.err"
+          pre=$?
+          set -e
+          test "$pre" -ne 0
           ./build/native-real/smartcar_pqc_trust_admin admit --identity "$vehicle" --previous-keystore "$backup" --reason "v4.0.0 hosted mixed generation" --confirm "ADMIT:$new_id" > "$root/admission.json"
           ./build/native-real/smartcar_blockchain append --identity "$vehicle" --ledger "$root/ledger.json" --event "V4.0.0:MIXED" > "$root/mixed-report.json"
           python - "$root/mixed-report.json" <<'PY'
@@ -209,6 +216,7 @@ jobs:
           mkdir -p security-reports/v400
           cp "$root/mixed-report.json" security-reports/v400/mixed-generation-runtime.json
           cp "$root/admission.json" security-reports/v400/trust-admission.json
+          cp "$root/pre-admission.err" security-reports/v400/pre-admission-verify.err
 
       - name: Run PQC rollback and recovery-state validation
         shell: bash
