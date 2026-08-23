@@ -3,15 +3,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from release_integrity import (
-    MANIFEST_SCHEMA,
-    RELEASE_TAG,
-    build_manifest,
-    current_commit,
-    verify_manifest,
-    write_manifest,
-)
-from release_metadata import RELEASE_VERSION
+from release_integrity import MANIFEST_SCHEMA, RELEASE_TAG, build_manifest, current_commit, verify_manifest, write_manifest
+from release_metadata import INTERNAL_HARDENING_PHASE, RELEASE_VERSION
 
 
 TEST_COMMIT = "a" * 40
@@ -26,7 +19,8 @@ class ReleaseIntegrityTests(unittest.TestCase):
         self.assertEqual(manifest["schema"], MANIFEST_SCHEMA)
         self.assertEqual(manifest["release_version"], RELEASE_VERSION)
         self.assertEqual(manifest["release_tag"], RELEASE_TAG)
-        self.assertEqual(manifest["internal_hardening_phase"], "v3.3")
+        self.assertEqual(manifest["internal_hardening_phase"], INTERNAL_HARDENING_PHASE)
+        self.assertEqual(INTERNAL_HARDENING_PHASE, "v4.0")
         self.assertFalse(manifest["secret_values_exposed"])
         self.assertFalse(manifest["claims"]["production_certified"])
         profile = manifest["native_security_profile"]
@@ -38,14 +32,22 @@ class ReleaseIntegrityTests(unittest.TestCase):
         self.assertTrue(profile["durable_identity"])
         self.assertTrue(profile["signed_historical_trust"])
         self.assertTrue(profile["mixed_generation_verification"])
-        self.assertFalse(profile["hardware_pqc_provider_implemented"])
+        self.assertTrue(profile["hardware_pqc_provider_implemented"])
+        self.assertTrue(profile["pkcs11_v32_provider_adapter_implemented"])
+        self.assertFalse(profile["pkcs11_production_token_validated"])
         self.assertFalse(profile["hardware_monotonic_rollback_protection"])
+        runtime = manifest["runtime_security_profile"]
+        self.assertTrue(runtime["authenticated_go_control_api"])
+        self.assertTrue(runtime["authenticated_live_runtime_stream"])
+        self.assertTrue(runtime["source_backed_security_strength"])
+        self.assertFalse(runtime["synthetic_security_percentage"])
 
     def test_manifest_covers_version_and_secure_native_source(self):
         manifest = build_manifest(commit_sha=TEST_COMMIT)
         records = {item["path"]: item for item in manifest["source_tree"]["files"]}
         self.assertIn("VERSION", records)
         self.assertIn("CMakeLists.txt", records)
+        self.assertIn("runtime_security_strength.py", records)
         self.assertIn("native/secure_blockchain_v303.cpp", records)
         self.assertIn("native/pqc_state_guard.cpp", records)
         self.assertNotIn("blockchain.cpp", records)

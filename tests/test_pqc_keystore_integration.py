@@ -2,6 +2,8 @@ import re
 import unittest
 from pathlib import Path
 
+from release_metadata import RELEASE_VERSION
+
 
 SECURE_CPP = Path("native/secure_blockchain.cpp")
 KEYSTORE_CPP = Path("native/pqc_key_store.cpp")
@@ -75,8 +77,8 @@ class PqcKeyStoreIntegrationTests(unittest.TestCase):
 
     def test_hosted_ci_supplies_isolated_keystore_to_supported_native_selftest(self):
         self.assertIn("tests.test_pqc_keystore_integration", self.workflow)
-        self.assertIn("Run secure native v3.0.3 self-test", self.workflow)
-        self.assertIn('root="$RUNNER_TEMP/v303-native"', self.workflow)
+        self.assertIn(f"Run secure native v{RELEASE_VERSION} self-test", self.workflow)
+        self.assertIn('root="$RUNNER_TEMP/v400-native"', self.workflow)
         self.assertIn('rm -rf "$root" && mkdir -p "$root"', self.workflow)
         self.assertIn("SMARTCAR_CPP_PQC_KEYSTORE_KEY", self.workflow)
         self.assertIn('SMARTCAR_CPP_PQC_KEYSTORE_PATH="$root/identity.json"', self.workflow)

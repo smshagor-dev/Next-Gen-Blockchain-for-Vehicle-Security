@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 from credential_policy import secret_policy, validate_secret_separation
+from release_metadata import RELEASE_VERSION
 
 
 CMAKE = Path("CMakeLists.txt")
@@ -66,7 +67,10 @@ class NativeBuildSecurityTests(unittest.TestCase):
     def test_missing_real_liboqs_fails_closed_for_hardened_target(self):
         self.assertRegex(self.cmake, r'option\(SMARTCAR_FORCE_PQC_UNAVAILABLE_FOR_TESTS\s+"[^"]+"\s+OFF\)')
         self.assertIn("smartcar_require_real_pqc", self.cmake)
-        self.assertIn("Simulated PQC is not available in the supported v3.0.3 build graph", self.cmake)
+        self.assertIn(
+            f"Simulated PQC is not available in the supported v{RELEASE_VERSION} build graph",
+            self.cmake,
+        )
 
     def test_secure_source_uses_authenticated_encryption(self):
         self.assertIn("EVP_aes_256_gcm()", self.secure_cpp)
