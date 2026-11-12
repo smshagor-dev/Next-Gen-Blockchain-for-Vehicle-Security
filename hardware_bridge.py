@@ -20,6 +20,17 @@ from typing import Optional
 
 from env_config import load_project_env_once, get_env, get_int, get_bool
 from blockchain import SmartCarBlockchain, TelemetryData
+from hardware_actuation_safety import BenchActuationGate
+from hardware_transport_security import (
+    AuthenticatedLineFramer,
+    HardwareEnvelopeVerifier,
+    HardwareTransportError,
+    build_authenticated_envelope,
+    build_safe_stop_payload,
+    encode_authenticated_envelope,
+    parse_device_registry,
+    validate_plaintext_hardware_host,
+)
 
 load_project_env_once()
 
@@ -61,17 +72,42 @@ def to_telemetry(pkt: dict) -> TelemetryData:
     )
 
 
+class AuthenticatedPiTelemetrySession:
+    """Bind each connection to one enrolled identity, authenticating before mutation.
+
+    The verifier and replay cache are shared across sessions by the server;
+    the per-session framer is reset on disconnect. No legacy raw JSON fallback.
+    """
+
+    def __init__(self, verifier: HardwareEnvelopeVerifier):
+        self.verifier = verifier
+        self.framer = AuthenticatedLineFramer(verifier.max_frame_bytes)
+        self.device_id = None
+
+    def receive(self, data: bytes):
+        verified = []
+        for frame in self.framer.feed(data):
+            item = self.verifier.verify(
+                frame, expected_kind="TELEMETRY", expected_device_id=self.device_id
+            )
+            self.device_id = item.device_id
+            verified.append(item)
+        return verified
+
+
 class SafeModeActuatorDispatcher:
     """Dispatch hardware stop commands when blockchain safe mode is activated."""
 
-    def __init__(self):
-        self.enabled = get_bool("SMARTCAR_HARD_STOP_ENABLED", True)
+    def __init__(self, gate: Optional[BenchActuationGate] = None):
+        self.gate = gate if gate is not None else BenchActuationGate()
+        # Opt in explicitly; never energize an actuator just by starting bridge.
+        self.enabled = get_bool("SMARTCAR_HARD_STOP_ENABLED", False)
         self._last_sent_at = 0.0
         self._cooldown_sec = 0.8
-        self.ecu_gateway = ECUCommandGateway()
+        self.ecu_gateway = ECUCommandGateway(gate=self.gate)
 
     def _should_send(self, bc: SmartCarBlockchain, block) -> bool:
-        if not self.enabled:
+        if not self.enabled or not self.gate.is_armed():
             return False
         now = time.time()
         if now - self._last_sent_at < self._cooldown_sec:
@@ -94,37 +130,45 @@ class SafeModeActuatorDispatcher:
             print("[ACTUATOR] SAFE_MODE_STOP sent to Arduino")
         except Exception as e:
             print(f"[ACTUATOR] Arduino command failed: {e}")
+            return
         self.ecu_gateway.send_safe_mode_stop(block_index=getattr(block, "index", -1))
 
-    def maybe_send_pi(self, conn, bc: SmartCarBlockchain, block):
+    def maybe_send_pi(
+        self,
+        conn,
+        bc: SmartCarBlockchain,
+        block,
+        *,
+        device_id: str,
+        device_secret: str,
+    ):
         if not self._should_send(bc, block):
             return
-        cmd = {
-            "cmd": "SAFE_MODE_STOP",
-            "throttle": 0,
-            "brake_pressure": 100,
-            "ignition_cut": 1,
-            "timestamp": _now(),
-        }
         try:
-            conn.sendall((json.dumps(cmd) + "\n").encode())
+            payload = build_safe_stop_payload(block_index=getattr(block, "index", -1))
+            envelope = build_authenticated_envelope(
+                device_id, device_secret, "COMMAND", payload
+            )
+            conn.sendall(encode_authenticated_envelope(envelope))
             self._last_sent_at = time.time()
-            print("[ACTUATOR] SAFE_MODE_STOP sent to Pi node")
-        except Exception as e:
-            print(f"[ACTUATOR] Pi command failed: {e}")
+            print("[ACTUATOR] Signed SAFE_MODE_STOP sent to Pi bench node")
+        except (OSError, HardwareTransportError) as e:
+            print(f"[ACTUATOR] Pi command rejected: {e}")
+            return
         self.ecu_gateway.send_safe_mode_stop(block_index=getattr(block, "index", -1))
 
 
 class ECUCommandGateway:
     """Send hard-stop command to ECU over CAN or serial fallback."""
 
-    def __init__(self):
-        self.enabled = get_bool("SMARTCAR_ECU_CONTROL_ENABLED", True)
+    def __init__(self, gate: Optional[BenchActuationGate] = None):
+        self.gate = gate if gate is not None else BenchActuationGate()
+        self.enabled = get_bool("SMARTCAR_ECU_CONTROL_ENABLED", False)
         self.mode = get_env("SMARTCAR_ECU_MODE", "can").strip().lower()
         self._can_bus = None
         self._ser = None
         self._init_ok = False
-        if self.enabled:
+        if self.enabled and self.gate.is_armed():
             self._init_transport()
 
     def _init_transport(self):
@@ -168,7 +212,8 @@ class ECUCommandGateway:
             print(f"[ECU] Serial init failed: {e}")
 
     def send_safe_mode_stop(self, block_index: int = -1):
-        if not self.enabled or not self._init_ok:
+        # Recheck for removal of interlock after hardware transport opened.
+        if not self.enabled or not self._init_ok or not self.gate.is_armed():
             return
         if self.mode == "can":
             self._send_can_safe_stop(block_index)
@@ -244,41 +289,60 @@ def run_arduino_mode(bc: SmartCarBlockchain):
 
 
 def run_pi_mode(bc: SmartCarBlockchain):
-    host = get_env("SMARTCAR_HW_BRIDGE_HOST", "127.0.0.1")
+    """Authenticated, bounded, bench-scoped Pi receiver (no raw JSON bypass)."""
+    host = validate_plaintext_hardware_host(
+        get_env("SMARTCAR_HW_BRIDGE_HOST", "127.0.0.1"),
+        allow_private_lan=get_bool("SMARTCAR_HW_ALLOW_PLAINTEXT_PRIVATE_LAN", False),
+    )
     port = get_int("SMARTCAR_HW_BRIDGE_PORT", 9901)
-    print(f"[HW BRIDGE] Raspberry Pi TCP mode listening on {host}:{port}")
-    srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    srv.bind((host, port))
-    srv.listen(4)
-
+    # Startup fails closed if no independent enrolled Pi secrets are configured.
+    device_keys = parse_device_registry(get_env("SMARTCAR_HW_DEVICE_KEYS_JSON", "{}"))
+    verifier = HardwareEnvelopeVerifier(
+        device_keys,
+        max_frame_bytes=get_int("SMARTCAR_HW_MAX_FRAME_BYTES", 32 * 1024),
+        replay_window_sec=get_int("SMARTCAR_HW_REPLAY_WINDOW_SEC", 15),
+        replay_cache_entries=get_int("SMARTCAR_HW_REPLAY_CACHE_ENTRIES", 2048),
+    )
+    idle_timeout = max(1, min(30, get_int("SMARTCAR_HW_IDLE_TIMEOUT_SEC", 5)))
+    max_session_sec = max(5, min(600, get_int("SMARTCAR_HW_MAX_SESSION_SEC", 120)))
     actuator = SafeModeActuatorDispatcher()
-    while True:
-        conn, addr = srv.accept()
-        print(f"[HW BRIDGE] Pi connected: {addr[0]}:{addr[1]}")
-        buf = ""
-        with conn:
-            while True:
-                data = conn.recv(4096)
-                if not data:
-                    break
-                buf += data.decode(errors="ignore")
-                while "\n" in buf:
-                    line, buf = buf.split("\n", 1)
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        pkt = json.loads(line)
-                    except Exception:
-                        continue
-                    tel = to_telemetry(pkt)
-                    evt = str(pkt.get("event", "HW:PI:TELEMETRY"))
-                    b = bc.push_telemetry(tel, evt)
-                    print(f"[CHAIN] block={b.index} event={evt}")
-                    actuator.maybe_send_pi(conn, bc, b)
-        print("[HW BRIDGE] Pi disconnected")
+    print(f"[HW BRIDGE] Authenticated Pi TCP mode listening on {host}:{port}")
 
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as srv:
+        srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        srv.bind((host, port))
+        srv.listen(4)
+        while True:
+            conn, addr = srv.accept()
+            print(f"[HW BRIDGE] Pi connected: {addr[0]}:{addr[1]}")
+            with conn:
+                conn.settimeout(idle_timeout)
+                session = AuthenticatedPiTelemetrySession(verifier)
+                deadline = time.monotonic() + max_session_sec
+                try:
+                    while time.monotonic() < deadline:
+                        data = conn.recv(4096)
+                        if not data:
+                            break
+                        # Verify MAC, freshness, replay nonce, schema, and per-
+                        # connection identity before *any* ledger/actuation side effect.
+                        for item in session.receive(data):
+                            tel = to_telemetry(item.payload)
+                            event = str(item.payload["event"])
+                            block = bc.push_telemetry(tel, event)
+                            print(f"[CHAIN] block={block.index} event={event}")
+                            actuator.maybe_send_pi(
+                                conn, bc, block,
+                                device_id=item.device_id,
+                                device_secret=verifier.device_secret(item.device_id),
+                            )
+                except HardwareTransportError as exc:
+                    print(f"[HW BRIDGE] rejected Pi frame: {exc.reason}")
+                except socket.timeout:
+                    print("[HW BRIDGE] Pi connection closed after idle timeout")
+                except OSError:
+                    print("[HW BRIDGE] Pi connection ended after network error")
+            print("[HW BRIDGE] Pi disconnected")
 
 def main():
     vehicle_id = get_env("SMARTCAR_VEHICLE_ID", "SMARTCAR_VIN_2024_BD_XYZ789")
