@@ -57,10 +57,14 @@ experiments/v2x/verified_hub_capture_exporter.py:
   monotonically increasing sequence and a canonical HMAC-SHA256 over
   the complete export record. File mode is 0600, exclusive creation
   avoids overwrites, and the writer flushes and fsyncs each record.
-- Exporter output failures are logged (without dumping payloads or keys)
-  but do **not** block the already-authenticated live V2X transport or
-  local safety controls. Review exporter failure logs and complete-capture
-  provenance before treating a run as a population-complete experiment.
+- Exporter exceptions are logged (without dumping payloads or keys) and
+  do not abort the authenticated network forwarding method. However,
+  **each write performs synchronous flush/fsync and may block on slow
+  storage**. Therefore this opt-in exporter is for isolated research
+  benches only, not production vehicle safety or guaranteed network
+  latency. Its I/O behaviour needs a separate bounded async redesign
+  before timing-sensitive deployment. Review failure logs and complete
+  capture provenance before treating a run as population-complete.
 - The exporter rejects unsupported or action-bearing ALERT payloads.
   If the policy is OFF, those authenticated legacy messages can still
   be forwarded by V2XHub; their absence from this research-only file
