@@ -127,8 +127,8 @@ def import_archive(
     archive = Path(archive)
     if not HEX64.fullmatch(expected_sha256):
         raise ValueError("expected_sha256 must be a 64-character hex digest")
-    if split not in ("train", "validation", "test"):
-        raise ValueError("split must be train, validation or test")
+    if split not in ("train", "validation", "test", "unverified"):
+        raise ValueError("split must be train, validation, test or unverified")
     if not attack_subset or not release_tag or any(c in attack_subset for c in "/\\"):
         raise ValueError("attack_subset and release_tag must be explicit metadata")
     if min(max_json_files, max_entry_bytes, max_total_bytes) < 1:
@@ -189,6 +189,7 @@ def import_archive(
         "source_archive": archive.name,
         "source_sha256_verified": actual_sha,
         "split_declared": split,
+        "split_verified": False,  # Source archive digest alone does not verify publisher-designated partition.
         "attack_subset_declared": attack_subset,
         "dataset_distribution_license": "NOT_VERIFIED_CHECK_SOURCE_RECORD",
         "receiver_json_files": files_seen,
@@ -218,7 +219,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--archive", required=True)
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--expected-sha256", required=True)
-    parser.add_argument("--split", choices=("train", "validation", "test"), required=True)
+    parser.add_argument("--split", choices=("train", "validation", "test", "unverified"), required=True)
     parser.add_argument("--attack-subset", required=True)
     parser.add_argument("--release-tag", required=True)
     parser.add_argument("--max-json-files", type=int, default=20000)
