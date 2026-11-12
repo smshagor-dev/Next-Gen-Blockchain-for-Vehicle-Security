@@ -19,6 +19,7 @@ from typing import Callable, Dict, FrozenSet
 
 EVENT_ID_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,80}$")
 DIGEST_RE = re.compile(r"^[a-f0-9]{64}$")
+AUTH_ID_RE = re.compile(r"^[A-Za-z0-9_.:@-]{1,128}$")
 EVENT_CLASSES: FrozenSet[str] = frozenset(
     {"COLLISION", "OBSTACLE", "ROAD_HAZARD", "TRAFFIC_CONTROL"}
 )
@@ -167,7 +168,7 @@ class EvidenceAdmissionGate:
 
     def evaluate(self, *, authenticated_sender_id: str, payload: object) -> AdmissionDecision:
         """Called only after hub's session MAC, identity and replay verification."""
-        if not isinstance(authenticated_sender_id, str) or not EVENT_ID_RE.fullmatch(authenticated_sender_id):
+        if not isinstance(authenticated_sender_id, str) or not AUTH_ID_RE.fullmatch(authenticated_sender_id):
             with self._lock:
                 return self._result("rejected", "AUTHENTICATED_ID_REQUIRED", False)
         try:
