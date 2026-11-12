@@ -51,8 +51,20 @@ certified physical-transmission deduplication.
   nanoseconds (negative values remain negative; not automatically anomalies).
 - Feature 2: absolute sender-reported acceleration \`abs(acl)\` in m/s²,
   using the receiver log with earliest observed receive timestamp.
-- Predefined methods: (B0) always-benign, (B1) receive-age threshold,
+- Initially defined methods: (B0) always-benign, (B1) receive-age threshold,
   (B2) acceleration-magnitude threshold, and (B3) fixed OR of B1/B2.
+- **Exploratory post-hoc extension (B4)**: temporal motion residual derived
+  from consecutive source-sender/pseudonym CAMs in the same source split:
+  `abs(hypot(dx,dy)/delta_t - reported_speed)` (planar metres, nanosecond
+  timestamps). Calibration uses only negative Validation fingerprints at the
+  same 99th percentile. Gap >5s, non-increasing timestamps or first sender
+  message yields a missing feature and a negative prediction. Coverage is
+  reported explicitly. Sender fields are claims, not independent sensor truth.
+- **Registration caveat:** B4 was developed after the initial B0–B3 test
+  outputs were inspected. Therefore B4's measured gain is exploratory
+  hypothesis generation, not pre-registered or confirmatory evidence. Evaluate
+  B4 on an untouched independent traffic simulation before claims of
+  superiority, and include all negative findings.
 - Only source Test distinct fingerprints are scored. Report all methods,
   including zero positives, poor detection or increased false alarms.
 - Outputs: TP/FP/TN/FN, positive/negative Test support, precision, recall,
@@ -60,6 +72,8 @@ certified physical-transmission deduplication.
   are JSON \`null\`, not fabricated zero.
 - No significance test, no pseudoreplication of receiver rows or
   seed-count fiction. One source archive/test split cannot show generality.
+  B4 is explicitly post-hoc; do not call its metrics independent held-out
+  confirmation after viewing B0–B3 results.
   No tests are chosen based on observed results.
 
 The CI workflow downloads only the official archive, verifies its exact
