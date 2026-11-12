@@ -1,0 +1,39 @@
+name: Paired Baseline Validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "experiments/statistics/**"
+      - "tests/test_paired_baseline.py"
+      - "paper/paired-comparison-protocol.md"
+      - ".github/workflows/paired-baseline-validation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "experiments/statistics/**"
+      - "tests/test_paired_baseline.py"
+      - "paper/paired-comparison-protocol.md"
+      - ".github/workflows/paired-baseline-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  paired-analysis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile research statistics module
+        run: python -m py_compile experiments/statistics/paired_baseline.py tests/test_paired_baseline.py
+      - name: Run paired statistical analysis contract tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest -v tests.test_paired_baseline
