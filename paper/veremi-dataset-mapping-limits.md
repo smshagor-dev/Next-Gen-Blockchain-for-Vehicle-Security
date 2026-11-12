@@ -48,15 +48,14 @@ Recheck this checksum against the publisher release before using it.
       --archive /path/to/InTAS_highway_2.zip \
       --output-dir /path/to/research/ve-remi-highway-2 \
       --expected-sha256 31c756180fe8f86ca31bf3802f0a450f3beac49551d3eb23b25d8310a078fb4d \
-      --split test \
+      --split unverified \
       --attack-subset baseline \
       --release-tag v1.0.0
 
 The split and subset flags are **caller-declared** and cannot be verified
 from the archive hash alone. The correct publisher dataset partition must be
 selected and documented before empirical reporting; the above example is
-illustrative and **does not assert the archive actually belongs to the
-test split**. The checksum verifies archive bytes, not the split label.
+illustrative and explicitly uses **unverified** partition metadata rather than asserting that the archive belongs to train/validation/test. The checksum verifies archive bytes, not the split label.
 
 Output: \`veremi_cam_messages.csv\` and
 \`veremi_cam_manifest.json\` (including raw ZIP and normalized CSV hashes).
