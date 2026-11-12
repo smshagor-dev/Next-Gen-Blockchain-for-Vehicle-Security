@@ -22,9 +22,10 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from v2x_evidence_admission import EvidenceAdmissionGate
+from experiments.v2x.consistent_subset_admission import ConsistentSubsetAdmissionGate
 
 ORIGIN = datetime(2026, 1, 1, tzinfo=timezone.utc)
-METHODS = ("authenticated_only", "quorum_two", "quorum_three", "wide_radius")
+METHODS = ("authenticated_only", "quorum_two", "quorum_three", "wide_radius", "consistent_subset")
 METRE_LATITUDE = 1.0 / 111_320.0
 MAX_SEEDS = 100
 SCENARIOS: tuple[tuple[str, bool, tuple[tuple[float, str, str, float, float, bool, bool], ...]], ...] = (
@@ -149,6 +150,10 @@ def evaluate_trace(rows: list[SyntheticReport]) -> dict[str, Any]:
             quorum=2, max_distance_m=10_000,
             clock=lambda: clock["ms"] / 1000, utc_clock=wall_clock,
         ),
+        "consistent_subset": ConsistentSubsetAdmissionGate(
+            quorum=2, max_reports=16, max_distance_m=100,
+            clock=lambda: clock["ms"] / 1000, utc_clock=wall_clock,
+        ),
     }
     known: dict[str, bool] = {}
     first_receipt: dict[str, int] = {}
@@ -191,7 +196,17 @@ def evaluate_trace(rows: list[SyntheticReport]) -> dict[str, Any]:
                 vote_sources[name].setdefault(report.scenario, []).append(report.sender_id)
             if decision.relayed:
                 relayed[name].setdefault(report.scenario, report.received_ms)
-                accepted_sources[name][report.scenario] = list(vote_sources[name][report.scenario])
+                if name == "consistent_subset":
+                    # Candidate records the actual selected mutual-consistency
+                    # clique, not everyone who reported a poisoned incident.
+                    selected = gate.accepted_sources_for(
+                        report.payload["evidence"]["incident_id"]
+                    )
+                    accepted_sources[name][report.scenario] = list(selected)
+                else:
+                    accepted_sources[name][report.scenario] = list(
+                        vote_sources[name][report.scenario]
+                    )
         decisions.append(summary)
     metrics: dict[str, Any] = {}
     for name in METHODS:
@@ -278,6 +293,8 @@ def run_campaign(output_dir: Path, *, seeds: Sequence[int] = tuple(range(12))) -
             "A compromised source can preempt an honest incident ID, poisoning the first reference location and suppressing later honest reports.",
             "A true incident accepted by an untrusted corroborator must be separately marked as malicious-assisted; incident TP counts alone overstate trustworthy corroboration.",
             "Policy off in the production V2X hub remains the default; this campaign never activates vehicle actuation.",
+            "The consistent-subset alternative is research-only and not wired into the hub; it may still be defeated by colluding malicious sources or bounded-pool flooding.",
+            "The alternative's selection is combinatorially bounded at 16 candidate reports and quorum <=4 and requires independent runtime/availability validation.",
             "No statistical inference, publishable attack effect, vehicle safety claim or novel cryptographic primitive is established.",
         ],
     }
