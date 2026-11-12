@@ -120,10 +120,41 @@ jobs:
           PY
           mkdir -p security-reports/veremi-smoke
           cp "$RUNNER_TEMP/veremi-import/veremi_cam_manifest.json" security-reports/veremi-smoke/
+      - name: Download publisher's dataReplay attack archive and verify release digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --retry-delay 2 --connect-timeout 20 --max-time 240 \
+            "https://github.com/VeReMi-dataset/VeReMi-NextGen/releases/download/v1.0.0/InTAS_highway_2_dataReplay.zip" \
+            --output "$RUNNER_TEMP/InTAS_highway_2_dataReplay.zip"
+          echo "08d84f96602c8812be064375b3a57dee2c9f233635eeffaf44c6810609613bea  $RUNNER_TEMP/InTAS_highway_2_dataReplay.zip" | sha256sum -c -
+      - name: Import genuine dataReplay CAM labels without assuming incident truth
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m experiments.datasets.veremi_nextgen_import \
+            --archive "$RUNNER_TEMP/InTAS_highway_2_dataReplay.zip" \
+            --output-dir "$RUNNER_TEMP/veremi-replay-import" \
+            --expected-sha256 08d84f96602c8812be064375b3a57dee2c9f233635eeffaf44c6810609613bea \
+            --split unverified --attack-subset dataReplay --release-tag v1.0.0
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          metadata = json.loads((Path(os.environ["RUNNER_TEMP"]) / "veremi-replay-import" / "veremi_cam_manifest.json").read_text())
+          assert metadata["received_cam_rows"] > 0
+          assert metadata["publication_ready"] is False
+          assert metadata["split_verified"] is False
+          assert metadata["evaluation_unit"] == "per_receiver_CAM_record_not_independent_hazard_incident"
+          print("OFFICIAL_DATAREPLAY_ROWS:", metadata["received_cam_rows"])
+          print("OFFICIAL_DATAREPLAY_ATTACKER_LABEL_ONE:", metadata["cam_attacker_label_one_rows"])
+          print("OFFICIAL_DATAREPLAY_ATTACKER_LABEL_ZERO:", metadata["cam_attacker_label_zero_rows"])
+          print("OFFICIAL_DATAREPLAY_UNLABELED:", metadata["cam_attacker_label_unavailable_rows"])
+          PY
+          cp "$RUNNER_TEMP/veremi-replay-import/veremi_cam_manifest.json" security-reports/veremi-smoke/dataReplay_manifest.json
       - name: Upload SHA-verified importer metadata only (never raw dataset)
         uses: actions/upload-artifact@v4
         with:
           name: veremi-nextgen-ingestion-provenance
-          path: security-reports/veremi-smoke/veremi_cam_manifest.json
+          path: security-reports/veremi-smoke/*.json
           if-no-files-found: error
           retention-days: 14
