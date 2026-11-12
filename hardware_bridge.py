@@ -258,6 +258,10 @@ class ECUCommandGateway:
             print(f"[ECU] Serial send failed: {e}")
 
 
+class SerialFramingDesynchronized(RuntimeError):
+    """A frame boundary was lost; the port must be closed before more input."""
+
+
 def read_bounded_serial_json(ser, max_bytes: int = 4096):
     """Read one complete bounded UTF-8 JSON object; never accept truncated lines.
 
@@ -270,7 +274,10 @@ def read_bounded_serial_json(ser, max_bytes: int = 4096):
     if not line:
         return None
     if len(line) > max_bytes or not line.endswith(b"\n"):
-        raise ValueError("oversized or incomplete serial frame")
+        # A later read might start in the middle of attacker-controlled JSON.
+        # Do not try to resynchronize by accepting subsequent bytes: close the
+        # session and require an explicit restart/re-enrollment of this port.
+        raise SerialFramingDesynchronized("oversized or incomplete serial frame; port quarantined")
     try:
         obj = json.loads(line.decode("utf-8"), parse_constant=lambda _: (_ for _ in ()).throw(ValueError("non-finite serial JSON")))
     except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
@@ -301,6 +308,9 @@ def run_arduino_mode(bc: SmartCarBlockchain):
             pkt = read_bounded_serial_json(ser, max_frame_bytes)
             if pkt is None:
                 continue
+        except SerialFramingDesynchronized as exc:
+            print(f"[HW BRIDGE] serial ingress stopped: {exc}")
+            raise RuntimeError("Arduino serial frame boundary lost; close port and restart bridge") from exc
         except ValueError as exc:
             print(f"[HW BRIDGE] serial frame rejected: {exc}")
             continue
