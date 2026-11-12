@@ -105,6 +105,48 @@ class ExperimentFrameworkTests(unittest.TestCase):
             report = (Path(tmp) / "out" / "fl_report.md").read_text(encoding="utf-8")
             self.assertIn("performs no hypothesis test", report)
 
+    def test_fl_report_counts_unique_seeds_and_no_inference(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "independent-trials.csv"
+            rows = [
+                "seed,peer_count,byzantine_fraction,attack_type,accuracy,precision,recall,f1,attack_success_rate,aggregation_latency_ms",
+                "0,10,0.1,sign-flip,0.80,0.70,0.60,0.65,0.20,12",
+                "1,10,0.1,sign-flip,0.60,0.50,0.40,0.45,0.40,16",
+                "0,10,0.1,label-flip,0.75,0.65,0.55,0.60,0.30,14",
+            ]
+            source.write_text("\n".join(rows) + "\n", encoding="utf-8")
+            result = run_fl(root / "out", input_csv=source)
+            self.assertEqual(len(result["rows"]), 2)
+            groups = {row["attack_type"]: row for row in result["rows"]}
+            self.assertEqual(groups["sign-flip"]["distinct_seed_count"], 2)
+            self.assertEqual(groups["label-flip"]["distinct_seed_count"], 1)
+            self.assertTrue(all(row["inference_status"] == "not_tested" for row in result["rows"]))
+            self.assertTrue(all(row["statistical_significance"] is False for row in result["rows"]))
+
+    def test_fl_rejects_duplicate_trial_identity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "duplicate.csv"
+            header = "seed,peer_count,byzantine_fraction,attack_type,accuracy,precision,recall,f1,attack_success_rate,aggregation_latency_ms"
+            example = "1,10,0.1,sign-flip,0.8,0.7,0.6,0.65,0.2,12"
+            source.write_text("\n".join([header, example, example]) + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "duplicate FL trial identity"):
+                run_fl(root / "out", input_csv=source)
+
+    def test_fl_rejects_nonfinite_metrics(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "nonfinite.csv"
+            header = "seed,peer_count,byzantine_fraction,attack_type,accuracy,precision,recall,f1,attack_success_rate,aggregation_latency_ms"
+            for invalid in ("nan", "inf", "-inf"):
+                source.write_text(
+                    "\n".join([header, f"1,10,0.1,sign-flip,{invalid},0.7,0.6,0.65,0.2,12"]) + "\n",
+                    encoding="utf-8",
+                )
+                with self.subTest(value=invalid), self.assertRaisesRegex(ValueError, "invalid accuracy"):
+                    run_fl(root / "out", input_csv=source)
+
     def test_adversarial_plan_uses_required_scenarios_and_metrics(self):
         for scenario in [
             "realistic-speed-range",
