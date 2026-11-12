@@ -125,9 +125,9 @@ class HighwayToUrbanTransferTests(unittest.TestCase):
             root = Path(tmp)
             first = self.transfer(root)
             edited = rows(URBAN, "u")
-            for item in edited:
-                if item["source_split"] == "test":
-                    item["attacker_label"] = "1" if item["attacker_label"] == "0" else "0"
+            # Modify one target Test label only. The validation thresholds
+            # must remain unchanged, while confusion counts must change.
+            edited[-1]["attacker_label"] = "1"
             second = self.transfer(root, urban=edited)
             self.assertEqual(first["source_frozen_thresholds"], second["source_frozen_thresholds"])
             self.assertNotEqual(first["methods"]["receive_age_p99"]["tp"], second["methods"]["receive_age_p99"]["tp"])
