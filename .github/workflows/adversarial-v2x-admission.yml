@@ -1,0 +1,87 @@
+name: Adversarial V2X Admission Campaign
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "experiments/v2x/adversarial_admission_campaign.py"
+      - "tests/test_adversarial_admission_campaign.py"
+      - "paper/research-status-matrix.md"
+      - ".github/workflows/adversarial-v2x-admission.yml"
+  push:
+    branches: [main]
+    paths:
+      - "experiments/v2x/adversarial_admission_campaign.py"
+      - "tests/test_adversarial_admission_campaign.py"
+      - "paper/research-status-matrix.md"
+      - ".github/workflows/adversarial-v2x-admission.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-policy-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile policy campaign source and tests
+        run: python -m py_compile experiments/v2x/adversarial_admission_campaign.py tests/test_adversarial_admission_campaign.py
+      - name: Run adversarial admission policy regression suite
+        env:
+          PYTHONPATH: .
+        run: python -m unittest -v tests.test_adversarial_admission_campaign
+      - name: Validate authenticated V2X trust boundary with existing regressions
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest -v tests.test_v2x_security
+          python -m unittest -v tests.test_v2x_evidence_admission
+      - name: Replay twelve deterministic seed variants and verify outputs
+        run: |
+          set -euo pipefail
+          mkdir -p security-reports/adversarial-policy
+          python -m experiments.v2x.adversarial_admission_campaign \
+            --output-dir security-reports/adversarial-policy --seed-count 12
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          root = Path("security-reports/adversarial-policy")
+          data = json.loads((root / "synthetic_adversarial_campaign.json").read_text())
+          manifest = json.loads((root / "synthetic_campaign_manifest.json").read_text())
+          assert data["publication_ready"] is False
+          assert data["independent_empirical_runs"] == 0
+          assert data["statistical_significance"] is False
+          assert len(data["per_seed"]) == 12
+          assert data["scenario_count_per_seed"] == 12
+          assert manifest["results_sha256"] == hashlib.sha256(
+              (root / "synthetic_adversarial_campaign.json").read_bytes()
+          ).hexdigest()
+          for seed in data["per_seed"]:
+              m = seed["methods"]
+              assert m["quorum_two"]["fp_incidents"] == 1, "two colluding enrolled nodes bypass policy"
+              assert m["quorum_two"]["tp_incidents"] == 2, "true isolated incidents are suppressed"
+              assert m["quorum_three"]["tp_incidents"] == 1
+              assert m["wide_radius"]["fp_incidents"] == 2
+          sample = data["per_seed"][0]["methods"]
+          for name in ("authenticated_only", "quorum_two", "quorum_three", "wide_radius"):
+              print("SCRIPTED_POLICY_CASES:", name,
+                    {k: sample[name][k] for k in (
+                       "tp_incidents", "fp_incidents", "tn_incidents", "fn_incidents",
+                       "false_acceptance_rate", "legitimate_delivery_rate"
+                    )})
+          print("ALL RESULTS ARE SYNTHETIC SOFTWARE VERIFICATION; NOT PUBLICATION EVIDENCE")
+          PY
+      - name: Retain synthetic policy evidence hashes and decisions only
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-v2x-admission-policy-check
+          path: security-reports/adversarial-policy/*
+          retention-days: 14
+          if-no-files-found: error
