@@ -111,7 +111,7 @@ def grouped_statistics(rows: Sequence[Dict[str, object]], group_by: Sequence[str
         result: Dict[str, object] = {
             "group_by": ",".join(group_by),
             "count": len(grouped_rows),
-            "statistical_significance": len(grouped_rows) >= 30,
+            "statistical_significance": False,  # No inferential test is performed.\n            "inference_status": "not_tested",
             "dataset_required": False,
         }
         for column, value in zip(group_by, key):
@@ -140,7 +140,7 @@ def _dataset_required_rows(group_by: Sequence[str]) -> List[Dict[str, object]]:
 
 
 def _fieldnames(group_by: Sequence[str]) -> List[str]:
-    fields = ["group_by", *group_by, "count", "statistical_significance", "dataset_required"]
+    fields = ["group_by", *group_by, "count", "statistical_significance", "inference_status", "dataset_required"]
     for metric in METRICS:
         for stat_name in ["mean", "std", "min", "max"]:
             fields.append(f"{metric}_{stat_name}")
@@ -168,7 +168,7 @@ def _write_fl_markdown(path: Path, summary: Dict[str, object], rows: Sequence[Di
             "- `mean`: arithmetic mean for each metric.",
             "- `std`: sample standard deviation for each metric; `0` for single-row groups.",
             "- `min` / `max`: observed metric bounds within the group.",
-            "- `statistical_significance`: `true` only when group `count >= 30`.",
+            "- `statistical_significance`: always `false`; this descriptive runner performs no hypothesis test.",\n            "- `inference_status`: `not_tested`; do not interpret sample size as significance.",
             "",
             "## Summary",
             "",
