@@ -21,6 +21,7 @@ class AdversarialAdmissionCampaignTests(unittest.TestCase):
         self.assertEqual((m["quorum_two"]["tp_incidents"], m["quorum_two"]["fp_incidents"]), (2, 1))
         self.assertEqual((m["quorum_three"]["tp_incidents"], m["quorum_three"]["fp_incidents"]), (1, 0))
         self.assertEqual((m["wide_radius"]["tp_incidents"], m["wide_radius"]["fp_incidents"]), (4, 2))
+        self.assertEqual((m["consistent_subset"]["tp_incidents"], m["consistent_subset"]["fp_incidents"]), (3, 1))
         self.assertGreater(m["quorum_two"]["mean_time_to_forward_ms"], 0)
         self.assertEqual(m["authenticated_only"]["mean_time_to_forward_ms"], 0)
         self.assertEqual(sum(m["quorum_two"][x] for x in ("tp_incidents","fp_incidents","tn_incidents","fn_incidents")), len(SCENARIOS))
@@ -40,6 +41,7 @@ class AdversarialAdmissionCampaignTests(unittest.TestCase):
         self.assertIn("false_colluding_enrolled", accepted["quorum_two"])
         self.assertNotIn("false_colluding_enrolled", accepted["quorum_three"])
         self.assertIn("false_colluding_enrolled", accepted["wide_radius"])
+        self.assertIn("false_colluding_enrolled", accepted["consistent_subset"])
 
     def test_attacker_first_wins_incident_key_can_suppress_honest_quorum(self):
         trial = evaluate_trace(make_trace(19))
@@ -57,6 +59,14 @@ class AdversarialAdmissionCampaignTests(unittest.TestCase):
         self.assertIn("nonmalicious_scripted", roles)
         self.assertEqual(trial["methods"]["quorum_two"]["malicious_assisted_admitted_incidents"], 1)
         self.assertEqual(trial["methods"]["wide_radius"]["malicious_assisted_admitted_incidents"], 3)
+        self.assertIn("true_incident_id_preemption", accepted["consistent_subset"])
+        self.assertEqual(
+            trial["accepted_voter_roles"]["consistent_subset"]["true_incident_id_preemption"],
+            ["nonmalicious_scripted", "nonmalicious_scripted"],
+        )
+        self.assertEqual(
+            trial["methods"]["consistent_subset"]["malicious_assisted_admitted_incidents"], 1
+        )
 
     def test_partitioned_honest_incidents_are_delayed_or_suppressed(self):
         accepted = evaluate_trace(make_trace(4))["accepted_by_scenario"]
