@@ -3,32 +3,44 @@ import io
 import unittest
 from hardware_bridge import read_bounded_serial_json
 
+class FakeSerial(io.BytesIO):
+    def read_until(self, expected=b"\\n", size=None):
+        out = bytearray()
+        while size is None or len(out) < size:
+            b = self.read(1)
+            if not b:
+                break
+            out.extend(b)
+            if b == expected:
+                break
+        return bytes(out)
+
 class SerialIngressTests(unittest.TestCase):
     def test_valid_object(self):
-        self.assertEqual(read_bounded_serial_json(io.BytesIO(b'{"speed":3}\\n')), {"speed": 3})
+        self.assertEqual(read_bounded_serial_json(FakeSerial(b'{"speed":3}\\n')), {"speed": 3})
 
     def test_empty_timeout(self):
-        self.assertIsNone(read_bounded_serial_json(io.BytesIO(b"")))
+        self.assertIsNone(read_bounded_serial_json(FakeSerial(b"")))
 
     def test_incomplete_frame_rejected(self):
         with self.assertRaisesRegex(ValueError, "incomplete"):
-            read_bounded_serial_json(io.BytesIO(b'{"speed":3}'))
+            read_bounded_serial_json(FakeSerial(b'{"speed":3}'))
 
     def test_oversized_frame_rejected(self):
         with self.assertRaisesRegex(ValueError, "oversized"):
-            read_bounded_serial_json(io.BytesIO(b"x" * 100 + b"\\n"), 64)
+            read_bounded_serial_json(FakeSerial(b"x" * 100 + b"\\n"), 64)
 
     def test_invalid_utf8_rejected(self):
         with self.assertRaisesRegex(ValueError, "invalid serial JSON"):
-            read_bounded_serial_json(io.BytesIO(b"\\xff\\n"))
+            read_bounded_serial_json(FakeSerial(b"\\xff\\n"))
 
     def test_nonobject_rejected(self):
         with self.assertRaisesRegex(ValueError, "must be an object"):
-            read_bounded_serial_json(io.BytesIO(b"[]\\n"))
+            read_bounded_serial_json(FakeSerial(b"[]\\n"))
 
     def test_invalid_limit_rejected(self):
         with self.assertRaisesRegex(ValueError, "limit"):
-            read_bounded_serial_json(io.BytesIO(b"{}\\n"), 1)
+            read_bounded_serial_json(FakeSerial(b"{}\\n"), 1)
 
 if __name__ == "__main__":
     unittest.main()
