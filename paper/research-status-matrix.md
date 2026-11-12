@@ -19,6 +19,18 @@ software verification and independent empirical research.
 | Runtime scaling and network availability | UNVERIFIED | Existing quick unit and deterministic simulation tests are not a representative runtime benchmark | Real network delays/partitions with measured CPU/RAM/tail latency and physical isolation |
 | Novelty and paper evidence | NOT ESTABLISHED | Evidence-gated multi-source corroboration is a mechanism candidate, **not** new cryptography | Published prior-art comparison, distinguishable formal claim, valid ablations, reproducible multi-scenario independent datasets |
 
+## Arduino serial ingress follow-up (draft, unverified)
+
+The `bound-arduino-serial-telemetry` branch adds a configurable 64–65536-byte
+complete-line limit (4096-byte default) and strict UTF-8/JSON-object decoding
+before serial telemetry is processed. Seven in-memory regression cases cover
+normal, empty, truncated, oversized, invalid UTF-8, non-object and invalid
+limit inputs. Tests have not yet been executed in a Python environment;
+CI verification is required. This does **not** authenticate an Arduino or
+protect against forged but syntactically valid telemetry. Serial source
+identity, physical actuation safety, and independently wired emergency
+control remain blocked pending authorized hardware validation.
+
 ## Research assertion / results gate
 
 - Real VeReMi CAM results are **auxiliary message-manipulation detection**
