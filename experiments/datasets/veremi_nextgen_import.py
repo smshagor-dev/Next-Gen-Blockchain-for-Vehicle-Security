@@ -166,7 +166,7 @@ def import_archive(
     out.mkdir(parents=True, exist_ok=True)
     csv_path = out / "veremi_cam_messages.csv"
     summary_path = out / "veremi_cam_manifest.json"
-    message_count, positive_count, missing_label_count, files_seen, bytes_read = 0, 0, 0, 0
+    message_count, positive_count, missing_label_count, files_seen, bytes_read = 0, 0, 0, 0, 0
     split_record_counts: dict[str, int] = {}
     nested_split_paths: set[str] = set()
 
