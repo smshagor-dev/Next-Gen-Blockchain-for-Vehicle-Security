@@ -65,6 +65,11 @@ def _nonnegative_integer(value: object, label: str) -> int:
 def _coords(value: object, label: str) -> list[str]:
     if value is None:
         return ["", "", ""]
+    # Publisher CAM JSON serializes planar XYZ as "x,y,z" text even though
+    # its public documentation describes a three-value array. Keep support
+    # for either exact three-component representation.
+    if isinstance(value, str):
+        value = value.split(",")
     if not isinstance(value, list) or len(value) != 3:
         raise ValueError(label + " must contain three planar coordinates")
     return [str(_finite(x, label)) for x in value]
