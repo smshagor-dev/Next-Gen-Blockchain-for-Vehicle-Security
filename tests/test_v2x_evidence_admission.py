@@ -75,7 +75,7 @@ class EvidenceGateTests(unittest.TestCase):
         for kwargs, reason in (
             ({"kind": "COLLISION", "sensor": "two"}, "INCIDENT_CLASS_CONFLICT"),
             ({"lat": 52.0, "sensor": "three"}, "INCIDENT_LOCATION_CONFLICT"),
-            ({"observed_at": UTC + timedelta(seconds=7), "sensor": "four"},
+            ({"observed_at": UTC - timedelta(seconds=7), "sensor": "four"},
              "INCIDENT_TIME_CONFLICT"),
         ):
             with self.subTest(reason=reason):
