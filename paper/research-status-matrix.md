@@ -1,24 +1,53 @@
-# Research evidence status (2026-11-12)
+# OmniGuard V2X research evidence status
 
-This matrix tracks evidence, not publication claims. Statuses describe observed repository work and outstanding independent validation.
+Updated: 2026-11-12. This is a **claim-gated status matrix**, not a finished paper.
+Distinguish implemented code, observed source-data analysis, deterministic
+software verification and independent empirical research.
 
-| Workstream | Status | Evidence and next gate |
-| --- | --- | --- |
-| Hardware TCP authentication, bounded framing, replay defense, actuation interlock | PARTIAL | Draft PR #74; main still has unauthenticated TCP and enabled-by-default hard stop. Review and validate PR #74 before merge. No real-vehicle authorization. |
-| Ledger crash consistency and finality | PARTIAL | Prior security work exists; mock finality is not consensus finality. Crash/fault injection and external node evidence outstanding. |
-| Evidence-gated incident admission | PARTIAL | Draft PR #80 candidate; novelty and safety-availability benefits unproven. |
-| VeReMi NextGen source importer | PARTIAL | Draft PR #82 validates archive format/provenance synthetically; authentic publisher data and license review outstanding. |
-| Incident truth and split hygiene | PARTIAL | This branch adds structural split audit and tests. Manual provenance strings are self-asserted, not verified annotation. |
-| CAN/in-vehicle authentic dataset | BLOCKED | No independently verified licensed data and mapping to safety-isolated incident truth yet. |
-| Attack/fault baseline experiments | BLOCKED | No independently labeled real trials, matched splits, or measured independent repetitions. |
-| Paired uncertainty and statistical inference | PARTIAL | Draft PR #78 provides exploratory paired analysis; no genuine results. PR #77 corrects n>=30 inference error. |
-| Runtime scaling and network/CPU/RAM/latency | BLOCKED | No representative measured deployment runs or HIL access. |
-| Research manuscript and numeric claim ledger | UPCOMING | Do not promote fixtures, 3-peer poisoning check, microbenchmarks, or offline communication formulas to main findings. |
+| Workstream | Status | Verified engineering/source evidence | Remaining scientific gate |
+| --- | --- | --- | --- |
+| Hardware TCP ingress, bound messages, authenticated node sessions, replay and safety gate | MERGED, LAB VALIDATION BLOCKED | PR #74 was merged; source regression and GitHub security CI addressed software controls | Physical Pi/CAN bench and local emergency safety case not independently verified |
+| V2X event admission | MERGED SOFTWARE PROTOTYPE | PR #80 merged opt-in off/shadow/enforce, authenticated-session-before-quorum policy; command-smuggling regression tests | Independent incident labels, prior-art originality analysis, correlated reporters and physical safety validation |
+| Network collusion and availability fault checks | NEW DRAFT (issue #88) | experiments/v2x/adversarial_admission_campaign.py executes policy under twelve fixed synthetic cases, seed/jitter variations, hash manifests and tests | These are scripted fault models, not independently captured incidents or repeated experiments; real labelled fault trials missing |
+| Source-CAM integrity | VERIFIED IMPORT, not event truth | PR #82 merged; official VeReMi NextGen v1.0.0 baseline and dataReplay archives SHA-verified and imported; receiver duplicates audited | CAM attacker bit does not mean a verified hazard incident or physical source attestation; distribution license review |
+| Auxiliary Highway CAM detection | DRAFT PR #85, REPRODUCED | Official SHA-verified Highway_2 dataReplay single-source Test: 18,892 unique fingerprints; temporal comparator F1 25.05% (post-hoc) | Untouched independent simulator/split, published detectors, uncertainty; no incident truth |
+| Auxiliary Urban transfer | DRAFT PR #87, EXPLORATORY REPRODUCED | Fixed Highway Validation thresholds transferred to Urban_2 Test (113,779 fingerprints), source SHA verified, temporal comparator F1 26.06% | Only one new scenario; source selection after Highway results; no independent seeds or confirmatory significance |
+| Incident truth and split hygiene | STRUCTURAL ONLY | PR #83 merged structural source/group split audit | Independent world-state incident labels, label-review procedure, source license and temporal leakage still unverified |
+| Realistic in-vehicle CAN source | BLOCKED | No licensed original CAN trace linked to independently annotated V2X hazard state | Verify source, license, timing, physical attack model and authorization boundary |
+| Ledger crash safety and contract finality | PARTIAL | Prior source security hardening exists; mock contract success is not ledger finality | Process kill/power fault recovery, real consensus finality evidence and measured safety semantics |
+| Statistical validation | TOOLING ONLY | PR #77/#78 merged exploratory no-false-significance reporting, paired bootstrap/sign-flip/Holm code | Independent seed execution, preregistered analysis, baseline/ablation comparisons, CIs/effect sizes using **actual** incident data |
+| Runtime scaling and network availability | UNVERIFIED | Existing quick unit and deterministic simulation tests are not a representative runtime benchmark | Real network delays/partitions with measured CPU/RAM/tail latency and physical isolation |
+| Novelty and paper evidence | NOT ESTABLISHED | Evidence-gated multi-source corroboration is a mechanism candidate, **not** new cryptography | Published prior-art comparison, distinguishable formal claim, valid ablations, reproducible multi-scenario independent datasets |
 
-## Structural audit usage
+## Research assertion / results gate
 
-Run `python -m unittest -v tests.test_incident_split_audit` and `python experiments/v2x/audit_incident_splits.py independently_annotated_incidents.csv --output audit.json`.
+- Real VeReMi CAM results are **auxiliary message-manipulation detection**
+  observations, not experiments proving false hazard-event admission rates.
+- Twelve scripted adversarial incident cases (including single/multiple enrolled
+  liar, copied sensor digest, session-unverified report, repeated identity,
+  stale-separated source, displaced reporter, remote-action-field smuggling and
+  lost honest corroboration) are deterministic **software verification** only.
+- The campaign's apparent scenario rates must never be presented as
+  detection accuracy, model uncertainty, independent statistical samples,
+  vehicle safety, post-quantum security or a publication-grade result.
+  Deliberately failing cases (colluding malicious quorum, partition-induced
+  missed true alerts) are essential negative evidence, not benchmarks.
+- No physical hardware, external vehicle, road test, or HIL evidence has
+  been observed in this session. No vehicle actuation is performed.
+- A later paper may use only immutable verified actual-source evidence with
+  source/metric mapping, defensible independent units, accurate citations,
+  comparative baselines, uncertainty and limits. A software QA report is
+  **not** an original research paper.
 
-Manifest columns: `source_id,incident_id,group_id,split,label,label_provenance`. Each incident is unique per source, and groups must not cross splits. Labels are binary incident truth assertions with declared annotation provenance, **not** CAM attacker labels. Passing this audit does **not** verify independence, source authenticity, license, annotation quality, temporal leakage, or research validity. All outputs explicitly say `publication_ready=false`.
+## Next substantive code tasks
 
-Next: review hardware PR #74 and ensure safe local emergency control; validate authentic VeReMi source and license; independently annotate incidents and inspect temporal/session leakage before comparing candidate #80 against authenticated-only and corroboration baselines.
+1. Build a verified incident-level world-state annotation bridge, keeping
+   original VeReMi CAM attacker labels separate and explicit provenance.
+2. Parameterize enrolled-node collusion, honest reporter missingness,
+   time/distance disagreement, replay and saturation under controlled network
+   fault models; collect time-to-alert, false-accept and false-negative traces.
+3. Replace scripted truth and delivery flags with authenticated captured
+   sessions and independently verified simulation world truth.
+4. Run matched published comparators and multiple independently simulated
+   seeds/scenarios, pre-register hypotheses, preserve raw evidence and
+   evaluate uncertainty/effect sizes before writing numeric manuscript claims.
