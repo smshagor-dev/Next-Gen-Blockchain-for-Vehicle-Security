@@ -92,6 +92,12 @@ def parse_evidence(payload: object, *, now: datetime, max_age_sec: int) -> Evide
     if not isinstance(payload, dict) or not isinstance(payload.get("evidence"), dict):
         raise ValueError("EVIDENCE_MISSING")
     fields = payload["evidence"]
+    # ENFORCE mode must never forward arbitrary action/actuation fields
+    # hidden beside otherwise valid evidence. Exact schema is deliberate.
+    if set(payload) != {"evidence"} or set(fields) != {
+        "incident_id", "event_class", "observed_at", "lat", "lon", "sensor_sha256"
+    }:
+        raise ValueError("UNEXPECTED_EVIDENCE_FIELDS")
     event_id = fields.get("incident_id")
     kind = fields.get("event_class")
     digest = fields.get("sensor_sha256")
