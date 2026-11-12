@@ -14,7 +14,7 @@ software verification and independent empirical research.
 | Auxiliary Urban transfer | DRAFT PR #87, EXPLORATORY REPRODUCED | Fixed Highway Validation thresholds transferred to Urban_2 Test (113,779 fingerprints), source SHA verified, temporal comparator F1 26.06% | Only one new scenario; source selection after Highway results; no independent seeds or confirmatory significance |
 | Incident truth and split hygiene | STRUCTURAL ONLY | PR #83 merged structural source/group split audit | Independent world-state incident labels, label-review procedure, source license and temporal leakage still unverified |
 | Realistic in-vehicle CAN source | BLOCKED | No licensed original CAN trace linked to independently annotated V2X hazard state | Verify source, license, timing, physical attack model and authorization boundary |
-| Ledger crash safety and contract finality | PARTIAL | Prior source security hardening exists; mock contract success is not ledger finality | Process kill/power fault recovery, real consensus finality evidence and measured safety semantics |
+| Ledger crash safety and contract finality | DRAFT PR #90 — LOCAL CHECKPOINT RESEARCH ONLY | Experimental `experiments/ledger/crash_checkpoint.py` verifies local Go snapshots, fsyncs temporary files, uses atomic replacement and POSIX directory fsync; 10 fault-injection tests include real subprocess exits | Not wired into production Go persistence; no real power-loss/HIL validation, server-signed receipt finality or trusted monotonic host-rollback anchor |
 | Statistical validation | TOOLING ONLY | PR #77/#78 merged exploratory no-false-significance reporting, paired bootstrap/sign-flip/Holm code | Independent seed execution, preregistered analysis, baseline/ablation comparisons, CIs/effect sizes using **actual** incident data |
 | Runtime scaling and network availability | UNVERIFIED | Existing quick unit and deterministic simulation tests are not a representative runtime benchmark | Real network delays/partitions with measured CPU/RAM/tail latency and physical isolation |
 | Novelty and paper evidence | NOT ESTABLISHED | Evidence-gated multi-source corroboration is a mechanism candidate, **not** new cryptography | Published prior-art comparison, distinguishable formal claim, valid ablations, reproducible multi-scenario independent datasets |
@@ -58,3 +58,22 @@ software verification and independent empirical research.
 4. Run matched published comparators and multiple independently simulated
    seeds/scenarios, pre-register hypotheses, preserve raw evidence and
    evaluate uncertainty/effect sizes before writing numeric manuscript claims.
+
+## Local Go ledger crash-checkpoint evidence boundary (PR #90)
+
+The research-only local checkpoint validates snapshot block hashes against the
+existing Go ledger verifier before writing and refuses a different historical
+prefix relative to the **currently available** checkpoint. A bounded JSON
+checkpoint is written to a temporary file, flushed/fsynced, atomically
+replaced and directory-fsynced on POSIX. Fault-injection tests include actual
+POSIX subprocess `os._exit(73)` at three durability stages, malformed and
+truncated checkpoints, generation mismatch and recovery of complete old/new
+states. These verify software behaviour on the tested OS/filesystem, **not**
+physical power-loss durability or distributed consensus finality.
+
+Two deliberate failure cases must remain visible: a host can restore a valid
+older checkpoint after restart because no externally trusted monotonic anchor
+exists, and unkeyed SHA-256 hashes can be recomputed over forged receipt
+metadata. Hence the prototype provides neither cryptographically authenticated
+smart-contract finality nor host-rollback resistance. No HIL/vehicle safety
+claim or submission-ready experimental result follows from these tests.
