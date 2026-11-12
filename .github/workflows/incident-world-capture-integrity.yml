@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - "experiments/v2x/join_world_capture.py"
+      - "experiments/v2x/verified_hub_capture_exporter.py"
+      - "tests/test_verified_hub_capture_exporter.py"
+      - "v2x_protocol.py"
       - "tests/test_join_world_capture.py"
       - "paper/incident-world-capture-evidence-protocol.md"
       - ".github/workflows/incident-world-capture-integrity.yml"
@@ -30,12 +33,13 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile independent-world joiner
-        run: python -m py_compile experiments/v2x/join_world_capture.py tests/test_join_world_capture.py
+        run: python -m py_compile experiments/v2x/join_world_capture.py experiments/v2x/verified_hub_capture_exporter.py tests/test_join_world_capture.py tests/test_verified_hub_capture_exporter.py v2x_protocol.py
       - name: Run world-truth coverage and exporter integrity contract tests
         env:
           PYTHONPATH: .
         run: |
           python -m unittest -v tests.test_join_world_capture
+          python -m unittest -v tests.test_verified_hub_capture_exporter
           python -m unittest -v tests.test_incident_split_audit
           python -m unittest -v tests.test_v2x_admission_replay
       - name: Check no actual dataset or exporter secrets are committed
