@@ -50,6 +50,13 @@ SCENARIOS: tuple[tuple[str, bool, tuple[tuple[float, str, str, float, float, boo
         (0.0, "HONEST_A", "honest_a", 0, 0, True, False),
         (7.0, "HONEST_B", "honest_b", 15, 0, True, False),
     )),
+    # Compromised enrolled sender speaks first under the same event id,
+    # poisoning first-observation position and blocking later honest reports.
+    ("true_incident_id_preemption", True, (
+        (0.0, "MALICIOUS_A", "preempt", 750, 0, True, False),
+        (0.25, "HONEST_A", "honest_a", 0, 0, True, False),
+        (0.5, "HONEST_B", "honest_b", 10, 0, True, False),
+    )),
     ("false_single_enrolled", False, (
         (0.0, "MALICIOUS_A", "malice_a", 0, 0, True, False),
     )),
@@ -146,6 +153,8 @@ def evaluate_trace(rows: list[SyntheticReport]) -> dict[str, Any]:
     known: dict[str, bool] = {}
     first_receipt: dict[str, int] = {}
     relayed: dict[str, dict[str, int]] = {method: {} for method in METHODS}
+    vote_sources: dict[str, dict[str, list[str]]] = {method: {} for method in METHODS}
+    accepted_sources: dict[str, dict[str, list[str]]] = {method: {} for method in METHODS}
     decisions: list[dict[str, Any]] = []
     for report in rows:
         if report.received_ms < clock["ms"]:
@@ -164,7 +173,9 @@ def evaluate_trace(rows: list[SyntheticReport]) -> dict[str, Any]:
             "source_is_synthetic": True,
         }
         if report.session_verified_claim:
-            relayed["authenticated_only"].setdefault(report.scenario, report.received_ms)
+            if report.scenario not in relayed["authenticated_only"]:
+                relayed["authenticated_only"][report.scenario] = report.received_ms
+                accepted_sources["authenticated_only"][report.scenario] = [report.sender_id]
             summary["authenticated_only"] = "relayed"
         else:
             summary["authenticated_only"] = "unverified_not_forwarded"
@@ -176,8 +187,11 @@ def evaluate_trace(rows: list[SyntheticReport]) -> dict[str, Any]:
                 authenticated_sender_id=report.sender_id, payload=report.payload,
             )
             summary[name] = f"{decision.status}:{decision.reason}"
+            if decision.status in ("pending", "accepted"):
+                vote_sources[name].setdefault(report.scenario, []).append(report.sender_id)
             if decision.relayed:
                 relayed[name].setdefault(report.scenario, report.received_ms)
+                accepted_sources[name][report.scenario] = list(vote_sources[name][report.scenario])
         decisions.append(summary)
     metrics: dict[str, Any] = {}
     for name in METHODS:
@@ -200,10 +214,26 @@ def evaluate_trace(rows: list[SyntheticReport]) -> dict[str, Any]:
             "legitimate_delivery_rate": tp / (tp + fn) if tp + fn else None,
             "time_to_forward_ms": latencies,
             "mean_time_to_forward_ms": sum(latencies) / len(latencies) if latencies else None,
+            "malicious_assisted_admitted_incidents": sum(
+                any(source.startswith("MALICIOUS_") for source in sources)
+                for sources in accepted_sources[name].values()
+            ),
             "policy_counters": gates[name].snapshot() if name in gates else None,
         }
     evidence = {method: sorted(receipts) for method, receipts in relayed.items()}
-    return {"seed": rows[0].trial_seed, "methods": metrics, "accepted_by_scenario": evidence, "decisions": decisions}
+    return {
+        "seed": rows[0].trial_seed, "methods": metrics,
+        "accepted_by_scenario": evidence,
+        "accepted_voter_roles": {
+            method: {
+                scenario: ["malicious" if node.startswith("MALICIOUS_") else "nonmalicious_scripted"
+                           for node in sources]
+                for scenario, sources in cases.items()
+            }
+            for method, cases in accepted_sources.items()
+        },
+        "decisions": decisions,
+    }
 
 
 def run_campaign(output_dir: Path, *, seeds: Sequence[int] = tuple(range(12))) -> dict[str, Any]:
@@ -236,7 +266,8 @@ def run_campaign(output_dir: Path, *, seeds: Sequence[int] = tuple(range(12))) -
         "comparison_methods": list(METHODS),
         "per_seed": [
             {"seed": trial["seed"], "methods": trial["methods"],
-             "accepted_by_scenario": trial["accepted_by_scenario"]}
+             "accepted_by_scenario": trial["accepted_by_scenario"],
+             "accepted_voter_roles": trial["accepted_voter_roles"]}
             for trial in trials
         ],
         "limitations": [
@@ -244,6 +275,8 @@ def run_campaign(output_dir: Path, *, seeds: Sequence[int] = tuple(range(12))) -
             "Many seeds change only bounded deterministic time jitter, not independent network simulations or independent participant samples.",
             "No actual VeReMi incident truth, CAN traffic, physical local emergency control or in-vehicle hardware is evaluated.",
             "Colluding enrolled identities can satisfy quorum; single honest reports and partitioned hazards are suppressed.",
+            "A compromised source can preempt an honest incident ID, poisoning the first reference location and suppressing later honest reports.",
+            "A true incident accepted by an untrusted corroborator must be separately marked as malicious-assisted; incident TP counts alone overstate trustworthy corroboration.",
             "Policy off in the production V2X hub remains the default; this campaign never activates vehicle actuation.",
             "No statistical inference, publishable attack effect, vehicle safety claim or novel cryptographic primitive is established.",
         ],
