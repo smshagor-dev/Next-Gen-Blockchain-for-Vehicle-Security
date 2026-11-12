@@ -7,6 +7,7 @@ on:
       - "v2x_evidence_admission.py"
       - "v2x_protocol.py"
       - "tests/test_v2x_evidence_admission.py"
+      - "tests/test_v2x_admission_replay.py"
       - "experiments/v2x/**"
       - "paper/v2x-admission-research-protocol.md"
       - ".github/workflows/v2x-evidence-admission.yml"
@@ -16,6 +17,7 @@ on:
       - "v2x_evidence_admission.py"
       - "v2x_protocol.py"
       - "tests/test_v2x_evidence_admission.py"
+      - "tests/test_v2x_admission_replay.py"
       - "experiments/v2x/**"
       - "paper/v2x-admission-research-protocol.md"
       - ".github/workflows/v2x-evidence-admission.yml"
@@ -36,10 +38,11 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile V2X admission modules and tests
-        run: python -m py_compile v2x_evidence_admission.py v2x_protocol.py tests/test_v2x_evidence_admission.py
+        run: python -m py_compile v2x_evidence_admission.py v2x_protocol.py experiments/v2x/evaluate_admission.py tests/test_v2x_evidence_admission.py tests/test_v2x_admission_replay.py
       - name: Run authenticated V2X and evidence admission tests
         env:
           PYTHONPATH: .
         run: |
           python -m unittest -v tests.test_v2x_security
           python -m unittest -v tests.test_v2x_evidence_admission
+          python -m unittest -v tests.test_v2x_admission_replay
