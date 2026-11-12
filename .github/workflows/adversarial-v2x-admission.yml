@@ -59,14 +59,16 @@ jobs:
           assert data["independent_empirical_runs"] == 0
           assert data["statistical_significance"] is False
           assert len(data["per_seed"]) == 12
-          assert data["scenario_count_per_seed"] == 12
+          assert data["scenario_count_per_seed"] == 13
           assert manifest["results_sha256"] == hashlib.sha256(
               (root / "synthetic_adversarial_campaign.json").read_bytes()
           ).hexdigest()
           for seed in data["per_seed"]:
               m = seed["methods"]
               assert m["quorum_two"]["fp_incidents"] == 1, "two colluding enrolled nodes bypass policy"
-              assert m["quorum_two"]["tp_incidents"] == 2, "true isolated incidents are suppressed"
+              assert m["quorum_two"]["tp_incidents"] == 2, "true isolated/preempted incidents are suppressed"
+              assert m["quorum_two"]["malicious_assisted_admitted_incidents"] == 1
+              assert m["wide_radius"]["malicious_assisted_admitted_incidents"] == 3
               assert m["quorum_three"]["tp_incidents"] == 1
               assert m["wide_radius"]["fp_incidents"] == 2
           sample = data["per_seed"][0]["methods"]
