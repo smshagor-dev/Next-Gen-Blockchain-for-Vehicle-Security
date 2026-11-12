@@ -169,7 +169,7 @@ func consensusSecurityOutput() map[string]any {
 		"hash_collision_resistance":                 true,
 		"retroactive_tamper_evidence":               true,
 		"protects_against_forward_majority_control": false,
-		"notes":                                     majorityAttackNote,
+		"notes": majorityAttackNote,
 	}
 }
 
