@@ -139,7 +139,7 @@ class VerifiedHubResearchExporterTests(unittest.TestCase):
             message.pop("security")
             message["security"] = client.sign_message(message)
             with mock.patch.object(hub, "_broadcast") as broadcast:
-                with self.assertLogs("v2x_protocol", level="ERROR"):
+                with self.assertLogs("SmartCarV2X", level="ERROR"):
                     hub._handle_msg(conn, message)
                 # With policy OFF, authenticated legacy forwarding remains;
                 # the opt-in research exporter rejects unsupported schema.
@@ -153,7 +153,7 @@ class VerifiedHubResearchExporterTests(unittest.TestCase):
 
         hub, conn, client = self.hub(BrokenExporter())
         with mock.patch.object(hub, "_broadcast") as broadcast:
-            with self.assertLogs("v2x_protocol", level="ERROR"):
+            with self.assertLogs("SmartCarV2X", level="ERROR"):
                 hub._handle_msg(conn, authenticated_alert(client))
             broadcast.assert_called_once()
 
