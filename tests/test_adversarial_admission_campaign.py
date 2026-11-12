@@ -15,16 +15,16 @@ from v2x_evidence_admission import EvidenceAdmissionGate
 class AdversarialAdmissionCampaignTests(unittest.TestCase):
     def test_policy_exercised_with_expected_failures_and_baseline(self):
         trial = evaluate_trace(make_trace(13))
-        self.assertEqual(len(SCENARIOS), 12)
+        self.assertEqual(len(SCENARIOS), 13)
         m = trial["methods"]
-        self.assertEqual((m["authenticated_only"]["tp_incidents"], m["authenticated_only"]["fp_incidents"]), (5, 6))
+        self.assertEqual((m["authenticated_only"]["tp_incidents"], m["authenticated_only"]["fp_incidents"]), (6, 6))
         self.assertEqual((m["quorum_two"]["tp_incidents"], m["quorum_two"]["fp_incidents"]), (2, 1))
         self.assertEqual((m["quorum_three"]["tp_incidents"], m["quorum_three"]["fp_incidents"]), (1, 0))
-        self.assertEqual((m["wide_radius"]["tp_incidents"], m["wide_radius"]["fp_incidents"]), (3, 2))
+        self.assertEqual((m["wide_radius"]["tp_incidents"], m["wide_radius"]["fp_incidents"]), (4, 2))
         self.assertGreater(m["quorum_two"]["mean_time_to_forward_ms"], 0)
         self.assertEqual(m["authenticated_only"]["mean_time_to_forward_ms"], 0)
         self.assertEqual(sum(m["quorum_two"][x] for x in ("tp_incidents","fp_incidents","tn_incidents","fn_incidents")), len(SCENARIOS))
-        self.assertEqual(m["quorum_two"]["legitimate_delivery_rate"], 2 / 5)
+        self.assertEqual(m["quorum_two"]["legitimate_delivery_rate"], 2 / 6)
         self.assertEqual(m["quorum_two"]["false_acceptance_rate"], 1 / 7)
 
     def test_single_enrolled_forgery_and_duplicate_source_do_not_pass_quorum(self):
@@ -40,6 +40,23 @@ class AdversarialAdmissionCampaignTests(unittest.TestCase):
         self.assertIn("false_colluding_enrolled", accepted["quorum_two"])
         self.assertNotIn("false_colluding_enrolled", accepted["quorum_three"])
         self.assertIn("false_colluding_enrolled", accepted["wide_radius"])
+
+    def test_attacker_first_wins_incident_key_can_suppress_honest_quorum(self):
+        trial = evaluate_trace(make_trace(19))
+        accepted = trial["accepted_by_scenario"]
+        # Same true real-world incident in the script, but malicious enrolled
+        # report seeds incorrect geolocation first, causing honest reporters
+        # to be rejected by the strict admission gate.
+        self.assertIn("true_incident_id_preemption", accepted["authenticated_only"])
+        self.assertNotIn("true_incident_id_preemption", accepted["quorum_two"])
+        self.assertNotIn("true_incident_id_preemption", accepted["quorum_three"])
+        # Wide radius accepts that incident with one compromised quorum vote.
+        self.assertIn("true_incident_id_preemption", accepted["wide_radius"])
+        roles = trial["accepted_voter_roles"]["wide_radius"]["true_incident_id_preemption"]
+        self.assertIn("malicious", roles)
+        self.assertIn("nonmalicious_scripted", roles)
+        self.assertEqual(trial["methods"]["quorum_two"]["malicious_assisted_admitted_incidents"], 1)
+        self.assertEqual(trial["methods"]["wide_radius"]["malicious_assisted_admitted_incidents"], 3)
 
     def test_partitioned_honest_incidents_are_delayed_or_suppressed(self):
         accepted = evaluate_trace(make_trace(4))["accepted_by_scenario"]
