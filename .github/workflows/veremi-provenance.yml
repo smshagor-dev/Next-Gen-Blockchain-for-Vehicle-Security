@@ -6,6 +6,7 @@ on:
     paths:
       - "experiments/datasets/**"
       - "tests/test_veremi_provenance_import.py"
+      - "tests/test_veremi_cam_independence.py"
       - "paper/veremi-dataset-mapping-limits.md"
       - ".github/workflows/veremi-provenance.yml"
   push:
@@ -13,6 +14,7 @@ on:
     paths:
       - "experiments/datasets/**"
       - "tests/test_veremi_provenance_import.py"
+      - "tests/test_veremi_cam_independence.py"
       - "paper/veremi-dataset-mapping-limits.md"
       - ".github/workflows/veremi-provenance.yml"
   workflow_dispatch:
@@ -32,11 +34,13 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile source and tests
-        run: python -m py_compile experiments/datasets/veremi_nextgen_import.py tests/test_veremi_provenance_import.py
+        run: python -m py_compile experiments/datasets/veremi_nextgen_import.py experiments/datasets/audit_cam_independence.py tests/test_veremi_provenance_import.py tests/test_veremi_cam_independence.py
       - name: Test source-digest, CAM labels and no-incident inference
         env:
           PYTHONPATH: .
-        run: python -m unittest -v tests.test_veremi_provenance_import
+        run: |
+          python -m unittest -v tests.test_veremi_provenance_import
+          python -m unittest -v tests.test_veremi_cam_independence
 
   official-release-ingestion:
     runs-on: ubuntu-latest
@@ -151,6 +155,30 @@ jobs:
           print("OFFICIAL_DATAREPLAY_UNLABELED:", metadata["cam_attacker_label_unavailable_rows"])
           PY
           cp "$RUNNER_TEMP/veremi-replay-import/veremi_cam_manifest.json" security-reports/veremi-smoke/dataReplay_manifest.json
+      - name: Audit independent CAM fingerprints and split overlap on authentic publisher traces
+        shell: bash
+        run: |
+          set -euo pipefail
+          for kind in baseline replay; do
+            case "$kind" in
+              baseline) root="$RUNNER_TEMP/veremi-import"; dest="baseline_independence.json";;
+              replay) root="$RUNNER_TEMP/veremi-replay-import"; dest="dataReplay_independence.json";;
+            esac
+            python -m experiments.datasets.audit_cam_independence \
+              --input-csv "$root/veremi_cam_messages.csv" \
+              --source-manifest "$root/veremi_cam_manifest.json" \
+              --output-json "security-reports/veremi-smoke/$dest"
+          done
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for name in ("baseline_independence.json", "dataReplay_independence.json"):
+              report=json.loads((Path("security-reports/veremi-smoke") / name).read_text())
+              assert report["publication_ready"] is False
+              assert report["status"] == "cam_reception_fingerprint_audit_only"
+              print("SOURCE_CAM_AUDIT:", name, report["counts"])
+              print("SOURCE_SPLITS:", report["per_source_split"])
+          PY
       - name: Upload SHA-verified importer metadata only (never raw dataset)
         uses: actions/upload-artifact@v4
         with:
