@@ -258,6 +258,28 @@ class ECUCommandGateway:
             print(f"[ECU] Serial send failed: {e}")
 
 
+def read_bounded_serial_json(ser, max_bytes: int = 4096):
+    """Read one complete bounded UTF-8 JSON object; never accept truncated lines.
+
+    Serial ingress remains untrusted; this is resource protection, not device
+    authentication. A local emergency-stop circuit must remain independent.
+    """
+    if not 64 <= max_bytes <= 65536:
+        raise ValueError("serial frame limit out of range")
+    line = ser.read_until(b"\\n", size=max_bytes + 1)
+    if not line:
+        return None
+    if len(line) > max_bytes or not line.endswith(b"\\n"):
+        raise ValueError("oversized or incomplete serial frame")
+    try:
+        obj = json.loads(line.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("invalid serial JSON") from exc
+    if not isinstance(obj, dict):
+        raise ValueError("serial JSON must be an object")
+    return obj
+
+
 def run_arduino_mode(bc: SmartCarBlockchain):
     if not serial:
         raise RuntimeError("pyserial not installed. Install with: pip install pyserial")
@@ -273,13 +295,14 @@ def run_arduino_mode(bc: SmartCarBlockchain):
             f"Set SMARTCAR_HW_SERIAL_PORT in .env to your Arduino port. Details: {e}"
         )
     actuator = SafeModeActuatorDispatcher()
+    max_frame_bytes = get_int("SMARTCAR_HW_SERIAL_MAX_FRAME_BYTES", 4096)
     while True:
-        line = ser.readline().decode(errors="ignore").strip()
-        if not line:
-            continue
         try:
-            pkt = json.loads(line)
-        except Exception:
+            pkt = read_bounded_serial_json(ser, max_frame_bytes)
+            if pkt is None:
+                continue
+        except ValueError as exc:
+            print(f"[HW BRIDGE] serial frame rejected: {exc}")
             continue
         tel = to_telemetry(pkt)
         evt = str(pkt.get("event", "HW:ARDUINO:TELEMETRY"))
