@@ -36,7 +36,7 @@ def discover_results(input_dir: Path) -> Dict[str, Dict[str, object]]:
 
 
 def _is_number(value: object) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool) and not math.isnan(float(value))
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(float(value))
 
 
 def _numeric_items(row: dict) -> List[tuple[str, object]]:
@@ -72,6 +72,8 @@ def _section(title: str, experiment_key: str, results: Dict[str, Dict[str, objec
         lines.extend(["- Result file: missing", ""])
         return lines
     lines.append(f"- Source: `{path}`")
+    if any("fixture" in part.lower() or "smoke" in part.lower() for part in path.parts):
+        lines.append("- Evidence classification: fixture/smoke only; not a publishable main experiment.")
     lines.extend(_status_lines(payload))
     rows = _rows(payload)
     numeric_rows = []
@@ -111,6 +113,12 @@ def _missing_todos(results: Dict[str, Dict[str, object]]) -> List[str]:
         elif isinstance(payload, dict) and (payload.get("dataset_required") is True or payload.get("status") == "dataset_required"):
             lines.append(f"- {label}: dataset required before metrics can be cited.")
             any_missing = True
+        elif results[key]["path"] and any(
+            "fixture" in part.lower() or "smoke" in part.lower()
+            for part in results[key]["path"].parts
+        ):
+            lines.append(f"- {label}: only fixture/smoke evidence located; run the real research protocol before publication.")
+            any_missing = True
     if not any_missing:
         lines.append("- No missing result files detected by the aggregator. Review claim-safety notes before citing results.")
     lines.append("")
@@ -125,7 +133,8 @@ def _claim_safety_notes() -> List[str]:
         "- Do not claim Sybil resistance under open registration.",
         "- Do not claim 51% attack resistance.",
         "- Do not claim 100% detection.",
-        "- Do not claim statistically significant FL/adversarial results unless count/repeated runs support it.",
+        "- Sample count (including 30 rows) does not imply statistical significance; use prespecified inferential tests, effect sizes and uncertainty.",
+        "- Do not cite fixture/smoke outputs as main experimental evidence.",
         "- Do not claim measured scalability from communication simulation.",
         "",
     ]
