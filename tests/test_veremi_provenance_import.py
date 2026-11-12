@@ -123,7 +123,7 @@ class VeremiImportContractTests(unittest.TestCase):
             self.assertFalse((root / "out/veremi_cam_messages.csv").exists())
 
     def test_malformed_attacker_label_must_not_be_silently_cast(self):
-        for bad in (True, "1", 2, -1, None):
+        for bad in (True, "unknown", "", 2, -1, 1.0):
             with self.subTest(label=bad):
                 with self.assertRaisesRegex(ValueError, "attacker label"):
                     normalize_cam(cam(bad), receiver_log="r.json", index=0,
