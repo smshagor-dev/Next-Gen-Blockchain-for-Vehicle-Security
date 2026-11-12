@@ -1,0 +1,188 @@
+name: VeReMi Dataset Provenance Validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "experiments/datasets/**"
+      - "tests/test_veremi_provenance_import.py"
+      - "tests/test_veremi_cam_independence.py"
+      - "paper/veremi-dataset-mapping-limits.md"
+      - ".github/workflows/veremi-provenance.yml"
+  push:
+    branches: [main]
+    paths:
+      - "experiments/datasets/**"
+      - "tests/test_veremi_provenance_import.py"
+      - "tests/test_veremi_cam_independence.py"
+      - "paper/veremi-dataset-mapping-limits.md"
+      - ".github/workflows/veremi-provenance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  importer-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile source and tests
+        run: python -m py_compile experiments/datasets/veremi_nextgen_import.py experiments/datasets/audit_cam_independence.py tests/test_veremi_provenance_import.py tests/test_veremi_cam_independence.py
+      - name: Test source-digest, CAM labels and no-incident inference
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest -v tests.test_veremi_provenance_import
+          python -m unittest -v tests.test_veremi_cam_independence
+
+  official-release-ingestion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download publisher's original baseline archive and verify release SHA-256
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --retry-delay 2 --connect-timeout 20 --max-time 240 \
+            "https://github.com/VeReMi-dataset/VeReMi-NextGen/releases/download/v1.0.0/InTAS_highway_2.zip" \
+            --output "$RUNNER_TEMP/InTAS_highway_2.zip"
+          echo "31c756180fe8f86ca31bf3802f0a450f3beac49551d3eb23b25d8310a078fb4d  $RUNNER_TEMP/InTAS_highway_2.zip" | sha256sum -c -
+      - name: Inspect publisher ZIP internal paths without extracting
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os, zipfile
+          from pathlib import Path
+          archive = Path(os.environ["RUNNER_TEMP"]) / "InTAS_highway_2.zip"
+          with zipfile.ZipFile(archive) as z:
+              infos = [x for x in z.infolist() if not x.is_dir()]
+              print("PUB_ARCHIVE_NON_DIRECTORY_FILES:", len(infos))
+              for member in infos[:25]:
+                  print("PUB_ARCHIVE_ENTRY:", repr(member.filename), "uncompressed_bytes:", member.file_size)
+              if infos:
+                  with z.open(infos[0]) as source:
+                      prefix = source.read(300)
+                  print("PUB_ARCHIVE_FIRST_FILE_PREFIX:", repr(prefix))
+                  import io, json
+                  with z.open(infos[0]) as outer_source:
+                      nested = outer_source.read()
+                  with zipfile.ZipFile(io.BytesIO(nested)) as inner:
+                      files = [v for v in inner.infolist() if v.filename.endswith(".json")]
+                      print("PUB_NESTED_RECEIVER_JSON_FILES:", len(files))
+                      if files:
+                          with inner.open(files[0]) as source:
+                              document = json.load(source)
+                          print("PUB_FIRST_RECEIVER_TYPE:", type(document).__name__)
+                          print("PUB_FIRST_RECEIVER_ROWS:", len(document) if isinstance(document, list) else "non-array")
+                          if isinstance(document, list) and document:
+                              first = document[0]
+                              print("PUB_CAM_KEYS:", sorted(first))
+                              for field in ("attacker", "sender_id", "sender_alias", "messageID", "sendTime", "rcvTime"):
+                                  print("PUB_CAM_FIELD:", field, "type=", type(first.get(field)).__name__, "value=", repr(first.get(field))[:120])
+                              print("PUB_CAM_SENDER_KEYS:", sorted(first.get("sender", {})) if isinstance(first.get("sender"), dict) else "not-dict")
+                              print("PUB_CAM_RECEIVER_KEYS:", sorted(first.get("receiver", {})) if isinstance(first.get("receiver"), dict) else "not-dict")
+                              for sensor_role in ("sender", "receiver"):
+                                  source = first.get(sensor_role, {})
+                                  if isinstance(source, dict):
+                                      for field in ("pos", "spd", "acl", "hed"):
+                                          sample = source.get(field)
+                                          print("PUB_SAMPLE_VALUE:", sensor_role, field, "type=", type(sample).__name__, "value=", repr(sample)[:120])
+          PY
+      - name: Ingest genuine archive without inventing train/test partition or incident truth
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m experiments.datasets.veremi_nextgen_import \
+            --archive "$RUNNER_TEMP/InTAS_highway_2.zip" \
+            --output-dir "$RUNNER_TEMP/veremi-import" \
+            --expected-sha256 31c756180fe8f86ca31bf3802f0a450f3beac49551d3eb23b25d8310a078fb4d \
+            --split unverified --attack-subset unverified --release-tag v1.0.0
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          metadata = json.loads((Path(os.environ["RUNNER_TEMP"]) / "veremi-import" / "veremi_cam_manifest.json").read_text())
+          assert metadata["received_cam_rows"] > 0
+          assert metadata["publication_ready"] is False
+          assert metadata["split_verified"] is False
+          assert metadata["evaluation_unit"] == "per_receiver_CAM_record_not_independent_hazard_incident"
+          print("Publisher archive bytes verified; CAM rows:", metadata["received_cam_rows"])
+          print("Attacker-labeled CAM rows:", metadata["cam_attacker_label_one_rows"])
+          print("No incident-level ground truth or paper performance metrics are claimed.")
+          PY
+          mkdir -p security-reports/veremi-smoke
+          cp "$RUNNER_TEMP/veremi-import/veremi_cam_manifest.json" security-reports/veremi-smoke/
+      - name: Download publisher's dataReplay attack archive and verify release digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --retry-delay 2 --connect-timeout 20 --max-time 240 \
+            "https://github.com/VeReMi-dataset/VeReMi-NextGen/releases/download/v1.0.0/InTAS_highway_2_dataReplay.zip" \
+            --output "$RUNNER_TEMP/InTAS_highway_2_dataReplay.zip"
+          echo "08d84f96602c8812be064375b3a57dee2c9f233635eeffaf44c6810609613bea  $RUNNER_TEMP/InTAS_highway_2_dataReplay.zip" | sha256sum -c -
+      - name: Import genuine dataReplay CAM labels without assuming incident truth
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m experiments.datasets.veremi_nextgen_import \
+            --archive "$RUNNER_TEMP/InTAS_highway_2_dataReplay.zip" \
+            --output-dir "$RUNNER_TEMP/veremi-replay-import" \
+            --expected-sha256 08d84f96602c8812be064375b3a57dee2c9f233635eeffaf44c6810609613bea \
+            --split unverified --attack-subset dataReplay --release-tag v1.0.0
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          metadata = json.loads((Path(os.environ["RUNNER_TEMP"]) / "veremi-replay-import" / "veremi_cam_manifest.json").read_text())
+          assert metadata["received_cam_rows"] > 0
+          assert metadata["publication_ready"] is False
+          assert metadata["split_verified"] is False
+          assert metadata["evaluation_unit"] == "per_receiver_CAM_record_not_independent_hazard_incident"
+          print("OFFICIAL_DATAREPLAY_ROWS:", metadata["received_cam_rows"])
+          print("OFFICIAL_DATAREPLAY_ATTACKER_LABEL_ONE:", metadata["cam_attacker_label_one_rows"])
+          print("OFFICIAL_DATAREPLAY_ATTACKER_LABEL_ZERO:", metadata["cam_attacker_label_zero_rows"])
+          print("OFFICIAL_DATAREPLAY_UNLABELED:", metadata["cam_attacker_label_unavailable_rows"])
+          PY
+          cp "$RUNNER_TEMP/veremi-replay-import/veremi_cam_manifest.json" security-reports/veremi-smoke/dataReplay_manifest.json
+      - name: Audit independent CAM fingerprints and split overlap on authentic publisher traces
+        shell: bash
+        run: |
+          set -euo pipefail
+          for kind in baseline replay; do
+            case "$kind" in
+              baseline) root="$RUNNER_TEMP/veremi-import"; dest="baseline_independence.json";;
+              replay) root="$RUNNER_TEMP/veremi-replay-import"; dest="dataReplay_independence.json";;
+            esac
+            python -m experiments.datasets.audit_cam_independence \
+              --input-csv "$root/veremi_cam_messages.csv" \
+              --source-manifest "$root/veremi_cam_manifest.json" \
+              --output-json "security-reports/veremi-smoke/$dest"
+          done
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for name in ("baseline_independence.json", "dataReplay_independence.json"):
+              report=json.loads((Path("security-reports/veremi-smoke") / name).read_text())
+              assert report["publication_ready"] is False
+              assert report["status"] == "cam_reception_fingerprint_audit_only"
+              print("SOURCE_CAM_AUDIT:", name, report["counts"])
+              print("SOURCE_SPLITS:", report["per_source_split"])
+          PY
+      - name: Upload SHA-verified importer metadata only (never raw dataset)
+        uses: actions/upload-artifact@v4
+        with:
+          name: veremi-nextgen-ingestion-provenance
+          path: security-reports/veremi-smoke/*.json
+          if-no-files-found: error
+          retention-days: 14
