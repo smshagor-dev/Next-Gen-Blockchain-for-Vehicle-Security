@@ -33,6 +33,45 @@ A genuinely independent simulator world-state export and label review are
 not yet available. A manually entered annotation string is self-attested
 even if it passes this software audit.
 
+## Opt-in live-hub export integration
+
+The actual V2XHub now accepts an **explicit caller-supplied**
+research capture_exporter object with a record_verified method. It never
+loads or enables an exporter automatically from environment variables.
+The hub invokes it only after its real session MAC, source-ID and replay
+nonce verifier has returned true for an ALERT. PING, failed-MAC,
+unauthenticated or replayed traffic is never exported.
+
+The optional exporter implementation is
+experiments/v2x/verified_hub_capture_exporter.py:
+
+- Construct VerifiedHubCaptureExporter using an already-existing
+  trusted directory, a private owner-only 0600 exporter-key file,
+  an exclusive new output capture path, and explicit source/scenario/seed.
+- Pass the constructed exporter to
+  V2XHub(node_key_registry=..., capture_exporter=exporter).
+- Operate only on an isolated authorized research bench, and close the
+  caller-owned exporter when finished. The output includes source
+  pseudonyms and reported positions; restrict access accordingly.
+- Each accepted V2X ALERT is written once, with a fresh receipt ID,
+  monotonically increasing sequence and a canonical HMAC-SHA256 over
+  the complete export record. File mode is 0600, exclusive creation
+  avoids overwrites, and the writer flushes and fsyncs each record.
+- Exporter output failures are logged (without dumping payloads or keys)
+  but do **not** block the already-authenticated live V2X transport or
+  local safety controls. Review exporter failure logs and complete-capture
+  provenance before treating a run as a population-complete experiment.
+- The exporter rejects unsupported or action-bearing ALERT payloads.
+  If the policy is OFF, those authenticated legacy messages can still
+  be forwarded by V2XHub; their absence from this research-only file
+  means this capture is **not a complete sample of all forwarded network
+  traffic**. The current adapter therefore cannot estimate all-message
+  false acceptance without a separately verified capture-completeness audit.
+
+Both the exporter and joiner are source code with synthetic session/unit
+verification tests. No real sensor/vehicle session has been captured,
+and neither module independently authenticates original world-state labels.
+
 ## Input B: hub-exported V2X ALERT NDJSON
 
 Each JSON object has exactly:
