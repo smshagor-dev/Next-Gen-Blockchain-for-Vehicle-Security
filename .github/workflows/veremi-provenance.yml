@@ -90,6 +90,12 @@ jobs:
                                   print("PUB_CAM_FIELD:", field, "type=", type(first.get(field)).__name__, "value=", repr(first.get(field))[:120])
                               print("PUB_CAM_SENDER_KEYS:", sorted(first.get("sender", {})) if isinstance(first.get("sender"), dict) else "not-dict")
                               print("PUB_CAM_RECEIVER_KEYS:", sorted(first.get("receiver", {})) if isinstance(first.get("receiver"), dict) else "not-dict")
+                              for sensor_role in ("sender", "receiver"):
+                                  source = first.get(sensor_role, {})
+                                  if isinstance(source, dict):
+                                      for field in ("pos", "spd", "acl", "hed"):
+                                          sample = source.get(field)
+                                          print("PUB_SAMPLE_VALUE:", sensor_role, field, "type=", type(sample).__name__, "value=", repr(sample)[:120])
           PY
       - name: Ingest genuine archive without inventing train/test partition or incident truth
         shell: bash
