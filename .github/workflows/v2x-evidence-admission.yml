@@ -1,0 +1,45 @@
+name: V2X Evidence Admission Validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "v2x_evidence_admission.py"
+      - "v2x_protocol.py"
+      - "tests/test_v2x_evidence_admission.py"
+      - "experiments/v2x/**"
+      - "paper/v2x-admission-research-protocol.md"
+      - ".github/workflows/v2x-evidence-admission.yml"
+  push:
+    branches: [main]
+    paths:
+      - "v2x_evidence_admission.py"
+      - "v2x_protocol.py"
+      - "tests/test_v2x_evidence_admission.py"
+      - "experiments/v2x/**"
+      - "paper/v2x-admission-research-protocol.md"
+      - ".github/workflows/v2x-evidence-admission.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evidence-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile V2X admission modules and tests
+        run: python -m py_compile v2x_evidence_admission.py v2x_protocol.py tests/test_v2x_evidence_admission.py
+      - name: Run authenticated V2X and evidence admission tests
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest -v tests.test_v2x_security
+          python -m unittest -v tests.test_v2x_evidence_admission
