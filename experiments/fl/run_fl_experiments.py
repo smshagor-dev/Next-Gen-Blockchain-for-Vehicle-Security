@@ -73,6 +73,12 @@ def _load_rows(input_csv: Path) -> List[Dict[str, object]]:
                     parsed[metric] = float(row[metric])
                 except (TypeError, ValueError) as exc:
                     raise ValueError(f"invalid {metric} at CSV line {i}: {exc}") from exc
+                if not math.isfinite(parsed[metric]):
+                    raise ValueError(f"non-finite {metric} at CSV line {i}")
+                if metric == "aggregation_latency_ms" and parsed[metric] < 0:
+                    raise ValueError(f"negative aggregation latency at CSV line {i}")
+                if metric != "aggregation_latency_ms" and not 0.0 <= parsed[metric] <= 1.0:
+                    raise ValueError(f"metric {metric} outside [0,1] at CSV line {i}")
             rows.append(parsed)
     return rows
 
@@ -111,7 +117,10 @@ def grouped_statistics(rows: Sequence[Dict[str, object]], group_by: Sequence[str
         result: Dict[str, object] = {
             "group_by": ",".join(group_by),
             "count": len(grouped_rows),
-            "statistical_significance": len(grouped_rows) >= 30,
+            "distinct_seed_count": len({int(row["seed"]) for row in grouped_rows}),
+            # Grouped descriptive statistics do NOT test a null hypothesis.
+            "statistical_significance": False,
+            "inference_status": "not_performed",
             "dataset_required": False,
         }
         for column, value in zip(group_by, key):
@@ -128,7 +137,9 @@ def _dataset_required_rows(group_by: Sequence[str]) -> List[Dict[str, object]]:
     row: Dict[str, object] = {
         "group_by": ",".join(group_by),
         "count": "",
+        "distinct_seed_count": "",
         "statistical_significance": False,
+        "inference_status": "not_performed",
         "dataset_required": True,
     }
     for column in group_by:
@@ -140,7 +151,10 @@ def _dataset_required_rows(group_by: Sequence[str]) -> List[Dict[str, object]]:
 
 
 def _fieldnames(group_by: Sequence[str]) -> List[str]:
-    fields = ["group_by", *group_by, "count", "statistical_significance", "dataset_required"]
+    fields = [
+        "group_by", *group_by, "count", "distinct_seed_count",
+        "statistical_significance", "inference_status", "dataset_required",
+    ]
     for metric in METRICS:
         for stat_name in ["mean", "std", "min", "max"]:
             fields.append(f"{metric}_{stat_name}")
@@ -168,7 +182,10 @@ def _write_fl_markdown(path: Path, summary: Dict[str, object], rows: Sequence[Di
             "- `mean`: arithmetic mean for each metric.",
             "- `std`: sample standard deviation for each metric; `0` for single-row groups.",
             "- `min` / `max`: observed metric bounds within the group.",
-            "- `statistical_significance`: `true` only when group `count >= 30`.",
+            "- `distinct_seed_count`: unique seed identifiers, not proof of independent observations.",
+            "- `statistical_significance`: always `false` for descriptive-only aggregation.",
+            "- `inference_status`: `not_performed`; no hypothesis test or effect-size inference was performed.",
+            "- Statistical significance requires prespecified comparisons, independence checks, valid tests and uncertainty, regardless of sample count.",
             "",
             "## Summary",
             "",
@@ -257,6 +274,8 @@ def run(
         "group_by": ",".join(group_columns),
         "metrics": ",".join(METRICS),
         "dataset_required": dataset_required,
+        "statistical_significance": False,
+        "inference_status": "not_performed",
         "seed": int(seed),
     }
     fields = _fieldnames(group_columns)
