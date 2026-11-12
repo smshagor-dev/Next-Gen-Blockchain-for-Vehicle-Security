@@ -1,7 +1,7 @@
 """Serial ingress bounded framing: in-memory only, no real actuator access."""
 import io
 import unittest
-from hardware_bridge import read_bounded_serial_json
+from hardware_bridge import read_bounded_serial_json, SerialFramingDesynchronized
 
 class FakeSerial(io.BytesIO):
     def read_until(self, expected=b"\n", size=None):
@@ -23,12 +23,24 @@ class SerialIngressTests(unittest.TestCase):
         self.assertIsNone(read_bounded_serial_json(FakeSerial(b"")))
 
     def test_incomplete_frame_rejected(self):
-        with self.assertRaisesRegex(ValueError, "incomplete"):
+        with self.assertRaisesRegex(SerialFramingDesynchronized, "incomplete"):
             read_bounded_serial_json(FakeSerial(b'{"speed":3}'))
 
     def test_oversized_frame_rejected(self):
-        with self.assertRaisesRegex(ValueError, "oversized"):
+        with self.assertRaisesRegex(SerialFramingDesynchronized, "oversized"):
             read_bounded_serial_json(FakeSerial(b"x" * 100 + b"\n"), 64)
+
+    def test_oversized_frame_quarantines_even_with_valid_following_frame(self):
+        port = FakeSerial(b"x" * 100 + b"\\n" + b'{"speed":3}\\n')
+        with self.assertRaises(SerialFramingDesynchronized):
+            read_bounded_serial_json(port, 64)
+        # The caller must close this port; it cannot safely resume parsing
+        # bytes left over from an oversized or unterminated frame.
+        self.assertTrue(port.read())
+
+    def test_timeout_with_partial_frame_requires_port_restart(self):
+        with self.assertRaises(SerialFramingDesynchronized):
+            read_bounded_serial_json(FakeSerial(b'{"speed":3'), 64)
 
     def test_invalid_utf8_rejected(self):
         with self.assertRaisesRegex(ValueError, "invalid serial JSON"):
