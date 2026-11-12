@@ -40,6 +40,11 @@ jobs:
           python -m py_compile scripts/bootstrap_local_env.py scripts/generate_sbom.py scripts/generate_provenance.py scripts/secret_scan.py scripts/ci_windows_go_backend_smoke.py
           python -m py_compile hardware_bridge.py hardware_transport_security.py hardware_actuation_safety.py pi_sensor_node.py
 
+      - name: Install hardware bridge Python test dependency
+        # The bridge imports the blockchain FL learner, which requires NumPy.
+        # Install only this runtime dependency instead of the entire GUI/CV stack.
+        run: python -m pip install --disable-pip-version-check "numpy==1.26.4"
+
       - name: Run Python security regression tests
         env:
           PYTHONPATH: .
