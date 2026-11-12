@@ -266,14 +266,14 @@ def read_bounded_serial_json(ser, max_bytes: int = 4096):
     """
     if not 64 <= max_bytes <= 65536:
         raise ValueError("serial frame limit out of range")
-    line = ser.read_until(b"\\n", size=max_bytes + 1)
+    line = ser.read_until(b"\n", size=max_bytes + 1)
     if not line:
         return None
-    if len(line) > max_bytes or not line.endswith(b"\\n"):
+    if len(line) > max_bytes or not line.endswith(b"\n"):
         raise ValueError("oversized or incomplete serial frame")
     try:
-        obj = json.loads(line.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        obj = json.loads(line.decode("utf-8"), parse_constant=lambda _: (_ for _ in ()).throw(ValueError("non-finite serial JSON")))
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
         raise ValueError("invalid serial JSON") from exc
     if not isinstance(obj, dict):
         raise ValueError("serial JSON must be an object")
