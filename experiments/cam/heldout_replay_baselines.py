@@ -14,14 +14,14 @@ import hashlib
 import json
 import math
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Sequence
 
 REQUIRED = (
     "archive_sha256", "source_split", "receiver_log", "sender_id",
     "sender_alias", "message_id", "send_time_raw", "receive_time_raw",
-    "sender_acceleration", "attacker_label",
+    "sender_acceleration", "sender_pos_x", "sender_pos_y", "sender_speed", "attacker_label",
 )
 SPLITS = frozenset(("train", "validation", "test"))
 METHODS = (
@@ -29,6 +29,7 @@ METHODS = (
     "receive_age_p99",
     "acceleration_magnitude_p99",
     "age_or_acceleration_p99",
+    "temporal_motion_residual_p99",
 )
 
 
@@ -46,14 +47,18 @@ def _integer_timestamp(text: str, field: str, line: int) -> int:
     return int(text)
 
 
-def _acceleration(text: str, line: int) -> float:
+def _finite_source_float(text: str, field: str, line: int) -> float:
     try:
         value = float(text)
     except (TypeError, ValueError, OverflowError) as exc:
-        raise ValueError(f"invalid sender acceleration at line {line}") from exc
+        raise ValueError(f"invalid {field} at line {line}") from exc
     if not math.isfinite(value):
-        raise ValueError(f"nonfinite sender acceleration at line {line}")
-    return abs(value)
+        raise ValueError(f"nonfinite {field} at line {line}")
+    return value
+
+
+def _acceleration(text: str, line: int) -> float:
+    return abs(_finite_source_float(text, "sender acceleration", line))
 
 
 @dataclass(frozen=True)
@@ -64,6 +69,11 @@ class Transmission:
     receiver_log: str
     age_ns: int
     abs_acceleration_mps2: float
+    send_ns: int
+    sender_x_m: float
+    sender_y_m: float
+    sender_speed_mps: float
+    motion_residual_mps: float | None = None
 
 
 def verified_source_manifest(source_csv: Path, manifest_file: Path, expected_archive_sha256: str) -> dict:
@@ -124,6 +134,10 @@ def deduplicate_labeled_cams(source_csv: Path, expected_archive_sha256: str, *, 
                 split=split, key=key, label=int(item["attacker_label"]),
                 receiver_log=item["receiver_log"], age_ns=age_ns,
                 abs_acceleration_mps2=_acceleration(item["sender_acceleration"], line),
+                send_ns=send_ns,
+                sender_x_m=_finite_source_float(item["sender_pos_x"], "sender_pos_x", line),
+                sender_y_m=_finite_source_float(item["sender_pos_y"], "sender_pos_y", line),
+                sender_speed_mps=_finite_source_float(item["sender_speed"], "sender_speed", line),
             )
             prior = seen.get(key)
             if prior is not None:
@@ -158,6 +172,40 @@ def deduplicate_labeled_cams(source_csv: Path, expected_archive_sha256: str, *, 
     return partitions, audit
 
 
+def annotate_motion_consistency(partitions: dict[str, list[Transmission]]) -> dict[str, list[Transmission]]:
+    """Compute sender-claimed planar motion residual without sharing state across source splits.
+
+    Invalid/non-increasing time, initial sender message or gaps over five seconds
+    produce no temporal feature and must not inflate measured detection.
+    """
+    annotated: dict[str, list[Transmission]] = {}
+    for split, trials in partitions.items():
+        sender_series: dict[tuple[str, str], list[Transmission]] = {}
+        for trial in trials:
+            sender_series.setdefault((trial.key[0], trial.key[1]), []).append(trial)
+        derived: dict[tuple[str, str, str, str], Transmission] = {}
+        for group in sender_series.values():
+            ordered = sorted(group, key=lambda t: (t.send_ns, t.key[2]))
+            previous = None
+            for current in ordered:
+                residual = None
+                if previous is not None:
+                    elapsed = current.send_ns - previous.send_ns
+                    if 0 < elapsed <= 5_000_000_000:
+                        distance_m = math.hypot(
+                            current.sender_x_m - previous.sender_x_m,
+                            current.sender_y_m - previous.sender_y_m,
+                        )
+                        estimated_speed_mps = distance_m * 1_000_000_000 / elapsed
+                        residual = abs(estimated_speed_mps - current.sender_speed_mps)
+                        if not math.isfinite(residual):
+                            raise ValueError("nonfinite computed temporal motion residual")
+                derived[current.key] = replace(current, motion_residual_mps=residual)
+                previous = current
+        annotated[split] = [derived[t.key] for t in trials]
+    return annotated
+
+
 def _nearest_rank(values: list[float | int], q: float) -> float | int:
     if not values or not 0 < q < 1:
         raise ValueError("negative validation reference samples and quantile in (0, 1) required")
@@ -169,12 +217,19 @@ def calibrate(validation: list[Transmission], *, quantile: float = 0.99) -> dict
     benign = [t for t in validation if t.label == 0]
     if len(benign) < 20:
         raise ValueError("at least 20 distinct benign validation CAM fingerprints required")
+    motion_benign = [t.motion_residual_mps for t in benign if t.motion_residual_mps is not None]
+    if len(motion_benign) < 20:
+        raise ValueError("at least 20 motion-eligible benign validation fingerprints required")
     return {
         "quantile": quantile,
         "calibration_partition": "publisher_validation_distinct_fingerprints",
+        "temporal_validation_eligible_benign": len(motion_benign),
+        "motion_gap_limit_seconds": 5,
+        "motion_feature_absent_policy": "predict_negative_and_report_coverage",
         "benign_validation_fingerprints": len(benign),
         "age_ns_upper": _nearest_rank([t.age_ns for t in benign], quantile),
         "acceleration_abs_mps2_upper": _nearest_rank([t.abs_acceleration_mps2 for t in benign], quantile),
+        "temporal_motion_residual_mps_upper": _nearest_rank(motion_benign, quantile),
         "threshold_rule": "strictly_greater_than_calibrated_negative_validation_quantile",
     }
 
@@ -190,6 +245,12 @@ def predictions(test: list[Transmission], calibration: dict, method: str) -> lis
         return [t.age_ns > age_threshold for t in test]
     if method == "acceleration_magnitude_p99":
         return [t.abs_acceleration_mps2 > acceleration_threshold for t in test]
+    if method == "temporal_motion_residual_p99":
+        return [
+            t.motion_residual_mps is not None
+            and t.motion_residual_mps > calibration["temporal_motion_residual_mps_upper"]
+            for t in test
+        ]
     return [t.age_ns > age_threshold or t.abs_acceleration_mps2 > acceleration_threshold for t in test]
 
 
@@ -207,6 +268,7 @@ def metrics(test: list[Transmission], pred: list[bool]) -> dict[str, Any]:
     return {
         "tp": tp, "fp": fp, "tn": tn, "fn": fn,
         "support": len(test), "positive_support": tp + fn, "negative_support": tn + fp,
+        "temporal_motion_feature_available": sum(t.motion_residual_mps is not None for t in test),
         "precision": precision, "recall": recall, "specificity": specificity,
         "f1": f1, "false_positive_rate": fp / (fp + tn) if fp + tn else None,
         "balanced_accuracy": (recall + specificity) / 2 if recall is not None and specificity is not None else None,
@@ -219,6 +281,7 @@ def run(source_csv: Path, manifest_path: Path, output_dir: Path, *,
         raise ValueError("expected archive digest must be 64 lowercase hexadecimal characters")
     hashes = verified_source_manifest(source_csv, manifest_path, expected_archive_sha256)
     partitions, audit = deduplicate_labeled_cams(source_csv, expected_archive_sha256)
+    partitions = annotate_motion_consistency(partitions)
     calibration = calibrate(partitions["validation"], quantile=quantile)
     test = partitions["test"]
     result = {
@@ -234,6 +297,7 @@ def run(source_csv: Path, manifest_path: Path, output_dir: Path, *,
             "An exact matching fingerprint across source train/validation/test is rejected, but identity and simulation-scene leakage beyond this key is not ruled out.",
             "The negative-validation nearest-rank 99th-percentile threshold was predeclared and never tuned on test observations.",
             "Heuristic methods are NOT new algorithms, competitive published detector reproductions, or validated original research contributions.",
+            "Temporal residual is derived from claimed sender position and speed, not physical sensor attestation; initial/gapped observations are missing this feature.",
             "One official archive and one publisher test split do not justify independent-run statistics, confirmatory significance, external validity, or safety claims.",
             "Dataset licensing and independent provenance beyond verified source ZIP hashes require separate review.",
         ],
@@ -244,7 +308,7 @@ def run(source_csv: Path, manifest_path: Path, output_dir: Path, *,
     json_file.write_text(json.dumps(result, indent=2, sort_keys=True, allow_nan=False) + "\n", encoding="utf-8")
     with csv_file.open("w", encoding="utf-8", newline="") as out:
         fields = ["method", "tp", "fp", "tn", "fn", "support", "positive_support", "negative_support",
-                  "precision", "recall", "specificity", "f1", "false_positive_rate", "balanced_accuracy"]
+                  "precision", "recall", "specificity", "f1", "false_positive_rate", "balanced_accuracy", "temporal_motion_feature_available"]
         writer = csv.DictWriter(out, fieldnames=fields)
         writer.writeheader()
         writer.writerows({"method": name, **measures} for name, measures in result["methods"].items())
