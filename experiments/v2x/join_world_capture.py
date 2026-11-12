@@ -325,6 +325,7 @@ def run(world_csv: Path, capture_jsonl: Path, metadata_file: Path,
     else:
         statuses = []
     results = _world_denominator(world, statuses, records)
+    received_incidents = {r["incident_id"] for r in records}
     report = {
         "status": "hub_export_integrity_bound_to_independent_claimed_world_annotations",
         "publication_ready": False,
@@ -344,9 +345,7 @@ def run(world_csv: Path, capture_jsonl: Path, metadata_file: Path,
             "world_incidents": len(world),
             "world_positive": sum(v["label"] for v in world.values()),
             "world_negative_opportunities": sum(not v["label"] for v in world.values()),
-            "zero_capture_incidents": sum(r["incident_id"] not in {
-                x["incident_id"] for x in records
-            } for r in [{"incident_id": key} for key in world]),
+            "zero_capture_incidents": sum(key not in received_incidents for key in world),
         },
         "capture_counts": counts,
         "methods": results,
