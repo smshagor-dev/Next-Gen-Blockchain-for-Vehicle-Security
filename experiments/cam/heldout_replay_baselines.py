@@ -289,6 +289,13 @@ def run(source_csv: Path, manifest_path: Path, output_dir: Path, *,
         "evaluation_unit": "unique_sender_pseudonym_messageid_sendtime_fingerprint",
         "dataset": "VeReMi NextGen v1.0.0 InTAS_highway_2_dataReplay",
         "publication_ready": False, "statistical_significance": False,
+        "comparison_registration": {
+            "initial_predefined_descriptive_methods": [
+                "always_benign", "receive_age_p99", "acceleration_magnitude_p99", "age_or_acceleration_p99"
+            ],
+            "post_hoc_exploratory_methods_after_test_review": ["temporal_motion_residual_p99"],
+            "confirmatory_test_evidence": False,
+        },
         "source_hashes": hashes, "split_audit": audit, "thresholds": calibration,
         "methods": {method: metrics(test, predictions(test, calibration, method)) for method in METHODS},
         "limitations": [
