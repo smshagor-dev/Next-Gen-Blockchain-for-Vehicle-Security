@@ -19,6 +19,10 @@ software verification and independent empirical research.
 | Runtime scaling and network availability | UNVERIFIED | Existing quick unit and deterministic simulation tests are not a representative runtime benchmark | Real network delays/partitions with measured CPU/RAM/tail latency and physical isolation |
 | Novelty and paper evidence | NOT ESTABLISHED | Evidence-gated multi-source corroboration is a mechanism candidate, **not** new cryptography | Published prior-art comparison, distinguishable formal claim, valid ablations, reproducible multi-scenario independent datasets |
 
+## Capture outage evaluation correction (draft, 2026-11-12)
+
+The incident world-truth join now permits an **authenticated header-only capture**: a valid zero-observation interval must count every independently labeled hazard as a false negative, rather than be excluded as an invalid sample. A headerless or malformed capture and an empty world-truth universe still fail closed. This is structural regression coverage, not observed network availability evidence. The exporter must independently attest that the capture interval was complete; an empty CSV alone cannot establish that no packets were received.
+
 ## Research assertion / results gate
 
 - Real VeReMi CAM results are **auxiliary message-manipulation detection**
