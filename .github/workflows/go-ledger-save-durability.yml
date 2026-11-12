@@ -40,7 +40,7 @@ jobs:
         shell: bash
         run: |
           files=$(gofmt -l atomic_chain_save.go atomic_chain_save_test.go main.go)
-          if [ -n "$files" ]; then echo "Unformatted files: $files"; exit 1; fi
+          if [ -n "$files" ]; then echo "Unformatted files: $files"; gofmt -d atomic_chain_save.go atomic_chain_save_test.go main.go; exit 1; fi
       - name: Test production Go API and atomic save failure boundaries
         run: go test -count=1 -v ./...
       - name: Vet Go code
