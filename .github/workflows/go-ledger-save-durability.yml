@@ -1,0 +1,61 @@
+name: Go Ledger Save Durability
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "api/go/**"
+      - "docs/go-ledger-save-durability.md"
+      - "paper/research-status-matrix.md"
+      - ".github/workflows/go-ledger-save-durability.yml"
+  push:
+    branches: [main]
+    paths:
+      - "api/go/**"
+      - "docs/go-ledger-save-durability.md"
+      - ".github/workflows/go-ledger-save-durability.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-go-tests:
+    name: Native Go 1.22 — ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: api/go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+      - name: Check formatted Go code
+        shell: bash
+        run: |
+          files=$(gofmt -l atomic_chain_save.go atomic_chain_save_test.go main.go)
+          if [ -n "$files" ]; then echo "Unformatted files: $files"; exit 1; fi
+      - name: Test production Go API and atomic save failure boundaries
+        run: go test -count=1 -v ./...
+      - name: Vet Go code
+        run: go vet ./...
+
+  go-race-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: api/go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+      - name: Detect concurrent save and API data races
+        run: go test -race -count=1 ./...
