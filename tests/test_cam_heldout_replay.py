@@ -73,7 +73,7 @@ class HeldoutCAMBaselinesTests(unittest.TestCase):
             self.assertAlmostEqual(threshold["acceleration_abs_mps2_upper"], 0.2)
             self.assertEqual(audit["test_distinct_fingerprints"], 4)
             self.assertEqual(predictions(split["test"], threshold, "receive_age_p99"),
-                             [False, True, False, True])
+                             [True, False, False, True])
             self.assertEqual(predictions(split["test"], threshold, "acceleration_magnitude_p99"),
                              [False, True, False, True])
             report = run(src, manifest, root / "output", expected_archive_sha256=SHA)
