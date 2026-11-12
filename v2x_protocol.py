@@ -814,6 +814,7 @@ class V2XHub:
         node_key_registry: Optional[Dict[str, str]] = None,
         shared_secret: Optional[str] = None,
         evidence_policy: Optional[str] = None,
+        capture_exporter: Optional[Any] = None,
     ):
         self.host = host or get_env("SMARTCAR_V2X_HOST", "127.0.0.1")
         self.port = port or get_int("SMARTCAR_V2X_PORT", 9988)
@@ -838,6 +839,12 @@ class V2XHub:
                 "global V2X PSK fallback is disabled by default"
             )
 
+        # A research exporter is NEVER implicitly enabled from environment.
+        # Explicit caller-owned exporter receives only actual hub-verified
+        # ALERTs and is responsible for its own private file lifecycle.
+        if capture_exporter is not None and not callable(getattr(capture_exporter, "record_verified", None)):
+            raise TypeError("capture_exporter must implement record_verified")
+        self._capture_exporter = capture_exporter
         self._running = False
         self._sock: Optional[socket.socket] = None
         self._lock = threading.Lock()
@@ -1066,6 +1073,15 @@ class V2XHub:
         ):
             logger.warning("Dropping invalid/replayed V2X message from %s", node_id)
             return
+
+        if mtype == V2XMessageType.ALERT and self._capture_exporter is not None:
+            # The exporter is invoked only after the actual MAC, source-ID,
+            # nonce and session checks above. Research I/O failure must not
+            # interrupt live transport or independent local safety controls.
+            try:
+                self._capture_exporter.record_verified(msg, bound_sender_id=node_id)
+            except Exception:
+                logger.exception("Optional V2X research capture export failed")
 
         if mtype == V2XMessageType.PING:
             pong = _new_message(
