@@ -31,6 +31,7 @@ class PendingIncident:
     event_class: str
     reports: dict[str, Evidence] = field(default_factory=dict)
     accepted: bool = False
+    accepted_sources: tuple[str, ...] = ()
 
 
 class ConsistentSubsetAdmissionGate:
@@ -79,6 +80,12 @@ class ConsistentSubsetAdmissionGate:
                 **self._counters, "active_incidents": len(self._incidents),
                 "max_reports_per_incident": self.max_reports, "quorum": self.quorum,
             }
+
+    def accepted_sources_for(self, incident_id: str) -> tuple[str, ...]:
+        """Return exact research-only voters for an admitted incident."""
+        with self._lock:
+            state = self._incidents.get(incident_id)
+            return state.accepted_sources if state and state.accepted else ()
 
     def _mutually_consistent(self, candidates: tuple[Evidence, ...]) -> bool:
         return all(
@@ -148,6 +155,7 @@ class ConsistentSubsetAdmissionGate:
                 reports = tuple(state.reports[sender] for sender in sources)
                 if self._mutually_consistent(reports):
                     state.accepted = True
+                    state.accepted_sources = tuple(sources)
                     return self._decision(
                         "accepted", "MUTUALLY_CONSISTENT_ENROLLED_SUBSET", True,
                         len(sources), sample.incident_id,
