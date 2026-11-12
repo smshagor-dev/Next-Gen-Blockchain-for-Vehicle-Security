@@ -1,0 +1,97 @@
+name: Held-out CAM Replay Baselines
+
+on:
+  pull_request:
+    branches: [main, research/veremi-cam-provenance]
+    paths:
+      - "experiments/cam/**"
+      - "tests/test_cam_heldout_replay.py"
+      - "paper/cam-heldout-benchmark-protocol.md"
+      - ".github/workflows/cam-heldout-baselines.yml"
+  push:
+    branches: [main]
+    paths:
+      - "experiments/cam/**"
+      - "tests/test_cam_heldout_replay.py"
+      - "paper/cam-heldout-benchmark-protocol.md"
+      - ".github/workflows/cam-heldout-baselines.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  baseline-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile held-out CAM benchmark
+        run: python -m py_compile experiments/cam/heldout_replay_baselines.py tests/test_cam_heldout_replay.py
+      - name: Validate source split, provenance and no-test-leakage contracts
+        env:
+          PYTHONPATH: .
+        run: python -m unittest -v tests.test_cam_heldout_replay
+
+  genuine-source-benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify original VeReMi publisher dataReplay archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --retry-delay 2 --connect-timeout 20 --max-time 240 \
+            "https://github.com/VeReMi-dataset/VeReMi-NextGen/releases/download/v1.0.0/InTAS_highway_2_dataReplay.zip" \
+            --output "$RUNNER_TEMP/InTAS_highway_2_dataReplay.zip"
+          echo "08d84f96602c8812be064375b3a57dee2c9f233635eeffaf44c6810609613bea  $RUNNER_TEMP/InTAS_highway_2_dataReplay.zip" | sha256sum -c -
+      - name: Preserve publisher Train Validation Test partitions and CAM labels
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m experiments.datasets.veremi_nextgen_import \
+            --archive "$RUNNER_TEMP/InTAS_highway_2_dataReplay.zip" \
+            --output-dir "$RUNNER_TEMP/replay-cam-import" \
+            --expected-sha256 08d84f96602c8812be064375b3a57dee2c9f233635eeffaf44c6810609613bea \
+            --split unverified --attack-subset dataReplay --release-tag v1.0.0
+      - name: Run predefined simple descriptive baselines on official held-out split
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m experiments.cam.heldout_replay_baselines \
+            --source-csv "$RUNNER_TEMP/replay-cam-import/veremi_cam_messages.csv" \
+            --source-manifest "$RUNNER_TEMP/replay-cam-import/veremi_cam_manifest.json" \
+            --output-dir "$RUNNER_TEMP/heldout-evidence" \
+            --expected-archive-sha256 08d84f96602c8812be064375b3a57dee2c9f233635eeffaf44c6810609613bea
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          result=json.loads((Path(os.environ["RUNNER_TEMP"])/"heldout-evidence"/"cam_heldout_results.json").read_text())
+          assert result["status"] == "real_source_cam_level_descriptive_heldout_baselines"
+          assert result["publication_ready"] is False
+          assert result["statistical_significance"] is False
+          assert result["split_audit"]["test_distinct_fingerprints"] > 0
+          assert result["split_audit"]["validation_distinct_fingerprints"] > 0
+          for name, stats in result["methods"].items():
+              assert sum(stats[k] for k in ("tp","fp","tn","fn")) == stats["support"]
+              print("GENUINE_HELDOUT_CAM:", name, stats)
+          print("SOURCE_CAM_PARTITION_COUNTS:", result["split_audit"])
+          print("NO incident-level safety or scientific significance claim.")
+          PY
+      - name: Upload only result summaries and hashes, never publisher raw data
+        uses: actions/upload-artifact@v4
+        with:
+          name: veremi-datareplay-heldout-descriptive-baselines
+          path: |
+            ${{ runner.temp }}/heldout-evidence/cam_heldout_results.json
+            ${{ runner.temp }}/heldout-evidence/cam_heldout_results.csv
+            ${{ runner.temp }}/heldout-evidence/cam_heldout_manifest.json
+          if-no-files-found: error
+          retention-days: 14
