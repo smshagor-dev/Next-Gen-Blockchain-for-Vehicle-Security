@@ -76,6 +76,43 @@ class VeremiImportContractTests(unittest.TestCase):
             metadata = json.loads((root / "out/veremi_cam_manifest.json").read_text())
             self.assertEqual(metadata["source_sha256_verified"], sha)
 
+    def test_official_outer_zip_nested_split_archives_are_decoded(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            outer = root / "official-layout-fixture.zip"
+            with zipfile.ZipFile(outer, "w") as package:
+                for split, count in (("Train", 2), ("Test", 1), ("Validation", 3)):
+                    nested = root / f"nested-{split}.zip"
+                    archive_with(nested, {f"highway_2/veh_{split}.json": [cam(0, i) for i in range(count)]})
+                    package.write(nested, f"InTAS_highway_2/{split}/InTAS_highway_2.zip")
+            digest = sha256_file(outer)
+            report = imported(outer, root / "out", digest)
+            self.assertEqual(report["received_cam_rows"], 1)
+            self.assertEqual(report["rows_by_source_split"], {"test": 1})
+            self.assertTrue(report["split_verified"])
+            self.assertEqual(report["source_path_splits"], ["test", "train", "validation"])
+            with (root / "out/veremi_cam_messages.csv").open(newline="", encoding="utf-8") as src:
+                record = next(csv.DictReader(src))
+            self.assertEqual(record["source_split"], "test")
+            self.assertIn("Test/InTAS_highway_2.zip!", record["receiver_log"])
+
+    def test_nested_archive_unverified_mode_preserves_all_source_splits(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            outer = root / "multi.zip"
+            with zipfile.ZipFile(outer, "w") as package:
+                for split in ("Train", "Test"):
+                    nested = root / f"{split}.zip"
+                    archive_with(nested, {f"receivers/{split}.json": [cam()]})
+                    package.write(nested, f"series/{split}/subset.zip")
+            report = import_archive(
+                outer, root / "out", expected_sha256=sha256_file(outer),
+                split="unverified", attack_subset="unverified", release_tag="fixture-only",
+            )
+            self.assertFalse(report["split_verified"])
+            self.assertEqual(report["received_cam_rows"], 2)
+            self.assertEqual(report["rows_by_source_split"], {"train": 1, "test": 1})
+
     def test_archive_hash_mismatch_fail_closed_before_import(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
