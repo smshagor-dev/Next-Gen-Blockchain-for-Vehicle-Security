@@ -1,6 +1,30 @@
 # VeReMi NextGen: source label preservation and event-study limits
 
-**Evidence status:** importer implementation, not a completed dataset evaluation.
+**Evidence status:** SHA-verified ingestion of two authentic publisher v1.0.0
+archives has completed in [GitHub Actions run 43266683264](https://github.com/smshagor-dev/Next-Gen-Blockchain-for-Vehicle-Security/actions/runs/43266683264).
+This verifies data decoding and CAM label extraction, **not** security detection
+performance, incident admission effectiveness or scientific originality.
+
+## Verified archive provenance (2026-11-12)
+
+| Publisher release asset | GitHub release SHA-256 | CAM receptions imported | attacker=1 | attacker=0 | unlabeled |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `InTAS_highway_2.zip` | `31c756180fe8f86ca31bf3802f0a450f3beac49551d3eb23b25d8310a078fb4d` | 99,937 | 0 | Not used as inferential negative evidence | Missing labels are preserved |
+| `InTAS_highway_2_dataReplay.zip` | `08d84f96602c8812be064375b3a57dee2c9f233635eeffaf44c6810609613bea` | 99,937 | 18,496 | 81,441 | 0 |
+
+The publisher ZIP assets themselves were verified with `sha256sum -c` before import.
+Both outer ZIP files contain nested Train, Test and Validation ZIPs, which
+contain per-receiver JSON arrays. Each archive's original source split path is
+preserved rather than inferring a partition from the archive name. Per-receiver
+message repetitions are retained. Numeric strings and comma-separated planar
+XYZ coordinates in the published files are parsed conservatively; raw timestamps
+are stored as strings to avoid precision loss.
+
+These values are **descriptive source/label counts**, not independent research
+trials, incident labels, detection rates, false-positive rates, or effect sizes.
+The original dataset's distribution license and study's incident-level mapping
+still require independent review. No raw downloaded dataset is committed or
+redistributed in this repository.
 
 Source documentation: https://github.com/VeReMi-dataset/VeReMi-NextGen/blob/main/Documentation/README.md
 
@@ -41,7 +65,7 @@ not be assumed to be the distribution license.
 
 Example archival release asset: InTAS_highway_2.zip from the publisher's
 GitHub release v1.0.0, which lists expected SHA-256
-\`31c756180fe8f86ca31bf3802f0a450f3beac49551d3eb23b25d8310a078fb4d\`.
+`31c756180fe8f86ca31bf3802f0a450f3beac49551d3eb23b25d8310a078fb4d`.
 Recheck this checksum against the publisher release before using it.
 
     python -m experiments.datasets.veremi_nextgen_import \
@@ -57,8 +81,8 @@ from the archive hash alone. The correct publisher dataset partition must be
 selected and documented before empirical reporting; the above example is
 illustrative and explicitly uses **unverified** partition metadata rather than asserting that the archive belongs to train/validation/test. The checksum verifies archive bytes, not the split label.
 
-Output: \`veremi_cam_messages.csv\` and
-\`veremi_cam_manifest.json\` (including raw ZIP and normalized CSV hashes).
+Output: `veremi_cam_messages.csv` and
+`veremi_cam_manifest.json` (including raw ZIP and normalized CSV hashes).
 No original archive data are committed to this project.
 
 ## Required additional study before original research conclusions
