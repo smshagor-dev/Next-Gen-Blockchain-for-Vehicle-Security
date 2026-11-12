@@ -93,6 +93,7 @@ type State struct {
 }
 
 type apiServer struct {
+	saveMu       sync.Mutex // serializes snapshots so older /save cannot overwrite newer /save
 	state        *State
 	secret       []byte
 	dataDir      string
@@ -168,7 +169,7 @@ func consensusSecurityOutput() map[string]any {
 		"hash_collision_resistance":                 true,
 		"retroactive_tamper_evidence":               true,
 		"protects_against_forward_majority_control": false,
-		"notes":                                     majorityAttackNote,
+		"notes": majorityAttackNote,
 	}
 }
 
@@ -918,7 +919,18 @@ func (s *apiServer) handleSave(w http.ResponseWriter, r *http.Request) {
 	if !s.requireInitialized(w) {
 		return
 	}
+	// Serialize save requests before acquiring a snapshot. Otherwise a
+	// delayed older /save can replace a more recent successfully saved chain.
+	// This protects one server process, not multiple writers/processes.
+	s.saveMu.Lock()
+	defer s.saveMu.Unlock()
+
 	s.state.mu.RLock()
+	if !s.state.verifyLocked() {
+		s.state.mu.RUnlock()
+		http.Error(w, "cannot save invalid chain", http.StatusConflict)
+		return
+	}
 	payload, err := json.MarshalIndent(s.state.Chain, "", "  ")
 	target := s.state.ChainFile
 	s.state.mu.RUnlock()
@@ -930,43 +942,10 @@ func (s *apiServer) handleSave(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "chain target not configured", http.StatusPreconditionFailed)
 		return
 	}
-	if err := os.MkdirAll(filepath.Dir(target), 0700); err != nil {
-		http.Error(w, "could not create chain directory", http.StatusInternalServerError)
+	if err := atomicReplaceChainFile(target, payload); err != nil {
+		log.Printf("Go chain /save persistence error: %v", err)
+		http.Error(w, "could not safely save chain", http.StatusInternalServerError)
 		return
-	}
-	temp, err := os.CreateTemp(filepath.Dir(target), ".chain-*.tmp")
-	if err != nil {
-		http.Error(w, "could not create temporary chain file", http.StatusInternalServerError)
-		return
-	}
-	tempName := temp.Name()
-	cleanup := func() { _ = os.Remove(tempName) }
-	defer cleanup()
-	if err := temp.Chmod(0600); err != nil {
-		_ = temp.Close()
-		http.Error(w, "could not secure temporary chain file", http.StatusInternalServerError)
-		return
-	}
-	if _, err := temp.Write(payload); err != nil {
-		_ = temp.Close()
-		http.Error(w, "could not write chain", http.StatusInternalServerError)
-		return
-	}
-	if err := temp.Sync(); err != nil {
-		_ = temp.Close()
-		http.Error(w, "could not sync chain", http.StatusInternalServerError)
-		return
-	}
-	if err := temp.Close(); err != nil {
-		http.Error(w, "could not close chain file", http.StatusInternalServerError)
-		return
-	}
-	if err := os.Rename(tempName, target); err != nil {
-		_ = os.Remove(target)
-		if retryErr := os.Rename(tempName, target); retryErr != nil {
-			http.Error(w, "could not save chain", http.StatusInternalServerError)
-			return
-		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"success": true, "file": filepath.Base(target)})
 }

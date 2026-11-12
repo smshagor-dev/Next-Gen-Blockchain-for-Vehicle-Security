@@ -14,7 +14,7 @@ software verification and independent empirical research.
 | Auxiliary Urban transfer | DRAFT PR #87, EXPLORATORY REPRODUCED | Fixed Highway Validation thresholds transferred to Urban_2 Test (113,779 fingerprints), source SHA verified, temporal comparator F1 26.06% | Only one new scenario; source selection after Highway results; no independent seeds or confirmatory significance |
 | Incident truth and split hygiene | STRUCTURAL ONLY | PR #83 merged structural source/group split audit | Independent world-state incident labels, label-review procedure, source license and temporal leakage still unverified |
 | Realistic in-vehicle CAN source | BLOCKED | No licensed original CAN trace linked to independently annotated V2X hazard state | Verify source, license, timing, physical attack model and authorization boundary |
-| Ledger crash safety and contract finality | DRAFT PR #90 — LOCAL CHECKPOINT RESEARCH ONLY | Experimental `experiments/ledger/crash_checkpoint.py` verifies local Go snapshots, fsyncs temporary files, uses atomic replacement and POSIX directory fsync; 10 fault-injection tests include real subprocess exits | Not wired into production Go persistence; no real power-loss/HIL validation, server-signed receipt finality or trusted monotonic host-rollback anchor |
+| Ledger crash safety and contract finality | PR #90 MERGED; GO /save PATCH IN REVIEW (issue #95) | Merged Python checkpoint research tests verified local snapshots; new Go `/save` no-delete atomic replacement, POSIX parent-directory fsync and serialized authenticated saves are implemented on a separate branch with native Go regression tests | Only explicit saves persist; startup recovery, multiple writers, hardware power-loss/HIL, receipt finality and trusted rollback anchors remain unverified |
 | Statistical validation | TOOLING ONLY | PR #77/#78 merged exploratory no-false-significance reporting, paired bootstrap/sign-flip/Holm code | Independent seed execution, preregistered analysis, baseline/ablation comparisons, CIs/effect sizes using **actual** incident data |
 | Runtime scaling and network availability | UNVERIFIED | Existing quick unit and deterministic simulation tests are not a representative runtime benchmark | Real network delays/partitions with measured CPU/RAM/tail latency and physical isolation |
 | Novelty and paper evidence | NOT ESTABLISHED | Evidence-gated multi-source corroboration is a mechanism candidate, **not** new cryptography | Published prior-art comparison, distinguishable formal claim, valid ablations, reproducible multi-scenario independent datasets |
@@ -77,3 +77,18 @@ exists, and unkeyed SHA-256 hashes can be recomputed over forged receipt
 metadata. Hence the prototype provides neither cryptographically authenticated
 smart-contract finality nor host-rollback resistance. No HIL/vehicle safety
 claim or submission-ready experimental result follows from these tests.
+
+## Production Go /save crash-consistency follow-up (issue #95)
+
+The original Go route deleted the prior valid saved chain after a failed
+rename before retrying. This can destroy the only committed snapshot under
+further failure. The new implementation never unlinks the destination,
+synchronizes temporary file contents before one replacement attempt and
+syncs its parent directory on POSIX. Same-server concurrent saves are
+serialized and invalid in-memory blockchain snapshots are not saved.
+Tests must verify rename failure retains original bytes, simulated
+post-rename sync errors report **uncertain durability**, and signed API saves
+write intact JSON with restrictive permissions. No automatic block-by-block
+durability or startup recovery has been implemented. No software tests alone
+establish disk power-loss behaviour, HIL safety, host rollback resistance or
+distributed transaction finality. See `docs/go-ledger-save-durability.md`.
