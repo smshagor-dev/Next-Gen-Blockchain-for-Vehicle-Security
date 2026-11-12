@@ -23,9 +23,9 @@ software verification and independent empirical research.
 
 The `bound-arduino-serial-telemetry` branch adds a configurable 64–65536-byte
 complete-line limit (4096-byte default) and strict UTF-8/JSON-object decoding
-before serial telemetry is processed. Seven in-memory regression cases cover
-normal, empty, truncated, oversized, invalid UTF-8, non-object and invalid
-limit inputs. Tests have not yet been executed in a Python environment;
+before serial telemetry is processed. Eight in-memory regression cases cover
+normal, empty, truncated, oversized, invalid UTF-8, non-object, non-finite JSON and invalid
+limit inputs. The initial patch accidentally used a literal backslash-n delimiter and incorrectly escaped test fixtures; both were repaired in follow-up commits. Tests have not yet been executed in a Python environment;
 CI verification is required. This does **not** authenticate an Arduino or
 protect against forged but syntactically valid telemetry. Serial source
 identity, physical actuation safety, and independently wired emergency
