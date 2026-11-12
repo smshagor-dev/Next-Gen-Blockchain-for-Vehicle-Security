@@ -1,0 +1,39 @@
+name: VeReMi Dataset Provenance Validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "experiments/datasets/**"
+      - "tests/test_veremi_provenance_import.py"
+      - "paper/veremi-dataset-mapping-limits.md"
+      - ".github/workflows/veremi-provenance.yml"
+  push:
+    branches: [main]
+    paths:
+      - "experiments/datasets/**"
+      - "tests/test_veremi_provenance_import.py"
+      - "paper/veremi-dataset-mapping-limits.md"
+      - ".github/workflows/veremi-provenance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  importer-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile source and tests
+        run: python -m py_compile experiments/datasets/veremi_nextgen_import.py tests/test_veremi_provenance_import.py
+      - name: Test source-digest, CAM labels and no-incident inference
+        env:
+          PYTHONPATH: .
+        run: python -m unittest -v tests.test_veremi_provenance_import
