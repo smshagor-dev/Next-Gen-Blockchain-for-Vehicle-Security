@@ -58,6 +58,19 @@ class EvidenceGateTests(unittest.TestCase):
         self.assertFalse(last.relayed)
         self.assertEqual(self.gate.snapshot()["accepted"], 1)
 
+    def test_signed_payload_cannot_smuggle_remote_actuator_fields(self):
+        for where in ("top", "evidence"):
+            payload = evidence()
+            if where == "top":
+                payload["ignition_cut"] = True
+            else:
+                payload["evidence"]["cmd"] = "SAFE_MODE_STOP"
+            with self.subTest(where=where):
+                decision = self.gate.evaluate(authenticated_sender_id="CAR1", payload=payload)
+                self.assertEqual(decision.reason, "UNEXPECTED_EVIDENCE_FIELDS")
+                self.assertFalse(decision.relayed)
+        self.assertEqual(self.gate.snapshot()["active_incidents"], 0)
+
     def test_source_identity_cannot_vote_twice_even_with_fresh_digest(self):
         self.assertFalse(self.report("CAR1", sensor="first").relayed)
         second = self.report("CAR1", sensor="second")
@@ -196,6 +209,17 @@ class V2XHubIntegrationTests(unittest.TestCase):
             hub._handle_msg(b_conn, self.signed_alert("CAR2", b_client, "two"))
             emit.assert_called_once()
             self.assertEqual(hub.evidence_admission_status()["accepted"], 1)
+
+    def test_validly_signed_remote_action_is_not_forwarded_in_enforce_mode(self):
+        hub, clients = self.make_hub("enforce")
+        conn, client = clients["CAR1"]
+        attack = self.signed_alert("CAR1", client, "one")
+        attack["payload"]["remote_brake_pressure"] = 100
+        attack["security"] = client.sign_message(attack)  # valid session MAC
+        with mock.patch.object(hub, "_broadcast") as emit:
+            hub._handle_msg(conn, attack)
+            emit.assert_not_called()
+        self.assertEqual(hub.evidence_admission_status()["rejected"], 1)
 
     def test_invalid_session_mac_never_contributes_to_quorum(self):
         hub, clients = self.make_hub("enforce")
