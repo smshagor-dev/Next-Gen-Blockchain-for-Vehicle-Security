@@ -113,9 +113,9 @@ func TestAtomicSaveDirectorySyncFailureReportsVisibleNewState(t *testing.T) {
 
 func TestAtomicSaveInvalidArgumentsFailClosed(t *testing.T) {
 	for _, input := range []struct {
-		path string
+		path   string
 		rename func(string, string) error
-		sync func(string) error
+		sync   func(string) error
 	}{
 		{"", os.Rename, syncChainParentDirectory},
 		{"file", nil, syncChainParentDirectory},
