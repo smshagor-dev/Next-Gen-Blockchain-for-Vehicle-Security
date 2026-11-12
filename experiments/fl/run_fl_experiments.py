@@ -68,12 +68,27 @@ def _load_rows(input_csv: Path) -> List[Dict[str, object]]:
                 "byzantine_fraction": float(row["byzantine_fraction"]),
                 "attack_type": str(row["attack_type"]),
             }
+            if parsed["seed"] < 0 or parsed["peer_count"] < 1 or not math.isfinite(parsed["byzantine_fraction"]) or not (0.0 <= parsed["byzantine_fraction"] <= 1.0):
+                raise ValueError(f"invalid FL trial identifiers at CSV line {i}")
+            if not parsed["attack_type"].strip():
+                raise ValueError(f"empty attack_type at CSV line {i}")
             for metric in METRICS:
                 try:
                     parsed[metric] = float(row[metric])
+                    if not math.isfinite(parsed[metric]):
+                        raise ValueError("non-finite input")
                 except (TypeError, ValueError) as exc:
                     raise ValueError(f"invalid {metric} at CSV line {i}: {exc}") from exc
             rows.append(parsed)
+    # Without model/dataset/method columns in this descriptive CSV, the complete
+    # scenario+seed identity must be unique; duplicate observations are not
+    # independent repetitions and cannot inflate reported sample counts.
+    seen = set()
+    for row in rows:
+        identity = (row["seed"], row["peer_count"], row["byzantine_fraction"], row["attack_type"])
+        if identity in seen:
+            raise ValueError(f"duplicate FL trial identity: {identity}")
+        seen.add(identity)
     return rows
 
 
@@ -111,7 +126,9 @@ def grouped_statistics(rows: Sequence[Dict[str, object]], group_by: Sequence[str
         result: Dict[str, object] = {
             "group_by": ",".join(group_by),
             "count": len(grouped_rows),
-            "statistical_significance": len(grouped_rows) >= 30,
+            "distinct_seed_count": len({row["seed"] for row in grouped_rows}),
+            "statistical_significance": False,  # No inferential test is performed.
+            "inference_status": "not_tested",
             "dataset_required": False,
         }
         for column, value in zip(group_by, key):
@@ -128,7 +145,9 @@ def _dataset_required_rows(group_by: Sequence[str]) -> List[Dict[str, object]]:
     row: Dict[str, object] = {
         "group_by": ",".join(group_by),
         "count": "",
+        "distinct_seed_count": "",
         "statistical_significance": False,
+        "inference_status": "not_tested",
         "dataset_required": True,
     }
     for column in group_by:
@@ -140,7 +159,7 @@ def _dataset_required_rows(group_by: Sequence[str]) -> List[Dict[str, object]]:
 
 
 def _fieldnames(group_by: Sequence[str]) -> List[str]:
-    fields = ["group_by", *group_by, "count", "statistical_significance", "dataset_required"]
+    fields = ["group_by", *group_by, "count", "distinct_seed_count", "statistical_significance", "inference_status", "dataset_required"]
     for metric in METRICS:
         for stat_name in ["mean", "std", "min", "max"]:
             fields.append(f"{metric}_{stat_name}")
@@ -165,10 +184,12 @@ def _write_fl_markdown(path: Path, summary: Dict[str, object], rows: Sequence[Di
             "## Statistic Definitions",
             "",
             "- `count`: number of CSV rows in the group.",
+            "- `distinct_seed_count`: number of unique seeds in the group; repeated seeds across different scenarios are not independent units.",
             "- `mean`: arithmetic mean for each metric.",
             "- `std`: sample standard deviation for each metric; `0` for single-row groups.",
             "- `min` / `max`: observed metric bounds within the group.",
-            "- `statistical_significance`: `true` only when group `count >= 30`.",
+            "- `statistical_significance`: always `false`; this descriptive runner performs no hypothesis test.",
+            "- `inference_status`: `not_tested`; do not interpret sample size as significance.",
             "",
             "## Summary",
             "",
