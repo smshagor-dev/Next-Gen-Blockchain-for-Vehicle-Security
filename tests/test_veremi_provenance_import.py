@@ -181,6 +181,41 @@ class VeremiImportContractTests(unittest.TestCase):
         self.assertNotIn("ground_truth_incident", observed)
         self.assertNotIn("session_verified", observed)
 
+    def test_genuine_publisher_numeric_strings_and_unlabeled_baseline(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            archive = root / "original-format.zip"
+            example = cam()
+            example.pop("attacker")
+            example["sender_alias"] = "4302773759"
+            example["messageID"] = "28110"
+            example["sendTime"] = "12590440832645"
+            example["rcvTime"] = "12590441898302"
+            example["sender"]["pos"] = ["10.5", "20.25", "0"]
+            sha = archive_with(archive, {"highway_2/veh_4079.json": [example]})
+            report = imported(archive, root / "out", sha)
+            self.assertEqual(report["received_cam_rows"], 1)
+            self.assertEqual(report["cam_attacker_label_one_rows"], 0)
+            self.assertEqual(report["cam_attacker_label_zero_rows"], 0)
+            self.assertEqual(report["cam_attacker_label_unavailable_rows"], 1)
+            with (root / "out/veremi_cam_messages.csv").open(newline="", encoding="utf-8") as src:
+                row = next(csv.DictReader(src))
+            self.assertEqual(row["attacker_label"], "")
+            self.assertEqual(row["sender_alias"], "4302773759")
+            self.assertEqual(row["message_id"], "28110")
+            self.assertEqual(row["send_time_raw"], "12590440832645")
+            self.assertEqual(row["receive_time_raw"], "12590441898302")
+            self.assertEqual(row["sender_pos_x"], "10.5")
+
+    def test_present_attacker_string_is_validated_not_guessed(self):
+        example = cam()
+        example["attacker"] = "1"
+        result = normalize_cam(example, receiver_log="r", index=0, sha="a" * 64, subset="subset")
+        self.assertEqual(result["attacker_label"], 1)
+        example["attacker"] = "unknown"
+        with self.assertRaisesRegex(ValueError, "attacker label"):
+            normalize_cam(example, receiver_log="r", index=0, sha="a" * 64, subset="subset")
+
     def test_declared_split_and_release_are_not_inferred(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
