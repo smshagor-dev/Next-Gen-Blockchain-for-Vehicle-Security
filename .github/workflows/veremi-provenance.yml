@@ -56,6 +56,23 @@ jobs:
             "https://github.com/VeReMi-dataset/VeReMi-NextGen/releases/download/v1.0.0/InTAS_highway_2.zip" \
             --output "$RUNNER_TEMP/InTAS_highway_2.zip"
           echo "31c756180fe8f86ca31bf3802f0a450f3beac49551d3eb23b25d8310a078fb4d  $RUNNER_TEMP/InTAS_highway_2.zip" | sha256sum -c -
+      - name: Inspect publisher ZIP internal paths without extracting
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os, zipfile
+          from pathlib import Path
+          archive = Path(os.environ["RUNNER_TEMP"]) / "InTAS_highway_2.zip"
+          with zipfile.ZipFile(archive) as z:
+              infos = [x for x in z.infolist() if not x.is_dir()]
+              print("PUB_ARCHIVE_NON_DIRECTORY_FILES:", len(infos))
+              for member in infos[:25]:
+                  print("PUB_ARCHIVE_ENTRY:", repr(member.filename), "uncompressed_bytes:", member.file_size)
+              if infos:
+                  with z.open(infos[0]) as source:
+                      prefix = source.read(300)
+                  print("PUB_ARCHIVE_FIRST_FILE_PREFIX:", repr(prefix))
+          PY
       - name: Ingest genuine archive without inventing train/test partition or incident truth
         shell: bash
         run: |
