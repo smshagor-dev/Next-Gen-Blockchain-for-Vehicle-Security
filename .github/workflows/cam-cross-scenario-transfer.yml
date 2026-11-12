@@ -1,0 +1,121 @@
+name: Cross-Scenario CAM Transfer Check
+
+on:
+  pull_request:
+    branches: [main, research/heldout-cam-replay-benchmarks]
+    paths:
+      - "experiments/cam/highway_to_urban_transfer.py"
+      - "tests/test_cam_highway_urban_transfer.py"
+      - "paper/highway-to-urban-transfer-protocol.md"
+      - ".github/workflows/cam-cross-scenario-transfer.yml"
+  push:
+    branches: [main]
+    paths:
+      - "experiments/cam/highway_to_urban_transfer.py"
+      - "tests/test_cam_highway_urban_transfer.py"
+      - "paper/highway-to-urban-transfer-protocol.md"
+      - ".github/workflows/cam-cross-scenario-transfer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frozen-calibration-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile cross-scenario CAM analysis
+        run: python -m py_compile experiments/cam/highway_to_urban_transfer.py tests/test_cam_highway_urban_transfer.py
+      - name: Verify frozen source thresholds and external Test isolation
+        env:
+          PYTHONPATH: .
+        run: python -m unittest -v tests.test_cam_highway_urban_transfer
+
+  real-external-urban-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download and SHA-verify the exact prior highway calibration source
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --retry-delay 2 --connect-timeout 20 --max-time 360 \
+            "https://github.com/VeReMi-dataset/VeReMi-NextGen/releases/download/v1.0.0/InTAS_highway_2_dataReplay.zip" \
+            --output "$RUNNER_TEMP/InTAS_highway_2_dataReplay.zip"
+          echo "08d84f96602c8812be064375b3a57dee2c9f233635eeffaf44c6810609613bea  $RUNNER_TEMP/InTAS_highway_2_dataReplay.zip" | sha256sum -c -
+      - name: Import authentic highway CAMs with source paths and no extracted files
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m experiments.datasets.veremi_nextgen_import \
+            --archive "$RUNNER_TEMP/InTAS_highway_2_dataReplay.zip" \
+            --output-dir "$RUNNER_TEMP/highway" \
+            --expected-sha256 08d84f96602c8812be064375b3a57dee2c9f233635eeffaf44c6810609613bea \
+            --split unverified --attack-subset dataReplay --release-tag v1.0.0
+      - name: Download independently selected official urban scenario and verify SHA-256
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --retry-delay 2 --connect-timeout 20 --max-time 600 \
+            "https://github.com/VeReMi-dataset/VeReMi-NextGen/releases/download/v1.0.0/InTAS_urban_2_dataReplay.zip" \
+            --output "$RUNNER_TEMP/InTAS_urban_2_dataReplay.zip"
+          echo "9984cd0cfa32d31f607788a2a1c53c72970c6786563c785cce9b989bb7ce7777  $RUNNER_TEMP/InTAS_urban_2_dataReplay.zip" | sha256sum -c -
+      - name: Import genuine urban dataReplay CAMs preserving publisher split
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m experiments.datasets.veremi_nextgen_import \
+            --archive "$RUNNER_TEMP/InTAS_urban_2_dataReplay.zip" \
+            --output-dir "$RUNNER_TEMP/urban" \
+            --expected-sha256 9984cd0cfa32d31f607788a2a1c53c72970c6786563c785cce9b989bb7ce7777 \
+            --split unverified --attack-subset dataReplay --release-tag v1.0.0 \
+            --max-total-bytes 8589934592 --max-json-files 60000
+      - name: Apply frozen highway validation thresholds to untouched urban Test CAMs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m experiments.cam.highway_to_urban_transfer \
+            --highway-csv "$RUNNER_TEMP/highway/veremi_cam_messages.csv" \
+            --highway-manifest "$RUNNER_TEMP/highway/veremi_cam_manifest.json" \
+            --urban-csv "$RUNNER_TEMP/urban/veremi_cam_messages.csv" \
+            --urban-manifest "$RUNNER_TEMP/urban/veremi_cam_manifest.json" \
+            --output-dir "$RUNNER_TEMP/cam-transfer-results"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          root = Path(os.environ["RUNNER_TEMP"]) / "cam-transfer-results"
+          result = json.loads((root / "cam_transfer_results.json").read_text())
+          assert result["publication_ready"] is False
+          assert result["confirmatory_study"] is False
+          assert result["cross_scenario_matching_fingerprints"] == 0
+          assert result["calibration_partition"] == "source_highway_2_validation_benign_only"
+          assert result["evaluation_partition"] == "target_urban_2_test_only"
+          support = result["target_fingerprint_audit"]["test_distinct_fingerprints"]
+          assert support > 0
+          for name, stats in result["methods"].items():
+              assert stats["support"] == support
+              assert sum(stats[k] for k in ("tp","fp","tn","fn")) == support
+              print("ACTUAL_URBAN_CAM_TRANSFER:", name, json.dumps(stats, sort_keys=True))
+          print("FROZEN_HIGHWAY_THRESHOLDS:", json.dumps(result["source_frozen_thresholds"], sort_keys=True))
+          print("URBAN_SOURCE_FINGERPRINT_COUNTS:", json.dumps(result["target_fingerprint_audit"], sort_keys=True))
+          print("EXPLORATORY_ONLY_NO_INCIDENT_SECURITY_CLAIM")
+          PY
+      - name: Publish source hashes and small result tables only, never publisher CAMs
+        uses: actions/upload-artifact@v4
+        with:
+          name: veremi-highway-to-urban-cam-transfer-evidence
+          path: |
+            ${{ runner.temp }}/cam-transfer-results/cam_transfer_results.json
+            ${{ runner.temp }}/cam-transfer-results/cam_transfer_results.csv
+            ${{ runner.temp }}/cam-transfer-results/cam_transfer_provenance.json
+          if-no-files-found: error
+          retention-days: 14
