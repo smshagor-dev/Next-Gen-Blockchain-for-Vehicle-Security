@@ -72,6 +72,24 @@ jobs:
                   with z.open(infos[0]) as source:
                       prefix = source.read(300)
                   print("PUB_ARCHIVE_FIRST_FILE_PREFIX:", repr(prefix))
+                  import io, json
+                  with z.open(infos[0]) as outer_source:
+                      nested = outer_source.read()
+                  with zipfile.ZipFile(io.BytesIO(nested)) as inner:
+                      files = [v for v in inner.infolist() if v.filename.endswith(".json")]
+                      print("PUB_NESTED_RECEIVER_JSON_FILES:", len(files))
+                      if files:
+                          with inner.open(files[0]) as source:
+                              document = json.load(source)
+                          print("PUB_FIRST_RECEIVER_TYPE:", type(document).__name__)
+                          print("PUB_FIRST_RECEIVER_ROWS:", len(document) if isinstance(document, list) else "non-array")
+                          if isinstance(document, list) and document:
+                              first = document[0]
+                              print("PUB_CAM_KEYS:", sorted(first))
+                              for field in ("attacker", "sender_id", "sender_alias", "messageID", "sendTime", "rcvTime"):
+                                  print("PUB_CAM_FIELD:", field, "type=", type(first.get(field)).__name__, "value=", repr(first.get(field))[:120])
+                              print("PUB_CAM_SENDER_KEYS:", sorted(first.get("sender", {})) if isinstance(first.get("sender"), dict) else "not-dict")
+                              print("PUB_CAM_RECEIVER_KEYS:", sorted(first.get("receiver", {})) if isinstance(first.get("receiver"), dict) else "not-dict")
           PY
       - name: Ingest genuine archive without inventing train/test partition or incident truth
         shell: bash
