@@ -5,6 +5,7 @@ import csv
 import hashlib
 import hmac
 import json
+import os
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -109,6 +110,7 @@ def fixture(root, *, events=None, packets=None, key=KEY):
     }), encoding="utf-8")
     keyfile = root / "exporter_secret.bin"
     keyfile.write_bytes(key)
+    os.chmod(keyfile, 0o600)
     return world, capture, metadata, keyfile
 
 
@@ -198,6 +200,22 @@ class JoinedWorldCaptureTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "receipt HMAC mismatch"):
                 run(world, capture, metadata, keyfile, root / "out",
                     expected_world_sha256=digest(world), expected_capture_sha256=digest(capture))
+
+    def test_world_export_key_permissions_and_bool_seed_cannot_bypass_provenance(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            world, capture, metadata, keyfile = fixture(root)
+            if os.name == "posix":
+                os.chmod(keyfile, 0o644)
+                with self.assertRaisesRegex(ValueError, "private owner-only"):
+                    run(world, capture, metadata, keyfile, root / "out",
+                        expected_world_sha256=digest(world),
+                        expected_capture_sha256=digest(capture))
+                os.chmod(keyfile, 0o600)
+            row = packet(1, "true-quorum", "CAR1", 100)
+            row["seed"] = True  # bool==1 in Python, but not valid evidence
+            with self.assertRaisesRegex(ValueError, "not bool"):
+                verified_run(root, packets=[row])
 
     def test_duplicate_verified_nonce_cannot_be_counted_as_second_vehicle(self):
         with tempfile.TemporaryDirectory() as tmp:
