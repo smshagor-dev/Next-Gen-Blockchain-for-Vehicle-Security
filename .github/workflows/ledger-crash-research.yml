@@ -1,0 +1,30 @@
+name: Ledger Crash Checkpoint Research
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "experiments/ledger/**"
+      - "tests/test_ledger_crash_checkpoint.py"
+      - "ledger_integrity.py"
+      - ".github/workflows/ledger-crash-research.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  crash-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile checkpoint and fault-injection suite
+        run: python -m py_compile experiments/ledger/crash_checkpoint.py tests/test_ledger_crash_checkpoint.py
+      - name: Validate ledger integrity and crash checkpoints
+        env:
+          PYTHONPATH: .
+        run: python -m unittest -v tests.test_ledger_integrity tests.test_ledger_crash_checkpoint
