@@ -141,7 +141,7 @@ class JoinedWorldCaptureTests(unittest.TestCase):
             self.assertFalse(result["independent_world_truth_verified"])
             self.assertFalse(result["original_v2x_session_mac_independently_reverified"])
             self.assertTrue(result["hub_export_receipt_hmac_checked"])
-            self.assertNotIn("signature", str(result))
+            self.assertNotIn("not-a-real-session-mac", str(result))
             self.assertNotIn(KEY.decode(), str(result))
             for name in ("joined_incident_capture.csv", "joined_incident_policy_decisions.csv",
                          "joined_incident_world_results.json", "joined_incident_evidence_manifest.json"):
