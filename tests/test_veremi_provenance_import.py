@@ -191,7 +191,8 @@ class VeremiImportContractTests(unittest.TestCase):
             example["messageID"] = "28110"
             example["sendTime"] = "12590440832645"
             example["rcvTime"] = "12590441898302"
-            example["sender"]["pos"] = ["10.5", "20.25", "0"]
+            example["receiver"]["pos"] = "5.0,10.0,0.0"
+            example["sender"]["pos"] = "10.5,20.25,0"
             sha = archive_with(archive, {"highway_2/veh_4079.json": [example]})
             report = imported(archive, root / "out", sha)
             self.assertEqual(report["received_cam_rows"], 1)
