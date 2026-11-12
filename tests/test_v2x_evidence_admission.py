@@ -215,6 +215,7 @@ class V2XHubIntegrationTests(unittest.TestCase):
         conn, client = clients["CAR1"]
         attack = self.signed_alert("CAR1", client, "one")
         attack["payload"]["remote_brake_pressure"] = 100
+        attack.pop("security")  # remove prior MAC before re-signing modified payload
         attack["security"] = client.sign_message(attack)  # valid session MAC
         with mock.patch.object(hub, "_broadcast") as emit:
             hub._handle_msg(conn, attack)
