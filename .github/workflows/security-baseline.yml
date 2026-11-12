@@ -66,6 +66,7 @@ jobs:
           python -m unittest -v tests.test_control_api_security
           python -m unittest -v tests.test_ledger_integrity
           python -m unittest -v tests.test_adversarial_validation
+          python -m unittest -v tests.test_research_evidence_integrity
           python -m unittest -v tests.test_hil_security_validation
           python -m unittest -v tests.test_native_build_security
           python -m unittest -v tests.test_pqc_keystore_foundation
