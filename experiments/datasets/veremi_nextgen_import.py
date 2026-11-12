@@ -39,16 +39,25 @@ def sha256_file(path: Path) -> str:
 
 
 def _finite(value: object, label: str) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
         raise ValueError(label + " must be a number")
-    result = float(value)
+    if isinstance(value, str) and not value.strip():
+        raise ValueError(label + " must be a number")
+    try:
+        result = float(value)
+    except (ValueError, OverflowError) as exc:
+        raise ValueError(label + " must be numeric") from exc
     if not math.isfinite(result):
         raise ValueError(label + " must be finite")
     return result
 
 
 def _nonnegative_integer(value: object, label: str) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+    if isinstance(value, bool):
+        raise ValueError(label + " must be a nonnegative integer")
+    if isinstance(value, str) and value.isdecimal():
+        return int(value)
+    if not isinstance(value, int) or value < 0:
         raise ValueError(label + " must be a nonnegative integer")
     return value
 
@@ -70,13 +79,27 @@ def normalize_cam(message: object, *, receiver_log: str, index: int, sha: str, s
         raise ValueError("CAM requires sender and receiver telemetry objects")
     if not isinstance(message.get("sender_id"), str) or not message["sender_id"].strip():
         raise ValueError("CAM sender_id must be non-empty")
+    # Publisher's original baseline archive has no attacker label; never
+    # silently infer benign class from missing values.
     attacker = message.get("attacker")
-    if isinstance(attacker, bool) or not isinstance(attacker, int) or attacker not in (0, 1):
-        raise ValueError("CAM attacker label must be integer 0 or 1")
+    if attacker is None:
+        label_value: int | str = ""
+    elif isinstance(attacker, bool):
+        raise ValueError("CAM attacker label must be 0, 1 or absent")
+    elif isinstance(attacker, str) and attacker in ("0", "1"):
+        label_value = int(attacker)
+    elif isinstance(attacker, int) and attacker in (0, 1):
+        label_value = attacker
+    else:
+        raise ValueError("CAM attacker label must be 0, 1 or absent")
     alias = _nonnegative_integer(message.get("sender_alias"), "sender_alias")
     msgid = _nonnegative_integer(message.get("messageID"), "messageID")
-    sent = _finite(message.get("sendTime"), "sendTime")
-    received = _finite(message.get("rcvTime"), "rcvTime")
+    sent_raw = message.get("sendTime")
+    received_raw = message.get("rcvTime")
+    # Accept publisher numeric strings but retain *exact* original text:
+    # parsing multi-digit nanosecond timestamps into float loses precision.
+    _finite(sent_raw, "sendTime")
+    _finite(received_raw, "rcvTime")
     sender_pos = _coords(sender.get("pos"), "sender.pos")
     receiver_pos = _coords(receiver.get("pos"), "receiver.pos")
     return {
@@ -88,9 +111,9 @@ def normalize_cam(message: object, *, receiver_log: str, index: int, sha: str, s
         "sender_alias": alias,
         "message_id": msgid,
         "attack_subset_declared": subset,
-        "attacker_label": attacker,
-        "send_time_raw": repr(sent),
-        "receive_time_raw": repr(received),
+        "attacker_label": label_value,
+        "send_time_raw": str(sent_raw),
+        "receive_time_raw": str(received_raw),
         "receiver_pos_x": receiver_pos[0],
         "receiver_pos_y": receiver_pos[1],
         "receiver_pos_z": receiver_pos[2],
@@ -143,7 +166,7 @@ def import_archive(
     out.mkdir(parents=True, exist_ok=True)
     csv_path = out / "veremi_cam_messages.csv"
     summary_path = out / "veremi_cam_manifest.json"
-    message_count, positive_count, files_seen, bytes_read = 0, 0, 0, 0
+    message_count, positive_count, missing_label_count, files_seen, bytes_read = 0, 0, 0, 0
     split_record_counts: dict[str, int] = {}
     nested_split_paths: set[str] = set()
 
@@ -159,7 +182,7 @@ def import_archive(
 
         def consume(z: zipfile.ZipFile, prefix: str = "", inherited_split: str | None = None,
                     depth: int = 0) -> None:
-            nonlocal files_seen, bytes_read, message_count, positive_count
+            nonlocal files_seen, bytes_read, message_count, positive_count, missing_label_count
             for entry in z.infolist():
                 if not _valid_zip_path(entry.filename):
                     raise ValueError("unsafe ZIP entry path")
@@ -204,7 +227,10 @@ def import_archive(
                     )
                     writer.writerow(normalized)
                     message_count += 1
-                    positive_count += normalized["attacker_label"]
+                    if normalized["attacker_label"] == 1:
+                        positive_count += 1
+                    elif normalized["attacker_label"] == "":
+                        missing_label_count += 1
                     split_record_counts[source_split] = split_record_counts.get(source_split, 0) + 1
 
         consume(outer)
@@ -230,7 +256,8 @@ def import_archive(
         "receiver_json_files": files_seen,
         "received_cam_rows": message_count,
         "cam_attacker_label_one_rows": positive_count,
-        "cam_attacker_label_zero_rows": message_count - positive_count,
+        "cam_attacker_label_zero_rows": message_count - positive_count - missing_label_count,
+        "cam_attacker_label_unavailable_rows": missing_label_count,
         "normalized_csv_sha256": sha256_file(csv_path),
         "time_units": "raw_source_values_not_assumed",
         "coordinate_system": "source_planar_xyz_not_geodetic_lat_lon",
@@ -238,6 +265,7 @@ def import_archive(
         "cross_receiver_duplicate_handling": "preserved_raw",
         "limitations": [
             "CAM attacker=1 denotes per-message manipulated attributes, not a false physical hazard incident.",
+            "Missing attacker labels in unmodified baseline receiver logs remain missing, not automatically labeled benign.",
             "Sender pseudonyms and sender IDs are not proof of independently enrolled authenticated vehicles.",
             "No incident_id, incident-level ground truth, or lat/lon is reconstructed.",
             "Reception of the same CAM at multiple receiver logs can duplicate a physical transmission.",
