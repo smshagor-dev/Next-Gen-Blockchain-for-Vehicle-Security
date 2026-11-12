@@ -21,7 +21,9 @@ import csv
 import hashlib
 import hmac
 import json
+import os
 import re
+import stat
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Sequence
@@ -151,8 +153,11 @@ def _load_manifest(path: Path, world_path: Path, capture_path: Path,
 
 
 def _read_export_key(path: Path) -> bytes:
-    if not path.is_file() or path.stat().st_size > 4096:
-        raise ValueError("hub exporter HMAC secret file missing or oversized")
+    if not path.is_file() or path.is_symlink() or path.stat().st_size > 4096:
+        raise ValueError("hub exporter HMAC secret file missing, linked or oversized")
+    info = path.stat()
+    if os.name == "posix" and stat.S_IMODE(info.st_mode) & 0o077:
+        raise ValueError("hub exporter key must have private owner-only file permissions")
     value = path.read_bytes()
     if len(value) < 32:
         raise ValueError("hub exporter key must be at least 32 bytes")
@@ -190,6 +195,8 @@ def _verify_capture(path: Path, key: bytes, world: dict, scope: tuple[str, str, 
             if not hmac.compare_digest(supplied_mac, expected):
                 raise ValueError(f"hub-export receipt HMAC mismatch at line {line_number}")
             counters["receipt_hmac_verified"] += 1
+            if type(record["seed"]) is not int or record["seed"] < 0:
+                raise ValueError("capture seed must be a nonnegative integer, not bool")
             if (record["source_id"], record["scenario_id"], record["seed"]) != scope:
                 raise ValueError("capture source/scenario/seed differs from world universe")
             if type(record["seq"]) is not int or record["seq"] <= last_seq:
