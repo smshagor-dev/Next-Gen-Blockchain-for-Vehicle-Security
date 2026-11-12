@@ -35,6 +35,38 @@ Hermann, A., Remmers, J.-N., Eisermann, D., Erb, B., and Kargl, F.
 "VeReMi NextGen: A Dataset for Evaluating Misbehavior Detection Systems in
 VANETs", IEEE Vehicular Networking Conference, 2026.
 
+## Receiver-level duplication and split audit
+
+The disk-backed `experiments/datasets/audit_cam_independence.py` audit ran on
+both SHA-verified publisher archives in
+[workflow 43267683137](https://github.com/smshagor-dev/Next-Gen-Blockchain-for-Vehicle-Security/actions/runs/43267683137).
+
+| Source metric | Baseline | dataReplay |
+| --- | ---: | ---: |
+| Receiver-level CAM records | 99,937 | 99,937 |
+| Distinct sender/pseudonym/messageID/sendTime fingerprints | 45,101 | 45,101 |
+| Repeated matching fingerprints in other receiver files | 54,836 | 54,836 |
+| Cross-source-split matching fingerprints flagged | 0 | 0 |
+
+The audit key is `sender_id + sender_alias + messageID + sendTime`, within a
+single SHA-verified archive. It is **a matching-fingerprint heuristic**, not
+proof of a distinct physical radio transmission, true vehicle identity or
+statistically independent sample. No cross-split overlap was observed for
+**this key in these two artifacts**; that does not prove no training/test
+leakage under other identity mappings, feature selection or datasets.
+
+| Publisher-defined source split | CAM rows | dataReplay attacker=1 | dataReplay attacker=0 |
+| --- | ---: | ---: | ---: |
+| Train | 37,701 | 6,541 | 31,160 |
+| Validation | 17,977 | 3,212 | 14,765 |
+| Test | 44,259 | 8,743 | 35,516 |
+
+The matching baseline split rows have no `attacker` field and remain
+**unlabeled**, not assumed benign. Reception counts and label balance are
+source-data descriptions, not detector accuracy, generalized attacker
+prevalence, or incident-admission outcomes. Raw trace and audit metadata
+hashes are retained as CI artifacts; raw publisher data are not redistributed.
+
 ## Source interpretation
 
 VeReMi NextGen contains per-receiver JSON arrays of Cooperative Awareness
