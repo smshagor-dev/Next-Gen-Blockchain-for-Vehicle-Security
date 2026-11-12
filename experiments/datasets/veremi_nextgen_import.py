@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import io
 import hashlib
 import json
 import math
@@ -20,7 +21,7 @@ from typing import Any, Sequence
 OFFICIAL_DATASET = "https://zenodo.org/records/19665762"
 OFFICIAL_DOCS = "https://github.com/VeReMi-dataset/VeReMi-NextGen/blob/main/Documentation/README.md"
 SOURCE_FIELDS = (
-    "archive_sha256", "receiver_log", "message_index", "sender_id",
+    "archive_sha256", "source_split", "receiver_log", "message_index", "sender_id",
     "sender_alias", "message_id", "attack_subset_declared", "attacker_label",
     "send_time_raw", "receive_time_raw", "receiver_pos_x", "receiver_pos_y",
     "receiver_pos_z", "sender_pos_x", "sender_pos_y", "sender_pos_z",
@@ -60,7 +61,7 @@ def _coords(value: object, label: str) -> list[str]:
     return [str(_finite(x, label)) for x in value]
 
 
-def normalize_cam(message: object, *, receiver_log: str, index: int, sha: str, subset: str) -> dict:
+def normalize_cam(message: object, *, receiver_log: str, index: int, sha: str, subset: str, source_split: str = "unverified") -> dict:
     if not isinstance(message, dict):
         raise ValueError("CAM record must be an object")
     sender = message.get("sender")
@@ -80,6 +81,7 @@ def normalize_cam(message: object, *, receiver_log: str, index: int, sha: str, s
     receiver_pos = _coords(receiver.get("pos"), "receiver.pos")
     return {
         "archive_sha256": sha,
+        "source_split": source_split,
         "receiver_log": receiver_log,
         "message_index": index,
         "sender_id": message["sender_id"],
@@ -142,40 +144,71 @@ def import_archive(
     csv_path = out / "veremi_cam_messages.csv"
     summary_path = out / "veremi_cam_manifest.json"
     message_count, positive_count, files_seen, bytes_read = 0, 0, 0, 0
-    with zipfile.ZipFile(archive) as z, csv_path.open("w", encoding="utf-8", newline="") as dest:
+    split_record_counts: dict[str, int] = {}
+    nested_split_paths: set[str] = set()
+
+    def split_from_path(name: str) -> str | None:
+        for part in name.replace("\\\\", "/").split("/"):
+            if part.lower() in {"train", "validation", "test"}:
+                return part.lower()
+        return None
+
+    with zipfile.ZipFile(archive) as outer, csv_path.open("w", encoding="utf-8", newline="") as dest:
         writer = csv.DictWriter(dest, fieldnames=SOURCE_FIELDS)
         writer.writeheader()
-        for entry in z.infolist():
-            if not _valid_zip_path(entry.filename):
-                raise ValueError("unsafe ZIP entry path")
-            if entry.is_dir():
-                continue
-            if not entry.filename.lower().endswith(".json"):
-                continue
-            files_seen += 1
-            if files_seen > max_json_files:
-                raise ValueError("JSON receiver file count exceeded limit")
-            if entry.file_size > max_entry_bytes or bytes_read + entry.file_size > max_total_bytes:
-                raise ValueError("archive decompressed size exceeds configured resource cap")
-            bytes_read += entry.file_size
-            try:
+
+        def consume(z: zipfile.ZipFile, prefix: str = "", inherited_split: str | None = None,
+                    depth: int = 0) -> None:
+            nonlocal files_seen, bytes_read, message_count, positive_count
+            for entry in z.infolist():
+                if not _valid_zip_path(entry.filename):
+                    raise ValueError("unsafe ZIP entry path")
+                if entry.is_dir():
+                    continue
+                entry_lower = entry.filename.lower()
+                observed = split_from_path(entry.filename) or inherited_split
+                if observed and depth == 0:
+                    nested_split_paths.add(observed)
+                if split in ("train", "validation", "test") and observed and observed != split:
+                    continue
+                if not entry_lower.endswith(".json") and not entry_lower.endswith(".zip"):
+                    continue
+                if entry.file_size > max_entry_bytes or bytes_read + entry.file_size > max_total_bytes:
+                    raise ValueError("archive decompressed size exceeds configured resource cap")
+                bytes_read += entry.file_size
                 with z.open(entry, "r") as input_stream:
-                    # Per-entry bound comes from verified ZIP metadata. In
-                    # addition, limit the actual bytes read for malformed sizes.
                     raw = input_stream.read(max_entry_bytes + 1)
-                    if len(raw) > max_entry_bytes or len(raw) != entry.file_size:
-                        raise ValueError("receiver JSON size mismatch or exceeds cap")
+                if len(raw) != entry.file_size or len(raw) > max_entry_bytes:
+                    raise ValueError("receiver JSON or nested ZIP size mismatch")
+                if entry_lower.endswith(".zip"):
+                    if depth >= 1:
+                        raise ValueError("nested ZIP depth exceeds one level")
+                    with zipfile.ZipFile(io.BytesIO(raw)) as child:
+                        consume(child, prefix + entry.filename + "!/", observed, depth + 1)
+                    continue
+                files_seen += 1
+                if files_seen > max_json_files:
+                    raise ValueError("JSON receiver file count exceeded limit")
+                try:
                     messages = json.loads(raw)
-            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-                raise ValueError(f"invalid receiver JSON: {entry.filename}") from exc
-            if not isinstance(messages, list):
-                raise ValueError(f"receiver JSON must be an array: {entry.filename}")
-            for index, message in enumerate(messages):
-                normalized = normalize_cam(message, receiver_log=entry.filename, index=index,
-                                           sha=actual_sha, subset=attack_subset)
-                writer.writerow(normalized)
-                message_count += 1
-                positive_count += normalized["attacker_label"]
+                except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                    raise ValueError(f"invalid receiver JSON: {entry.filename}") from exc
+                if not isinstance(messages, list):
+                    raise ValueError(f"receiver JSON must be an array: {entry.filename}")
+                source_split = observed or (split if split in ("train", "validation", "test") else "unverified")
+                for index, message in enumerate(messages):
+                    normalized = normalize_cam(
+                        message, receiver_log=prefix + entry.filename,
+                        index=index, sha=actual_sha, subset=attack_subset,
+                        source_split=source_split,
+                    )
+                    writer.writerow(normalized)
+                    message_count += 1
+                    positive_count += normalized["attacker_label"]
+                    split_record_counts[source_split] = split_record_counts.get(source_split, 0) + 1
+
+        consume(outer)
+
     if files_seen == 0:
         raise ValueError("archive contained no receiver JSON files")
 
@@ -189,7 +222,9 @@ def import_archive(
         "source_archive": archive.name,
         "source_sha256_verified": actual_sha,
         "split_declared": split,
-        "split_verified": False,  # Source archive digest alone does not verify publisher-designated partition.
+        "split_verified": split in nested_split_paths,
+        "source_path_splits": sorted(nested_split_paths),
+        "rows_by_source_split": split_record_counts,
         "attack_subset_declared": attack_subset,
         "dataset_distribution_license": "NOT_VERIFIED_CHECK_SOURCE_RECORD",
         "receiver_json_files": files_seen,
