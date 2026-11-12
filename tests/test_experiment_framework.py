@@ -87,6 +87,24 @@ class ExperimentFrameworkTests(unittest.TestCase):
             self.assertEqual(row["aggregation_latency_ms_mean"], 14.0)
             self.assertFalse(row["statistical_significance"])
 
+    def test_fl_thirty_observations_do_not_imply_significance(self):
+        # Thirty observations can support estimation but are not a hypothesis test.
+        # This test uses synthetic CSV rows only to check reporting semantics.
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "synthetic.csv"
+            header = "seed,peer_count,byzantine_fraction,attack_type,accuracy,precision,recall,f1,attack_success_rate,aggregation_latency_ms"
+            rows = [header]
+            for seed in range(30):
+                rows.append(f"{seed},10,0.1,sign-flip,0.8,0.7,0.6,0.65,0.2,12.0")
+            source.write_text("\n".join(rows) + "\n", encoding="utf-8")
+            result = run_fl(Path(tmp) / "out", input_csv=source)
+            row = result["rows"][0]
+            self.assertEqual(row["count"], 30)
+            self.assertFalse(row["statistical_significance"])
+            self.assertEqual(row["inference_status"], "not_tested")
+            report = (Path(tmp) / "out" / "fl_report.md").read_text(encoding="utf-8")
+            self.assertIn("performs no hypothesis test", report)
+
     def test_adversarial_plan_uses_required_scenarios_and_metrics(self):
         for scenario in [
             "realistic-speed-range",
