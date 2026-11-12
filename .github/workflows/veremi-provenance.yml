@@ -37,3 +37,52 @@ jobs:
         env:
           PYTHONPATH: .
         run: python -m unittest -v tests.test_veremi_provenance_import
+
+  official-release-ingestion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download publisher's original baseline archive and verify release SHA-256
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --retry-delay 2 --connect-timeout 20 --max-time 240 \
+            "https://github.com/VeReMi-dataset/VeReMi-NextGen/releases/download/v1.0.0/InTAS_highway_2.zip" \
+            --output "$RUNNER_TEMP/InTAS_highway_2.zip"
+          echo "31c756180fe8f86ca31bf3802f0a450f3beac49551d3eb23b25d8310a078fb4d  $RUNNER_TEMP/InTAS_highway_2.zip" | sha256sum -c -
+      - name: Ingest genuine archive without inventing train/test partition or incident truth
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m experiments.datasets.veremi_nextgen_import \
+            --archive "$RUNNER_TEMP/InTAS_highway_2.zip" \
+            --output-dir "$RUNNER_TEMP/veremi-import" \
+            --expected-sha256 31c756180fe8f86ca31bf3802f0a450f3beac49551d3eb23b25d8310a078fb4d \
+            --split unverified --attack-subset unverified --release-tag v1.0.0
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          metadata = json.loads((Path(os.environ["RUNNER_TEMP"]) / "veremi-import" / "veremi_cam_manifest.json").read_text())
+          assert metadata["received_cam_rows"] > 0
+          assert metadata["publication_ready"] is False
+          assert metadata["split_verified"] is False
+          assert metadata["evaluation_unit"] == "per_receiver_CAM_record_not_independent_hazard_incident"
+          print("Publisher archive bytes verified; CAM rows:", metadata["received_cam_rows"])
+          print("Attacker-labeled CAM rows:", metadata["cam_attacker_label_one_rows"])
+          print("No incident-level ground truth or paper performance metrics are claimed.")
+          PY
+          mkdir -p security-reports/veremi-smoke
+          cp "$RUNNER_TEMP/veremi-import/veremi_cam_manifest.json" security-reports/veremi-smoke/
+      - name: Upload SHA-verified importer metadata only (never raw dataset)
+        uses: actions/upload-artifact@v4
+        with:
+          name: veremi-nextgen-ingestion-provenance
+          path: security-reports/veremi-smoke/veremi_cam_manifest.json
+          if-no-files-found: error
+          retention-days: 14
