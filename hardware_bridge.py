@@ -273,23 +273,8 @@ class ECUCommandGateway:
             print(f"[ECU] CAN send failed: {e}")
 
     def _send_serial_safe_stop(self, block_index: int):
-        if self._ser is None:
-            return
-        cmd = {
-            "cmd": "ECU_SAFE_MODE_STOP",
-            "throttle_cut": 1,
-            "target_speed": 0,
-            "brake_pressure": 100,
-            "ignition_cut": 1,
-            "block_index": block_index,
-            "timestamp": _now(),
-        }
-        try:
-            self._ser.write((json.dumps(cmd) + "
-").encode())
-            print(f"[ECU] SAFE_MODE_STOP sent over serial block={block_index}")
-        except Exception as e:
-            print(f"[ECU] Serial send failed: {e}")
+        # Unsigned serial ECU actuation is deliberately disabled.
+        return
 
 
 def run_arduino_mode(bc: SmartCarBlockchain):
