@@ -344,6 +344,9 @@ def run_pi_mode(bc: SmartCarBlockchain):
     )
     idle_timeout = max(1, min(30, get_int("SMARTCAR_HW_IDLE_TIMEOUT_SEC", 5)))
     max_session_sec = max(5, min(600, get_int("SMARTCAR_HW_MAX_SESSION_SEC", 120)))
+    # A fully authenticated peer can still flood ledger writes; bound work
+    # per connection independently of the framer byte and time limits.
+    max_frames = max(1, min(10000, get_int("SMARTCAR_HW_MAX_FRAMES_PER_SESSION", 256)))
     actuator = SafeModeActuatorDispatcher()
     print(f"[HW BRIDGE] Authenticated Pi TCP mode listening on {host}:{port}")
 
@@ -357,6 +360,7 @@ def run_pi_mode(bc: SmartCarBlockchain):
             with conn:
                 conn.settimeout(idle_timeout)
                 session = AuthenticatedPiTelemetrySession(verifier)
+                accepted_frames = 0
                 deadline = time.monotonic() + max_session_sec
                 try:
                     while time.monotonic() < deadline:
@@ -366,6 +370,9 @@ def run_pi_mode(bc: SmartCarBlockchain):
                         # Verify MAC, freshness, replay nonce, schema, and per-
                         # connection identity before *any* ledger/actuation side effect.
                         for item in session.receive(data):
+                            if accepted_frames >= max_frames:
+                                raise HardwareTransportError("HW_SESSION_FRAME_BUDGET_EXCEEDED", authenticated=True)
+                            accepted_frames += 1
                             tel = to_telemetry(item.payload)
                             event = str(item.payload["event"])
                             block = bc.push_telemetry(tel, event)
