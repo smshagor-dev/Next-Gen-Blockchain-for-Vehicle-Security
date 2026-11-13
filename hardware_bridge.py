@@ -325,6 +325,11 @@ def run_arduino_mode(bc: SmartCarBlockchain):
                 print(f"[HW BRIDGE] quarantined Arduino serial input: {exc.reason}")
                 raise RuntimeError("Arduino serial authentication/framing failure") from exc
             for item in verified:
+                # A single serial read may contain several valid envelopes.
+                # Verification and earlier ledger writes consume time; do not
+                # admit later envelopes after the absolute session deadline.
+                if time.monotonic() >= deadline:
+                    raise RuntimeError("Arduino serial session lifetime exceeded; port quarantined")
                 tel = to_telemetry(item.payload)
                 event = str(item.payload["event"])
                 block = bc.push_telemetry(tel, event)
