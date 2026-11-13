@@ -173,12 +173,15 @@ class ECUCommandGateway:
 
     def _init_transport(self):
         if self.mode == "can":
+            # Never downgrade a failed CAN transport to unsigned serial actuation.
             self._init_can()
-            if self._init_ok:
-                return
-            self.mode = "serial"
-        if self.mode == "serial":
-            self._init_serial()
+        elif self.mode == "serial":
+            # No authenticated ECU serial receiver protocol exists yet.
+            print("[ECU] unsigned serial actuation disabled")
+            self._init_ok = False
+        else:
+            print("[ECU] unsupported transport; actuation disabled")
+            self._init_ok = False
 
     def _init_can(self):
         if can is None:
@@ -218,8 +221,7 @@ class ECUCommandGateway:
         if self.mode == "can":
             self._send_can_safe_stop(block_index)
             return
-        if self.mode == "serial":
-            self._send_serial_safe_stop(block_index)
+        # Unsigned serial ECU actuation is deliberately unavailable.
 
     def _send_can_safe_stop(self, block_index: int):
         if self._can_bus is None:
