@@ -81,3 +81,10 @@ claim or submission-ready experimental result follows from these tests.
 ## Arduino authenticated serial boundary (2026-11-13)
 
 Draft branch `authenticate-arduino-serial-ingress` removes raw unsigned Arduino JSON acceptance and uses the existing direction-separated envelope verifier. Devices must emit a complete signed TELEMETRY envelope per newline, using `SMARTCAR_HW_DEVICE_KEYS_JSON`. The port is closed on framing/authentication error, not automatically reconnected. This is a **breaking wire-protocol change** and requires a matching firmware sender; serial source keys can be extracted from compromised firmware. Serial confidentiality, durable anti-replay across process restarts, independent emergency wiring, and physical validation remain blocked. The pre-existing Arduino SAFE_MODE_STOP output is still governed by the bench actuation gate; it is not independently authenticated to firmware. No physical actuation has been tested. Synthetic tests are not publication evidence.
+
+## Arduino command authenticity (draft PR #99, 2026-11-13)
+
+- Arduino ingress accepts enrolled HMAC TELEMETRY envelopes; unsigned JSON is rejected before ledger mutation.
+- Outbound Arduino bench `SAFE_MODE_STOP` now uses an authenticated `COMMAND` envelope bound to the verified device identity, replacing unsigned serial JSON. A regression checks command verification and the disarmed interlock.
+- **PARTIAL / BLOCKED:** firmware must independently verify command MAC, replay nonce, freshness and safe local interlocks before any actuator response. The same enrolled symmetric secret is currently used in both directions; key separation and durable replay state remain unimplemented. No physical actuation or HIL evidence. Tests are pending execution; no research result follows from this patch.
+- **NEXT:** execute focused regressions; add firmware protocol conformance vectors, directional key separation and independent emergency-stop validation.
