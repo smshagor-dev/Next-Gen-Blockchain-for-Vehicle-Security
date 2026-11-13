@@ -103,3 +103,10 @@ Draft branch `authenticate-arduino-serial-ingress` removes raw unsigned Arduino 
 - BLOCKED: firmware interoperability, durable anti-replay, directional key separation, independent local emergency-stop and physical bench interlock validation. The same enrolled secret currently signs both directions, so do not claim directional key isolation.
 - UPCOMING: execute `python -m unittest tests.test_arduino_authenticated_ingress -v`, correct failures, implement independent inbound/outbound keys, then conduct isolated hardware bench tests before any physical actuation claim.
 - EVIDENCE CLASS: software change and unexecuted regression tests only; **not** incident-level scientific data, vehicle safety validation, or publishable performance evidence.
+
+## ECU command transport fail-closed boundary (2026-11-13, draft PR #99)
+
+- **PARTIAL / CODE CHANGED:** ECU gateway no longer falls back from failed CAN initialization to the unsigned serial actuator protocol. Explicit ECU serial mode also remains disabled; no unsigned serial dispatch is reachable through `send_safe_mode_stop`. Local emergency control remains independent of remote command dispatch.
+- **REGRESSION COVERAGE ADDED, NOT EXECUTED:** `test_failed_can_does_not_downgrade_to_unsigned_serial` and `test_explicit_unsigned_ecu_serial_is_disabled`. Run `python -m py_compile hardware_bridge.py tests/test_arduino_authenticated_ingress.py` and `python -m unittest tests.test_arduino_authenticated_ingress -v`, plus hardware security suite, before considering merge.
+- **BLOCKED:** No authenticated ECU serial protocol or hardware safety case; CAN command payload itself is not cryptographically authenticated. A wired independent emergency-stop, firmware acceptance tests, replay durability and HIL remain unverified. These changes cannot support vehicle safety or research-effectiveness claims.
+- **UPCOMING:** Add a verified authenticated ECU command protocol or permanently remove dead serial command code; test CAN failure/transport downgrade under fault injection and run actual regressions.
