@@ -63,6 +63,37 @@ class SerialIngressTests(unittest.TestCase):
         bc, _ = self.run_bridge([frame[:9], frame[9:]])
         bc.push_telemetry.assert_called_once()
 
+    def test_multiple_signed_frames_cannot_cross_serial_session_deadline(self):
+        first = encode_authenticated_envelope(build_authenticated_envelope(
+            DEVICE, SECRET, "TELEMETRY", payload()))
+        second = encode_authenticated_envelope(build_authenticated_envelope(
+            DEVICE, SECRET, "TELEMETRY", payload()))
+        fake = FakeSerial([first + second])
+        clock = [0.0]
+        bc = mock.Mock()
+        bc.push_telemetry.return_value.index = 3
+
+        def advance_after_first(*args):
+            clock[0] = 20.0
+            return bc.push_telemetry.return_value
+
+        bc.push_telemetry.side_effect = advance_after_first
+        env = {
+            "SMARTCAR_HW_DEVICE_KEYS_JSON": '{"arduino-bench-01":"' + SECRET + '"}',
+            "SMARTCAR_HW_MAX_SESSION_SEC": "5",
+            "SMARTCAR_HW_IDLE_TIMEOUT_SEC": "30",
+        }
+        with mock.patch.object(bridge, "serial") as serial, \
+             mock.patch.dict("os.environ", env), \
+             mock.patch.object(bridge.time, "monotonic", side_effect=lambda: clock[0]), \
+             mock.patch.object(bridge, "SafeModeActuatorDispatcher") as dispatcher:
+            serial.Serial.return_value = fake
+            with self.assertRaisesRegex(RuntimeError, "session lifetime exceeded"):
+                bridge.run_arduino_mode(bc)
+        self.assertEqual(bc.push_telemetry.call_count, 1)
+        dispatcher.return_value.maybe_send_arduino.assert_called_once()
+        self.assertTrue(fake.closed)
+
     def test_unsigned_json_cannot_mutate_ledger(self):
         bc, _ = self.run_bridge([b'{"speed":12}\n'])
         bc.push_telemetry.assert_not_called()
