@@ -404,6 +404,9 @@ def run_pi_mode(bc: SmartCarBlockchain):
                         # Verify MAC, freshness, replay nonce, schema, and per-
                         # connection identity before *any* ledger/actuation side effect.
                         for item in session.receive(data):
+                            # Restore normal idle timeout after first valid MAC.
+                            if accepted_frames == 0:
+                                conn.settimeout(idle_timeout)
                             if accepted_frames >= max_frames:
                                 raise HardwareTransportError("HW_SESSION_FRAME_BUDGET_EXCEEDED", authenticated=True)
                             if not global_budget.claim():
