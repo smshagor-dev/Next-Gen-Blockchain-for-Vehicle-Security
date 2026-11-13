@@ -471,8 +471,10 @@ def main():
     try:
         if mode == "pi":
             run_pi_mode(bc)
-        else:
+        elif mode == "arduino":
             run_arduino_mode(bc)
+        else:
+            raise RuntimeError("Unsupported SMARTCAR_HW_MODE; expected pi or arduino")
     except RuntimeError as e:
         print(f"[HW BRIDGE] {e}")
     except KeyboardInterrupt:
