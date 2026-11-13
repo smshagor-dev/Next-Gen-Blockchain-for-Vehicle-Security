@@ -21,6 +21,7 @@ from typing import Optional
 from env_config import load_project_env_once, get_env, get_int, get_bool
 from blockchain import SmartCarBlockchain, TelemetryData
 from hardware_actuation_safety import BenchActuationGate
+from hardware_transport_deadlines import deadline_check, DeadlineExpired
 from hardware_transport_security import (
     AuthenticatedLineFramer,
     HardwareEnvelopeVerifier,
@@ -414,10 +415,14 @@ def run_pi_mode(bc: SmartCarBlockchain):
                         # deadline must not be admitted merely because recv began
                         # before the deadline. Likewise for session expiry.
                         received_at = time.monotonic()
-                        if received_at >= deadline:
-                            raise HardwareTransportError("HW_SESSION_DEADLINE_EXCEEDED")
-                        if session.device_id is None and received_at >= authentication_deadline:
-                            raise HardwareTransportError("HW_AUTH_DEADLINE_EXCEEDED")
+                        try:
+                            deadline_check(
+                                received_at, session_deadline=deadline,
+                                auth_deadline=authentication_deadline,
+                                authenticated=session.device_id is not None,
+                            )
+                        except DeadlineExpired as exc:
+                            raise HardwareTransportError(str(exc)) from exc
                         # Verify MAC, freshness, replay nonce, schema, and per-
                         # connection identity before *any* ledger/actuation side effect.
                         for item in session.receive(data):
