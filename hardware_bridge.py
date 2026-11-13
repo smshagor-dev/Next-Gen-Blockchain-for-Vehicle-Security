@@ -14,6 +14,7 @@ Then pushes into SmartCar blockchain pipeline (with edge/PoA/DID/ZKP/etc).
 import json
 import os
 import socket
+import threading
 import time
 from datetime import datetime, timezone
 from typing import Optional
@@ -86,16 +87,19 @@ class GlobalTelemetryBudget:
         self.clock = clock or time.monotonic
         self.tokens = float(self.burst)
         self.last = self.clock()
+        # Shared by concurrent TCP handlers; protect the full refill/claim RMW.
+        self._lock = threading.Lock()
 
     def claim(self) -> bool:
-        now = self.clock()
-        elapsed = max(0.0, now - self.last)
-        self.last = now
-        self.tokens = min(float(self.burst), self.tokens + elapsed * self.rate)
-        if self.tokens < 1.0:
-            return False
-        self.tokens -= 1.0
-        return True
+        with self._lock:
+            now = self.clock()
+            elapsed = max(0.0, now - self.last)
+            self.last = now
+            self.tokens = min(float(self.burst), self.tokens + elapsed * self.rate)
+            if self.tokens < 1.0:
+                return False
+            self.tokens -= 1.0
+            return True
 
 
 class AuthenticatedPiTelemetrySession:
