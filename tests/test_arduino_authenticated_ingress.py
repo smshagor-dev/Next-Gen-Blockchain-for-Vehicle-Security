@@ -154,6 +154,32 @@ class SerialIngressTests(unittest.TestCase):
             self.assertEqual(result.device_id, DEVICE)
             ecu.return_value.send_safe_mode_stop.assert_called_once_with(block_index=17)
 
+    def test_failed_can_does_not_downgrade_to_unsigned_serial(self):
+        gate = mock.Mock()
+        gate.is_armed.return_value = True
+        with mock.patch.object(bridge, "get_bool", return_value=True), \
+             mock.patch.object(bridge, "get_env", return_value="can"), \
+             mock.patch.object(bridge.ECUCommandGateway, "_init_can") as init_can, \
+             mock.patch.object(bridge.ECUCommandGateway, "_init_serial") as init_serial:
+            gateway = bridge.ECUCommandGateway(gate=gate)
+            init_can.assert_called_once()
+            init_serial.assert_not_called()
+            self.assertFalse(gateway._init_ok)
+            self.assertEqual(gateway.mode, "can")
+
+    def test_explicit_unsigned_ecu_serial_is_disabled(self):
+        gate = mock.Mock()
+        gate.is_armed.return_value = True
+        with mock.patch.object(bridge, "get_bool", return_value=True), \
+             mock.patch.object(bridge, "get_env", return_value="serial"), \
+             mock.patch.object(bridge.ECUCommandGateway, "_init_serial") as init_serial:
+            gateway = bridge.ECUCommandGateway(gate=gate)
+            init_serial.assert_not_called()
+            self.assertFalse(gateway._init_ok)
+            with mock.patch.object(gateway, "_send_serial_safe_stop") as send:
+                gateway.send_safe_mode_stop(block_index=17)
+                send.assert_not_called()
+
     def test_unarmed_stop_never_writes_serial(self):
         gate = mock.Mock()
         gate.is_armed.return_value = False
