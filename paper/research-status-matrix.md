@@ -1,12 +1,12 @@
 # OmniGuard V2X research evidence status
 
-Updated: 2026-11-12. This is a **claim-gated status matrix**, not a finished paper.
+Updated: 2026-11-13. This is a **claim-gated status matrix**, not a finished paper.
 Distinguish implemented code, observed source-data analysis, deterministic
 software verification and independent empirical research.
 
 | Workstream | Status | Verified engineering/source evidence | Remaining scientific gate |
 | --- | --- | --- | --- |
-| Hardware TCP ingress, bound messages, authenticated node sessions, replay and safety gate | MERGED, LAB VALIDATION BLOCKED | PR #74 was merged; source regression and GitHub security CI addressed software controls | Physical Pi/CAN bench and local emergency safety case not independently verified |
+| Arduino serial authentication (draft, not validated) | PARTIAL — NEW DRAFT | Signed enrolled-device envelope required; bounded reads, MAC/freshness/replay checks before ledger mutation, port closed on quarantine; synthetic tests added | CI/local execution, serial firmware protocol interoperability, independent wired emergency-stop and HIL validation missing |\n| Hardware TCP ingress, bound messages, authenticated node sessions, replay and safety gate | MERGED, LAB VALIDATION BLOCKED | PR #74 was merged; source regression and GitHub security CI addressed software controls | Physical Pi/CAN bench and local emergency safety case not independently verified |
 | V2X event admission | MERGED SOFTWARE PROTOTYPE | PR #80 merged opt-in off/shadow/enforce, authenticated-session-before-quorum policy; command-smuggling regression tests | Independent incident labels, prior-art originality analysis, correlated reporters and physical safety validation |
 | Network collusion and availability fault checks | NEW DRAFT PR #89 (issue #88) | Actual merged EvidenceAdmissionGate and research-only ConsistentSubsetAdmissionGate exercised on 13 scripted incidents with seed/jitter variations, selected-source roles and SHA manifests | Constructed fault models, not independently captured physical incidents or repeated simulator trials; published comparator and HIL evidence missing |
 | Source-CAM integrity | VERIFIED IMPORT, not event truth | PR #82 merged; official VeReMi NextGen v1.0.0 baseline and dataReplay archives SHA-verified and imported; receiver duplicates audited | CAM attacker bit does not mean a verified hazard incident or physical source attestation; distribution license review |
@@ -77,3 +77,7 @@ exists, and unkeyed SHA-256 hashes can be recomputed over forged receipt
 metadata. Hence the prototype provides neither cryptographically authenticated
 smart-contract finality nor host-rollback resistance. No HIL/vehicle safety
 claim or submission-ready experimental result follows from these tests.
+
+## Arduino authenticated serial boundary (2026-11-13)
+
+Draft branch `authenticate-arduino-serial-ingress` removes raw unsigned Arduino JSON acceptance and uses the existing direction-separated envelope verifier. Devices must emit a complete signed TELEMETRY envelope per newline, using `SMARTCAR_HW_DEVICE_KEYS_JSON`. The port is closed on framing/authentication error, not automatically reconnected. This is a **breaking wire-protocol change** and requires a matching firmware sender; serial source keys can be extracted from compromised firmware. Serial confidentiality, durable anti-replay across process restarts, independent emergency wiring, and physical validation remain blocked. The pre-existing Arduino SAFE_MODE_STOP output is still governed by the bench actuation gate; it is not independently authenticated to firmware. No physical actuation has been tested. Synthetic tests are not publication evidence.
