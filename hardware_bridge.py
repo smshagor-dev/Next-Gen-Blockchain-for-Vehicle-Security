@@ -398,9 +398,26 @@ def run_pi_mode(bc: SmartCarBlockchain):
                             if remaining <= 0:
                                 raise HardwareTransportError("HW_AUTH_DEADLINE_EXCEEDED")
                             conn.settimeout(min(float(idle_timeout), remaining))
+                        # Also enforce the absolute session deadline at the
+                        # blocking syscall, not only at the next loop iteration.
+                        session_remaining = deadline - time.monotonic()
+                        if session_remaining <= 0:
+                            raise HardwareTransportError("HW_SESSION_DEADLINE_EXCEEDED")
+                        if session.device_id is None:
+                            conn.settimeout(min(float(idle_timeout), remaining, session_remaining))
+                        else:
+                            conn.settimeout(min(float(idle_timeout), session_remaining))
                         data = conn.recv(4096)
                         if not data:
                             break
+                        # A complete signed frame arriving after the authentication
+                        # deadline must not be admitted merely because recv began
+                        # before the deadline. Likewise for session expiry.
+                        received_at = time.monotonic()
+                        if received_at >= deadline:
+                            raise HardwareTransportError("HW_SESSION_DEADLINE_EXCEEDED")
+                        if session.device_id is None and received_at >= authentication_deadline:
+                            raise HardwareTransportError("HW_AUTH_DEADLINE_EXCEEDED")
                         # Verify MAC, freshness, replay nonce, schema, and per-
                         # connection identity before *any* ledger/actuation side effect.
                         for item in session.receive(data):
