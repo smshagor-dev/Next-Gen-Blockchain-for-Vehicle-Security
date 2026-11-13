@@ -7,6 +7,7 @@ key compromise, or a compromised enrolled sender.
 from __future__ import annotations
 
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -18,7 +19,7 @@ class DurableCommandNonceStore:
         if not path or path == ":memory:":
             raise ValueError("persistent SQLite path required")
         self.path = str(Path(path).resolve())
-        with self._connect() as db:
+        with closing(self._connect()) as db:
             db.execute("""CREATE TABLE IF NOT EXISTS accepted_commands (
                 device_id TEXT NOT NULL,
                 nonce TEXT NOT NULL,
@@ -34,7 +35,7 @@ class DurableCommandNonceStore:
         return db
 
     def claim(self, device_id: str, nonce: str, accepted_at: str) -> bool:
-        with self._connect() as db:
+        with closing(self._connect()) as db:
             db.execute("BEGIN IMMEDIATE")
             try:
                 db.execute(
