@@ -303,7 +303,8 @@ def run_arduino_mode(bc: SmartCarBlockchain):
         )
     actuator = SafeModeActuatorDispatcher()
     max_frame_bytes = get_int("SMARTCAR_HW_SERIAL_MAX_FRAME_BYTES", 4096)
-    while True:
+    try:
+      while True:
         try:
             pkt = read_bounded_serial_json(ser, max_frame_bytes)
             if pkt is None:
@@ -319,6 +320,8 @@ def run_arduino_mode(bc: SmartCarBlockchain):
         b = bc.push_telemetry(tel, evt)
         print(f"[CHAIN] block={b.index} event={evt}")
         actuator.maybe_send_arduino(ser, bc, b)
+    finally:
+        ser.close()  # Release quarantined ports even on framing errors.
 
 
 def run_pi_mode(bc: SmartCarBlockchain):
