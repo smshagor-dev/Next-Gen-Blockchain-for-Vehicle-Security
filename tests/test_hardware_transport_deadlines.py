@@ -19,5 +19,27 @@ class DeadlineBoundaryTests(unittest.TestCase):
         deadline_check(2.99, session_deadline=20.0, auth_deadline=3.0, authenticated=False)
 
 
+    def test_batched_frames_recheck_session_deadline(self):
+        # Each frame must be admitted at processing time, not recv time.
+        admitted = []
+        for index, now in enumerate((1.0, 1.5, 2.0)):
+            try:
+                deadline_check(
+                    now, session_deadline=2.0, auth_deadline=1.8,
+                    authenticated=index > 0,
+                )
+            except DeadlineExpired:
+                break
+            admitted.append(index)
+        self.assertEqual(admitted, [0, 1])
+
+    def test_batched_first_frame_cannot_authenticate_after_deadline(self):
+        # recv may finish before deadline but MAC verification may not.
+        with self.assertRaisesRegex(DeadlineExpired, "HW_AUTH_DEADLINE_EXCEEDED"):
+            deadline_check(
+                3.01, session_deadline=10.0, auth_deadline=3.0,
+                authenticated=False,
+            )
+
 if __name__ == "__main__":
     unittest.main()
