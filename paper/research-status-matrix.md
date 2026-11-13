@@ -96,3 +96,5 @@ claim or submission-ready experimental result follows from these tests.
 - **Partial:** Byte limits, strict UTF-8, JSON object and nonfinite rejection exist in PR #98. Arduino serial source authentication and safe restart/recovery are not implemented.
 - **Blocked:** No physical Arduino, independent emergency circuit, CAN bus or hardware fault-injection evidence available. No vehicle safety claim.
 - **Upcoming:** Validate the regression suite and implement authenticated Arduino framing plus explicit resynchronization policy before physical bench tests. Research results still require independent incident truth and matched baselines.
+
+- 2026-11-13 serial ingress follow-up (PR #98): fixed regression fixture to contain actual newline bytes; ensured serial port closes on desynchronization and all other exits. Synthetic tests/CI required before merge. No serial source authentication or physical E-stop evidence.
