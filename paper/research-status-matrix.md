@@ -1,3 +1,10 @@
+## 2026-11-13 — durable simulated admission receipt integration
+
+- **Implemented, execution pending (draft PR #99):** `SimulatedCommandReceiver.receive_with_receipt` validates the challenge before consuming the nonce, performs authenticated admission through the existing SQLite durable claim, and returns a challenge-bound HMAC receipt explicitly labeled **simulation admission only**. Added five fault regressions for genuine claim binding, lost response/restart retry, delayed response challenge mismatch, invalid challenge non-consumption, and duplicate receipt delivery.
+- **Commands awaiting execution:** `python -m unittest tests.test_simulated_admission_receipt_faults tests.test_hardware_command_receiver_simulator tests.test_command_ack_protocol -v`; `python -m py_compile hardware_command_receiver_simulator.py tests/test_simulated_admission_receipt_faults.py`. GitHub connector writes succeeded; no executable local checkout was available (GitHub DNS failure), so no passing tests are claimed.
+- **Safety limitation:** A valid receipt proves only simulator nonce admission, not physical execution, remote safety, ledger finality or exactly-once acknowledgment delivery. A lost receipt is intentionally not recoverable by resending the same command. Keys are domain-separated in the receipt MAC but share provisioning material in this simulator; independent ECU keys, firmware interoperability and hardware E-stop remain blocked.
+- **Next code task:** run full branch regression suite in executable checkout; implement bounded socket concurrency and real loopback Slowloris fault injection before hardware integration. Independently validate crash boundaries and database rollback threat model.
+
 ## 2026-11-13 — process-exit crash boundaries for durable command admission
 
 - **Implemented, execution pending:** `tests/test_durable_command_crash_boundaries.py` runs two real child processes that exit with `os._exit(73)`: one after an uncommitted SQLite INSERT and one after `DurableCommandNonceStore.claim` commits. Parent assertions require uncommitted state to be reusable exactly once and committed state to reject reuse after reopening.
