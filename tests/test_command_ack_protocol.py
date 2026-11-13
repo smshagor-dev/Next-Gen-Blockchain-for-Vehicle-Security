@@ -55,5 +55,25 @@ class ReceiptTests(unittest.TestCase):
                           challenge='a', admitted=True)
 
 
+    def test_untrusted_nested_receipt_values_fail_closed(self):
+        for field, value in (
+            ('device_id', {'unexpected': 'object'}),
+            ('command_nonce', ['b' * 32]),
+            ('challenge', {'nested': True}),
+            ('kind', ['SIMULATED_ADMISSION_RECEIPT']),
+            ('mac', {'fake': 'signature'}),
+        ):
+            with self.subTest(field=field):
+                receipt = self.receipt()
+                receipt[field] = value
+                self.assertFalse(self.verify(receipt))
+
+    def test_oversized_untrusted_fields_fail_closed(self):
+        for field in ('device_id', 'command_nonce', 'challenge', 'kind', 'mac'):
+            with self.subTest(field=field):
+                receipt = self.receipt()
+                receipt[field] = 'a' * 100000
+                self.assertFalse(self.verify(receipt))
+
 if __name__ == '__main__':
     unittest.main()
