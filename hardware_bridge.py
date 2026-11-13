@@ -259,33 +259,51 @@ class ECUCommandGateway:
 
 
 def run_arduino_mode(bc: SmartCarBlockchain):
+    """Enrolled-device authenticated serial ingress; no unsigned JSON fallback.
+
+    A framing or verification error quarantines the port. Local independent
+    emergency controls are not routed through this ingestion loop.
+    """
     if not serial:
         raise RuntimeError("pyserial not installed. Install with: pip install pyserial")
 
     port = get_env("SMARTCAR_HW_SERIAL_PORT", "COM3")
     baud = get_int("SMARTCAR_HW_SERIAL_BAUD", 115200)
-    print(f"[HW BRIDGE] Arduino serial mode: {port} @ {baud}")
+    device_keys = parse_device_registry(get_env("SMARTCAR_HW_DEVICE_KEYS_JSON", "{}"))
+    verifier = HardwareEnvelopeVerifier(
+        device_keys,
+        max_frame_bytes=get_int("SMARTCAR_HW_MAX_FRAME_BYTES", 4096),
+        replay_window_sec=get_int("SMARTCAR_HW_REPLAY_WINDOW_SEC", 15),
+        replay_cache_entries=get_int("SMARTCAR_HW_REPLAY_CACHE_ENTRIES", 2048),
+    )
+    session = AuthenticatedPiTelemetrySession(verifier)
+    print(f"[HW BRIDGE] authenticated Arduino serial mode: {port} @ {baud}")
     try:
         ser = serial.Serial(port=port, baudrate=baud, timeout=1)
     except Exception as e:
-        raise RuntimeError(
-            f"Could not open serial port '{port}'. "
-            f"Set SMARTCAR_HW_SERIAL_PORT in .env to your Arduino port. Details: {e}"
-        )
+        raise RuntimeError(f"Could not open serial port '{port}': {e}") from e
+
+    # Remote commands remain subject to an independent bench interlock.
     actuator = SafeModeActuatorDispatcher()
-    while True:
-        line = ser.readline().decode(errors="ignore").strip()
-        if not line:
-            continue
-        try:
-            pkt = json.loads(line)
-        except Exception:
-            continue
-        tel = to_telemetry(pkt)
-        evt = str(pkt.get("event", "HW:ARDUINO:TELEMETRY"))
-        b = bc.push_telemetry(tel, evt)
-        print(f"[CHAIN] block={b.index} event={evt}")
-        actuator.maybe_send_arduino(ser, bc, b)
+    try:
+        while True:
+            # Bounded read, including for a peer that never sends a newline.
+            chunk = ser.read(1024)
+            if not chunk:
+                continue
+            try:
+                verified = session.receive(chunk)
+            except HardwareTransportError as exc:
+                print(f"[HW BRIDGE] quarantined Arduino serial input: {exc.reason}")
+                raise RuntimeError("Arduino serial authentication/framing failure") from exc
+            for item in verified:
+                tel = to_telemetry(item.payload)
+                event = str(item.payload["event"])
+                block = bc.push_telemetry(tel, event)
+                print(f"[CHAIN] block={block.index} event={event}")
+                actuator.maybe_send_arduino(ser, bc, block)
+    finally:
+        ser.close()
 
 
 def run_pi_mode(bc: SmartCarBlockchain):
