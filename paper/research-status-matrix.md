@@ -1,3 +1,10 @@
+## 2026-11-13 — process-exit crash boundaries for durable command admission
+
+- **Implemented, execution pending:** `tests/test_durable_command_crash_boundaries.py` runs two real child processes that exit with `os._exit(73)`: one after an uncommitted SQLite INSERT and one after `DurableCommandNonceStore.claim` commits. Parent assertions require uncommitted state to be reusable exactly once and committed state to reject reuse after reopening.
+- **Test command:** `python -m unittest tests.test_durable_command_crash_boundaries -v`. This GitHub connector session created the test but did not run it; no passing result is claimed.
+- **Evidence boundary:** OS process termination is not power-loss testing. No disk rollback resistance, signed receiver acknowledgment, real ECU firmware or hardware interlock is established. Real CAN actuation remains disabled.
+- **Next:** execute the subprocess tests in a repository checkout, repair any failure, then add challenge-bound authenticated simulation ACK and fault injection for acknowledgment loss/duplication.
+
 ## 2026-11-13 — durable command admission receiver simulation
 
 - **Implemented, pending execution:** `hardware_command_receiver_simulator.py` validates
