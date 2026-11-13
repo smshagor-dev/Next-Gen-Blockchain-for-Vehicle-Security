@@ -77,6 +77,26 @@ software verification and independent empirical research.
   durable replay state, signed command acknowledgment, firmware conformance
   and independent emergency-stop/HIL safety evidence. PR #99 remains draft.
 
+## 2026-11-13 — aggregate Pi ingress rate bound (draft PR #99)
+
+- **Implemented, unverified:** `GlobalTelemetryBudget` uses a monotonic
+  single-process token bucket (default 32 accepted frames/sec, burst 64)
+  shared across all sequential Pi TCP sessions. The budget is claimed after
+  MAC/replay/schema verification and before ledger mutation or actuation.
+  A rejected over-budget frame closes its connection. Four deterministic
+  regression cases cover burst/refill, reconnect sharing, clock rollback,
+  and configuration bounds.
+- **Limits:** this is neither a distributed quota nor a network-level
+  SYN/connection admission defense. Repeated unauthenticated connections
+  still consume accept/verification CPU; separate admission and firewall
+  controls remain necessary. Serial mode does not use this TCP budget.
+- **Verification required:** `python -m unittest discover -s tests -p
+  'test_global_telemetry_budget.py' -v` and focused hardware security tests.
+  No execution or HIL evidence obtained in this connector run.
+- **Next code:** bound pre-auth connection acceptance per source and total
+  verification work, then implement crash-safe replay/session handshake
+  with receiver acknowledgments before considering CAN enablement.
+
 ## Research assertion / results gate
 
 - Real VeReMi CAM results are **auxiliary message-manipulation detection**
