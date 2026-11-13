@@ -301,7 +301,11 @@ def run_arduino_mode(bc: SmartCarBlockchain):
                 event = str(item.payload["event"])
                 block = bc.push_telemetry(tel, event)
                 print(f"[CHAIN] block={block.index} event={event}")
-                actuator.maybe_send_arduino(\n                    ser, bc, block,\n                    device_id=item.device_id,\n                    device_secret=verifier.device_secret(item.device_id),\n                )
+                actuator.maybe_send_arduino(
+                    ser, bc, block,
+                    device_id=item.device_id,
+                    device_secret=verifier.device_secret(item.device_id),
+                )
     finally:
         ser.close()
 
