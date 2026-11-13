@@ -72,6 +72,31 @@ def to_telemetry(pkt: dict) -> TelemetryData:
     )
 
 
+class GlobalTelemetryBudget:
+    """Bound aggregate authenticated ledger mutations across TCP sessions.
+
+    Single-process monotonic token bucket; not a distributed or durable quota.
+    A rejected frame never reaches ledger mutation or remote actuation.
+    """
+
+    def __init__(self, rate_per_sec: int, burst: int, *, clock=None):
+        self.rate = max(1, min(10000, int(rate_per_sec)))
+        self.burst = max(1, min(10000, int(burst)))
+        self.clock = clock or time.monotonic
+        self.tokens = float(self.burst)
+        self.last = self.clock()
+
+    def claim(self) -> bool:
+        now = self.clock()
+        elapsed = max(0.0, now - self.last)
+        self.last = now
+        self.tokens = min(float(self.burst), self.tokens + elapsed * self.rate)
+        if self.tokens < 1.0:
+            return False
+        self.tokens -= 1.0
+        return True
+
+
 class AuthenticatedPiTelemetrySession:
     """Bind each connection to one enrolled identity, authenticating before mutation.
 
@@ -347,8 +372,7 @@ def run_pi_mode(bc: SmartCarBlockchain):
     # A fully authenticated peer can still flood ledger writes; bound work
     # per connection independently of the framer byte and time limits.
     max_frames = max(1, min(10000, get_int("SMARTCAR_HW_MAX_FRAMES_PER_SESSION", 256)))
-    actuator = SafeModeActuatorDispatcher()
-    print(f"[HW BRIDGE] Authenticated Pi TCP mode listening on {host}:{port}")
+    global_budget = GlobalTelemetryBudget(\n        get_int("SMARTCAR_HW_GLOBAL_FRAMES_PER_SEC", 32),\n        get_int("SMARTCAR_HW_GLOBAL_FRAME_BURST", 64),\n    )\n    actuator = SafeModeActuatorDispatcher()\n    print(f"[HW BRIDGE] Authenticated Pi TCP mode listening on {host}:{port}")
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as srv:
         srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -372,8 +396,7 @@ def run_pi_mode(bc: SmartCarBlockchain):
                         for item in session.receive(data):
                             if accepted_frames >= max_frames:
                                 raise HardwareTransportError("HW_SESSION_FRAME_BUDGET_EXCEEDED", authenticated=True)
-                            accepted_frames += 1
-                            tel = to_telemetry(item.payload)
+                            if not global_budget.claim():\n                                raise HardwareTransportError("HW_GLOBAL_FRAME_BUDGET_EXCEEDED", authenticated=True)\n                            accepted_frames += 1\n                            tel = to_telemetry(item.payload)
                             event = str(item.payload["event"])
                             block = bc.push_telemetry(tel, event)
                             print(f"[CHAIN] block={block.index} event={event}")
