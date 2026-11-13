@@ -195,5 +195,27 @@ class SerialIngressTests(unittest.TestCase):
             ser.write.assert_not_called()
 
 
+    def test_can_stop_is_blocked_even_when_transport_and_gate_are_ready(self):
+        gate = mock.Mock()
+        gate.is_armed.return_value = True
+        with mock.patch.object(bridge, "get_bool", return_value=True), \
+             mock.patch.object(bridge, "get_env", return_value="can"), \
+             mock.patch.object(bridge.ECUCommandGateway, "_init_can"):
+            gateway = bridge.ECUCommandGateway(gate=gate)
+            gateway._init_ok = True
+            gateway._can_bus = mock.Mock()
+            gateway.send_safe_mode_stop(block_index=17)
+            gateway._can_bus.send.assert_not_called()
+
+    def test_can_stop_does_not_call_frame_builder(self):
+        gateway = bridge.ECUCommandGateway(gate=mock.Mock())
+        gateway.mode = "can"
+        gateway.enabled = True
+        gateway._init_ok = True
+        gateway._can_bus = mock.Mock()
+        with mock.patch.object(gateway, "_send_can_safe_stop") as send:
+            gateway.send_safe_mode_stop(block_index=1)
+            send.assert_not_called()
+
 if __name__ == "__main__":
     unittest.main()
