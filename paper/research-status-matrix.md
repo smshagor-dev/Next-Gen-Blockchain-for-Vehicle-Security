@@ -153,6 +153,24 @@ software verification and independent empirical research.
 - **Next code task:** socket-level Slowloris tests with real loopback
   connections and bounded concurrent session scheduling.
 
+## 2026-11-13 — hardware mode dispatch fail-closed review
+
+- **Implemented in draft PR #99:** reject unknown or empty
+  `SMARTCAR_HW_MODE` values instead of implicitly entering the Arduino
+  serial ingress path. Only explicit `pi` and `arduino` values dispatch.
+  Four new synthetic dispatch regressions check invalid/empty values,
+  explicit selections, and teardown after invalid configuration.
+- **Verification:** `python -m unittest tests.test_hardware_mode_dispatch -v`
+  and `python -m compileall -q hardware_bridge.py tests` are required.
+  GitHub commits were accepted, but tests could not be executed in the
+  current environment because the local GitHub checkout is unavailable
+  (DNS lookup failed). No passing tests or physical validation claimed.
+- **Next engineering task:** independent socket-level slow-client and
+  concurrent-admission experiments, followed by crash-safe replay
+  protection. The server still handles connections sequentially.
+- **Research evidence:** none from this change; this is a security
+  correctness fix, not a publishable scientific experiment.
+
 ## Research assertion / results gate
 
 - Real VeReMi CAM results are **auxiliary message-manipulation detection**
