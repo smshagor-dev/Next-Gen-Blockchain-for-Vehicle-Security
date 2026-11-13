@@ -97,6 +97,23 @@ software verification and independent empirical research.
   verification work, then implement crash-safe replay/session handshake
   with receiver acknowledgments before considering CAN enablement.
 
+## 2026-11-13 — TCP rate-limit syntax repair and unsafe helper removal
+
+- **Code repaired, execution pending:** The preceding aggregate-rate-budget
+  change introduced literal backslash-n text into Python control-flow lines.
+  Replaced those invalid source tokens with actual line breaks so the
+  `GlobalTelemetryBudget` construction and budget check are syntactically
+  structured. Removed the unused unsigned ECU serial command writer entirely,
+  leaving the existing fail-closed dispatch policy in place.
+- **Verification gate:** run `python -m py_compile hardware_bridge.py`,
+  `python -m unittest discover -s tests -p 'test_global_telemetry_budget.py' -v`,
+  and the full hardware security regression suite. Not executed: container
+  cannot resolve github.com and no executable checkout is available.
+- **Remaining:** pre-auth connection quotas, durable replay state,
+  authenticated ECU receiver acknowledgments, independent local emergency
+  wiring and hardware-in-the-loop validation. Draft PR #99 must not merge
+  without executable checks.
+
 ## Research assertion / results gate
 
 - Real VeReMi CAM results are **auxiliary message-manipulation detection**
