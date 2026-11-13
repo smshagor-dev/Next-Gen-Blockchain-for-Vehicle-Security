@@ -84,5 +84,42 @@ class SerialIngressTests(unittest.TestCase):
         self.assertEqual(bc.push_telemetry.call_count, 1)
 
 
+    def test_outbound_stop_is_authenticated_command(self):
+        from hardware_transport_security import HardwareEnvelopeVerifier
+        gate = mock.Mock()
+        gate.is_armed.return_value = True
+        with mock.patch.object(bridge, "get_bool", return_value=True), \
+             mock.patch.object(bridge, "ECUCommandGateway") as ecu:
+            dispatcher = bridge.SafeModeActuatorDispatcher(gate=gate)
+            dispatcher._last_sent_at = 0.0
+            ser = mock.Mock()
+            bc = mock.Mock(safe_mode_active=True)
+            block = mock.Mock(index=17, safe_mode_activated=True)
+            dispatcher.maybe_send_arduino(
+                ser, bc, block, device_id=DEVICE, device_secret=SECRET
+            )
+            ser.write.assert_called_once()
+            raw = ser.write.call_args.args[0]
+            self.assertNotIn(b'"cmd":', raw)
+            verifier = HardwareEnvelopeVerifier({DEVICE: SECRET})
+            result = verifier.verify(raw.rstrip(b"\\n"), expected_kind="COMMAND")
+            self.assertEqual(result.device_id, DEVICE)
+            ecu.return_value.send_safe_mode_stop.assert_called_once_with(block_index=17)
+
+    def test_unarmed_stop_never_writes_serial(self):
+        gate = mock.Mock()
+        gate.is_armed.return_value = False
+        with mock.patch.object(bridge, "get_bool", return_value=True), \
+             mock.patch.object(bridge, "ECUCommandGateway"):
+            dispatcher = bridge.SafeModeActuatorDispatcher(gate=gate)
+            ser = mock.Mock()
+            dispatcher.maybe_send_arduino(
+                ser, mock.Mock(safe_mode_active=True),
+                mock.Mock(index=2, safe_mode_activated=True),
+                device_id=DEVICE, device_secret=SECRET,
+            )
+            ser.write.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()
