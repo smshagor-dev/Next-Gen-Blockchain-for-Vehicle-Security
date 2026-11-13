@@ -58,6 +58,25 @@ software verification and independent empirical research.
   and `python -m unittest tests.test_arduino_authenticated_ingress -v`
   are required; tests were not executed in this connector session.
 
+## 2026-11-13 — authenticated TCP write-amplification boundary
+
+- **Implemented, unverified:** the Pi TCP session now has an independent
+  `SMARTCAR_HW_MAX_FRAMES_PER_SESSION` ledger-mutation budget (default 256,
+  bounded to 1–10000). After the budget is exhausted the connection is
+  rejected before another ledger write or remote command dispatch.
+  This addresses authenticated-peer write amplification beyond the existing
+  byte-framing and session-lifetime limits; it does not solve distributed
+  DoS or a large number of new connections.
+- **Synthetic regression added:** `tests/test_pi_authenticated_session_budget.py`
+  sends two separately signed telemetry envelopes over a fake socket with
+  budget=1, asserting exactly one blockchain mutation. No real TCP network
+  or physical ECU was exercised.
+- **Verification command:** `python -m unittest discover -s tests -p 'test_pi_authenticated_session_budget.py' -v`.
+  **Not executed:** the local checkout could not resolve github.com.
+- **Next engineering task:** enforce server-wide connection/rate quotas,
+  durable replay state, signed command acknowledgment, firmware conformance
+  and independent emergency-stop/HIL safety evidence. PR #99 remains draft.
+
 ## Research assertion / results gate
 
 - Real VeReMi CAM results are **auxiliary message-manipulation detection**
