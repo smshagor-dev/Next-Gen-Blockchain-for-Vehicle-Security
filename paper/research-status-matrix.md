@@ -96,3 +96,10 @@ Draft branch `authenticate-arduino-serial-ingress` removes raw unsigned Arduino 
 - Outbound Arduino bench `SAFE_MODE_STOP` now uses an authenticated `COMMAND` envelope bound to the verified device identity, replacing unsigned serial JSON. A regression checks command verification and the disarmed interlock.
 - **PARTIAL / BLOCKED:** firmware must independently verify command MAC, replay nonce, freshness and safe local interlocks before any actuator response. The same enrolled symmetric secret is currently used in both directions; key separation and durable replay state remain unimplemented. No physical actuation or HIL evidence. Tests are pending execution; no research result follows from this patch.
 - **NEXT:** execute focused regressions; add firmware protocol conformance vectors, directional key separation and independent emergency-stop validation.
+
+## Authenticated Arduino serial denial-of-service boundary (draft PR #99, 2026-11-13)
+
+- PARTIAL / UNVERIFIED: Arduino authenticated ingress now has bounded session lifetime (5–600 s) and inactivity timeout (1–30 s), in addition to bounded frames and fail-closed framing. Two synthetic regression tests cover silent and trickle-fed peers; tests have **not** been executed in this connector run.
+- BLOCKED: firmware interoperability, durable anti-replay, directional key separation, independent local emergency-stop and physical bench interlock validation. The same enrolled secret currently signs both directions, so do not claim directional key isolation.
+- UPCOMING: execute `python -m unittest tests.test_arduino_authenticated_ingress -v`, correct failures, implement independent inbound/outbound keys, then conduct isolated hardware bench tests before any physical actuation claim.
+- EVIDENCE CLASS: software change and unexecuted regression tests only; **not** incident-level scientific data, vehicle safety validation, or publishable performance evidence.
