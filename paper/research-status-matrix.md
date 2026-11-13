@@ -1,3 +1,22 @@
+## 2026-11-13 — durable command admission receiver simulation
+
+- **Implemented, pending execution:** `hardware_command_receiver_simulator.py` validates
+  directional signed command envelopes, identity and payload semantics before an
+  atomic SQLite durable nonce claim; WAL and FULL synchronous are requested.
+  Receiver returns **simulation admission only**, never physical actuation or
+  signed ECU acknowledgment. Six tests cover acceptance semantics, restart replay,
+  tampering, identity mismatch, duplicate claims across stores, and in-memory
+  database rejection.
+- **Security limitation:** nonce persistence alone does not stop database rollback,
+  compromised senders, compromised storage, stale-but-within-window commands, or
+  crash between durable admission and physical execution. No physical command
+  execution is implemented. No independently wired e-stop or HIL evidence exists.
+- **Validation required:** `python -m unittest tests.test_hardware_command_receiver_simulator -v`.
+  This connector session committed code but did **not** execute these tests.
+- **Next:** verify execution, add adversarial concurrent-process tests and crash
+  injection; design challenge-bound signed receiver ACK and independent safety
+  interlock before any hardware integration.
+
 # OmniGuard V2X research evidence status
 
 Updated: 2026-11-13. This is a **claim-gated status matrix**, not a finished paper.
