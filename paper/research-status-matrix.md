@@ -20,6 +20,24 @@ software verification and independent empirical research.
 | Runtime scaling and network availability | UNVERIFIED | Existing quick unit and deterministic simulation tests are not a representative runtime benchmark | Real network delays/partitions with measured CPU/RAM/tail latency and physical isolation |
 | Novelty and paper evidence | NOT ESTABLISHED | Evidence-gated multi-source corroboration is a mechanism candidate, **not** new cryptography | Published prior-art comparison, distinguishable formal claim, valid ablations, reproducible multi-scenario independent datasets |
 
+## 2026-11-13 — CAN command authorization boundary (draft PR #99)
+
+- **Implemented, not yet test-verified:** `ECUCommandGateway.send_safe_mode_stop`
+  now refuses all CAN actuation even when the bench gate is armed and the
+  transport is initialized. Existing CAN frame checksums provide neither
+  receiver authentication nor replay resistance. Removed misleading
+  "fallback to serial" diagnostic. Two regression tests assert that CAN
+  dispatch cannot reach the bus or frame builder.
+- **Blocked:** a versioned ECU receiver protocol, directional command keys,
+  durable replay state, independently wired emergency controls, hardware
+  interlock measurements, and physical/HIL evidence. Local emergency controls
+  must remain independent of this remote software path.
+- **Next code task:** implement an authenticated receiver/acknowledgment
+  simulator and fault-injection tests before considering any CAN re-enable.
+  Never interpret synthetic tests as a vehicle safety certification.
+- **Verification gate:** `python -m unittest tests.test_arduino_authenticated_ingress -v`;
+  not executed in this change. Keep PR draft pending CI and review.
+
 ## Research assertion / results gate
 
 - Real VeReMi CAM results are **auxiliary message-manipulation detection**
