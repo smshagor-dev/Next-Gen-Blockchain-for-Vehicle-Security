@@ -185,7 +185,7 @@ class ECUCommandGateway:
 
     def _init_can(self):
         if can is None:
-            print("[ECU] python-can not installed, fallback to serial")
+            print("[ECU] python-can not installed; CAN actuation unavailable")
             return
         channel = get_env("SMARTCAR_ECU_CAN_CHANNEL", "can0")
         bustype = get_env("SMARTCAR_ECU_CAN_BUSTYPE", "socketcan")
@@ -215,7 +215,13 @@ class ECUCommandGateway:
             print(f"[ECU] Serial init failed: {e}")
 
     def send_safe_mode_stop(self, block_index: int = -1):
-        # Recheck for removal of interlock after hardware transport opened.
+        # CAN payloads have only an additive checksum, not receiver-verified
+        # authentication or replay protection. Never actuate a vehicle from
+        # this prototype until a separately reviewed ECU protocol exists.
+        # Local hardwired emergency control is outside this software path.
+        if self.mode == "can":
+            print("[ECU] CAN actuation disabled: authenticated receiver protocol missing")
+            return
         if not self.enabled or not self._init_ok or not self.gate.is_armed():
             return
         if self.mode == "can":
