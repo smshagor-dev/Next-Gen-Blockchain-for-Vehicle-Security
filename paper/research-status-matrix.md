@@ -171,6 +171,23 @@ software verification and independent empirical research.
 - **Research evidence:** none from this change; this is a security
   correctness fix, not a publishable scientific experiment.
 
+## 2026-11-13 — per-frame processing-time deadline gate
+
+- **Implemented (draft PR #99):** the authenticated Pi TCP loop now rechecks
+  absolute session and first-authentication deadlines before **each** ledger
+  mutation within a multi-frame `recv` batch, not only immediately after
+  the blocking read. This closes a time-of-check/time-of-use window when
+  verification of a batch extends past its deadline.
+- **Added:** two deterministic boundary tests in
+  `tests/test_hardware_transport_deadlines.py` for late batch frames and
+  delayed first-frame authentication. These are software tests, not physical
+  measurements; full socket integration is still required.
+- **Verification pending:** `python -m unittest
+  tests.test_hardware_transport_deadlines -v` and full bridge regression.
+  No local execution or passing CI evidence was observed in this run.
+- **Still blocked:** bounded concurrent sessions, durable replay state,
+  authenticated ECU acknowledgments, independently wired E-stop, and HIL.
+
 ## Research assertion / results gate
 
 - Real VeReMi CAM results are **auxiliary message-manipulation detection**
