@@ -39,6 +39,15 @@ def issue_receipt(secret, *, device_id, command_nonce, challenge, admitted):
 def verify_receipt(secret, receipt, *, device_id, command_nonce, challenge):
     if type(receipt) is not dict or set(receipt) != {'version', 'kind', 'device_id', 'command_nonce', 'challenge', 'admitted', 'actuation_performed', 'physical_acknowledgment', 'mac'}:
         return False
+    # Treat receipt as untrusted network input: reject oversized or non-primitive
+    # values before canonical JSON serialization. No caller-controlled objects
+    # may reach the serializer, and invalid receipts must fail closed.
+    if (type(receipt['device_id']) is not str or len(receipt['device_id']) > 96
+            or not _valid_hex(receipt['command_nonce'])
+            or not _valid_hex(receipt['challenge'])
+            or type(receipt['kind']) is not str or len(receipt['kind']) > 64
+            or type(receipt['mac']) is not str or len(receipt['mac']) != 64):
+        return False
     if receipt['device_id'] != device_id or receipt['command_nonce'] != command_nonce or receipt['challenge'] != challenge:
         return False
     if receipt['version'] != 1 or type(receipt['version']) is not int or receipt['kind'] != 'SIMULATED_ADMISSION_RECEIPT':
