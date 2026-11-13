@@ -31,7 +31,7 @@ class SerialIngressTests(unittest.TestCase):
             read_bounded_serial_json(FakeSerial(b"x" * 100 + b"\n"), 64)
 
     def test_oversized_frame_quarantines_even_with_valid_following_frame(self):
-        port = FakeSerial(b"x" * 100 + b"\\n" + b'{"speed":3}\\n')
+        port = FakeSerial(b"x" * 100 + b"\n" + b'{"speed":3}\n')
         with self.assertRaises(SerialFramingDesynchronized):
             read_bounded_serial_json(port, 64)
         # The caller must close this port; it cannot safely resume parsing
