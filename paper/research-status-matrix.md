@@ -1,12 +1,12 @@
 # OmniGuard V2X research evidence status
 
-Updated: 2026-11-12. This is a **claim-gated status matrix**, not a finished paper.
+Updated: 2026-11-13. This is a **claim-gated status matrix**, not a finished paper.
 Distinguish implemented code, observed source-data analysis, deterministic
 software verification and independent empirical research.
 
 | Workstream | Status | Verified engineering/source evidence | Remaining scientific gate |
 | --- | --- | --- | --- |
-| Hardware TCP ingress, bound messages, authenticated node sessions, replay and safety gate | MERGED, LAB VALIDATION BLOCKED | PR #74 was merged; source regression and GitHub security CI addressed software controls | Physical Pi/CAN bench and local emergency safety case not independently verified |
+| Hardware TCP ingress, bound messages, authenticated node sessions, replay and safety gate | MERGED; SERIAL QUARANTINE DRAFT PR #98; LAB VALIDATION BLOCKED | PR #74 was merged; source regression and GitHub security CI addressed software controls | Physical Pi/CAN bench and local emergency safety case not independently verified |
 | V2X event admission | MERGED SOFTWARE PROTOTYPE | PR #80 merged opt-in off/shadow/enforce, authenticated-session-before-quorum policy; command-smuggling regression tests | Independent incident labels, prior-art originality analysis, correlated reporters and physical safety validation |
 | Network collusion and availability fault checks | NEW DRAFT PR #89 (issue #88) | Actual merged EvidenceAdmissionGate and research-only ConsistentSubsetAdmissionGate exercised on 13 scripted incidents with seed/jitter variations, selected-source roles and SHA manifests | Constructed fault models, not independently captured physical incidents or repeated simulator trials; published comparator and HIL evidence missing |
 | Source-CAM integrity | VERIFIED IMPORT, not event truth | PR #82 merged; official VeReMi NextGen v1.0.0 baseline and dataReplay archives SHA-verified and imported; receiver duplicates audited | CAM attacker bit does not mean a verified hazard incident or physical source attestation; distribution license review |
@@ -18,6 +18,18 @@ software verification and independent empirical research.
 | Statistical validation | TOOLING ONLY | PR #77/#78 merged exploratory no-false-significance reporting, paired bootstrap/sign-flip/Holm code | Independent seed execution, preregistered analysis, baseline/ablation comparisons, CIs/effect sizes using **actual** incident data |
 | Runtime scaling and network availability | UNVERIFIED | Existing quick unit and deterministic simulation tests are not a representative runtime benchmark | Real network delays/partitions with measured CPU/RAM/tail latency and physical isolation |
 | Novelty and paper evidence | NOT ESTABLISHED | Evidence-gated multi-source corroboration is a mechanism candidate, **not** new cryptography | Published prior-art comparison, distinguishable formal claim, valid ablations, reproducible multi-scenario independent datasets |
+
+## Arduino serial ingress follow-up (draft, unverified)
+
+The `bound-arduino-serial-telemetry` branch adds a configurable 64–65536-byte
+complete-line limit (4096-byte default) and strict UTF-8/JSON-object decoding
+before serial telemetry is processed. Eight in-memory regression cases cover
+normal, empty, truncated, oversized, invalid UTF-8, non-object, non-finite JSON and invalid
+limit inputs. The initial patch accidentally used a literal backslash-n delimiter and incorrectly escaped test fixtures; both were repaired in follow-up commits. Tests have not yet been executed in a Python environment;
+CI verification is required. This does **not** authenticate an Arduino or
+protect against forged but syntactically valid telemetry. Serial source
+identity, physical actuation safety, and independently wired emergency
+control remain blocked pending authorized hardware validation.
 
 ## Research assertion / results gate
 
@@ -77,3 +89,12 @@ exists, and unkeyed SHA-256 hashes can be recomputed over forged receipt
 metadata. Hence the prototype provides neither cryptographically authenticated
 smart-contract finality nor host-rollback resistance. No HIL/vehicle safety
 claim or submission-ready experimental result follows from these tests.
+
+## 2026-11-13 serial framing follow-up (draft PR #98)
+
+- **Completed in branch, awaiting CI:** `SerialFramingDesynchronized` stops the Arduino bridge when an oversized or incomplete serial frame loses its boundary. The bridge no longer resumes at an attacker-controlled fragment and requires an explicit restart. Added overflow-with-following-valid-frame and partial-timeout regression cases. This is an availability trade-off: malformed serial input can now stop remote telemetry, but it cannot bypass a separate local emergency-stop circuit.
+- **Partial:** Byte limits, strict UTF-8, JSON object and nonfinite rejection exist in PR #98. Arduino serial source authentication and safe restart/recovery are not implemented.
+- **Blocked:** No physical Arduino, independent emergency circuit, CAN bus or hardware fault-injection evidence available. No vehicle safety claim.
+- **Upcoming:** Validate the regression suite and implement authenticated Arduino framing plus explicit resynchronization policy before physical bench tests. Research results still require independent incident truth and matched baselines.
+
+- 2026-11-13 serial ingress follow-up (PR #98): fixed regression fixture to contain actual newline bytes; ensured serial port closes on desynchronization and all other exits. Synthetic tests/CI required before merge. No serial source authentication or physical E-stop evidence.

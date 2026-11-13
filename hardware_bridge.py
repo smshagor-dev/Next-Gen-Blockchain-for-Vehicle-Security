@@ -258,6 +258,35 @@ class ECUCommandGateway:
             print(f"[ECU] Serial send failed: {e}")
 
 
+class SerialFramingDesynchronized(RuntimeError):
+    """A frame boundary was lost; the port must be closed before more input."""
+
+
+def read_bounded_serial_json(ser, max_bytes: int = 4096):
+    """Read one complete bounded UTF-8 JSON object; never accept truncated lines.
+
+    Serial ingress remains untrusted; this is resource protection, not device
+    authentication. A local emergency-stop circuit must remain independent.
+    """
+    if not 64 <= max_bytes <= 65536:
+        raise ValueError("serial frame limit out of range")
+    line = ser.read_until(b"\n", size=max_bytes + 1)
+    if not line:
+        return None
+    if len(line) > max_bytes or not line.endswith(b"\n"):
+        # A later read might start in the middle of attacker-controlled JSON.
+        # Do not try to resynchronize by accepting subsequent bytes: close the
+        # session and require an explicit restart/re-enrollment of this port.
+        raise SerialFramingDesynchronized("oversized or incomplete serial frame; port quarantined")
+    try:
+        obj = json.loads(line.decode("utf-8"), parse_constant=lambda _: (_ for _ in ()).throw(ValueError("non-finite serial JSON")))
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+        raise ValueError("invalid serial JSON") from exc
+    if not isinstance(obj, dict):
+        raise ValueError("serial JSON must be an object")
+    return obj
+
+
 def run_arduino_mode(bc: SmartCarBlockchain):
     if not serial:
         raise RuntimeError("pyserial not installed. Install with: pip install pyserial")
@@ -273,19 +302,26 @@ def run_arduino_mode(bc: SmartCarBlockchain):
             f"Set SMARTCAR_HW_SERIAL_PORT in .env to your Arduino port. Details: {e}"
         )
     actuator = SafeModeActuatorDispatcher()
-    while True:
-        line = ser.readline().decode(errors="ignore").strip()
-        if not line:
-            continue
+    max_frame_bytes = get_int("SMARTCAR_HW_SERIAL_MAX_FRAME_BYTES", 4096)
+    try:
+      while True:
         try:
-            pkt = json.loads(line)
-        except Exception:
+            pkt = read_bounded_serial_json(ser, max_frame_bytes)
+            if pkt is None:
+                continue
+        except SerialFramingDesynchronized as exc:
+            print(f"[HW BRIDGE] serial ingress stopped: {exc}")
+            raise RuntimeError("Arduino serial frame boundary lost; close port and restart bridge") from exc
+        except ValueError as exc:
+            print(f"[HW BRIDGE] serial frame rejected: {exc}")
             continue
         tel = to_telemetry(pkt)
         evt = str(pkt.get("event", "HW:ARDUINO:TELEMETRY"))
         b = bc.push_telemetry(tel, evt)
         print(f"[CHAIN] block={b.index} event={evt}")
         actuator.maybe_send_arduino(ser, bc, b)
+    finally:
+        ser.close()  # Release quarantined ports even on framing errors.
 
 
 def run_pi_mode(bc: SmartCarBlockchain):
