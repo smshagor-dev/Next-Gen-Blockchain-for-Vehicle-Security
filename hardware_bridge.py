@@ -362,6 +362,14 @@ def run_pi_mode(bc: SmartCarBlockchain):
         get_int("SMARTCAR_HW_GLOBAL_FRAMES_PER_SEC", 32),
         get_int("SMARTCAR_HW_GLOBAL_FRAME_BURST", 64),
     )
+    # Charge admission before parsing or MAC verification, including failed
+    # handshakes and repeated reconnects. Keep this separate from the
+    # authenticated ledger mutation budget.
+    admission_budget = GlobalTelemetryBudget(
+        get_int("SMARTCAR_HW_ACCEPTS_PER_SEC", 4),
+        get_int("SMARTCAR_HW_ACCEPT_BURST", 8),
+    )
+    auth_timeout = max(1, min(15, get_int("SMARTCAR_HW_AUTH_TIMEOUT_SEC", 3)))
     actuator = SafeModeActuatorDispatcher()
     print(f"[HW BRIDGE] Authenticated Pi TCP mode listening on {host}:{port}")
 
@@ -373,12 +381,23 @@ def run_pi_mode(bc: SmartCarBlockchain):
             conn, addr = srv.accept()
             print(f"[HW BRIDGE] Pi connected: {addr[0]}:{addr[1]}")
             with conn:
+                if not admission_budget.claim():
+                    print("[HW BRIDGE] rejected connection: admission budget exceeded")
+                    continue
                 conn.settimeout(idle_timeout)
                 session = AuthenticatedPiTelemetrySession(verifier)
+                authentication_deadline = time.monotonic() + auth_timeout
                 accepted_frames = 0
                 deadline = time.monotonic() + max_session_sec
                 try:
                     while time.monotonic() < deadline:
+                        # Slowloris peers cannot keep the unauthenticated
+                        # session open by sending partial bytes indefinitely.
+                        if session.device_id is None:
+                            remaining = authentication_deadline - time.monotonic()
+                            if remaining <= 0:
+                                raise HardwareTransportError("HW_AUTH_DEADLINE_EXCEEDED")
+                            conn.settimeout(min(float(idle_timeout), remaining))
                         data = conn.recv(4096)
                         if not data:
                             break
