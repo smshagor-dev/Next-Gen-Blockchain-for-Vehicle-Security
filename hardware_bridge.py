@@ -114,22 +114,22 @@ class SafeModeActuatorDispatcher:
             return False
         return bool(getattr(bc, "safe_mode_active", False) or getattr(block, "safe_mode_activated", False))
 
-    def maybe_send_arduino(self, ser, bc: SmartCarBlockchain, block):
+    def maybe_send_arduino(
+        self, ser, bc: SmartCarBlockchain, block, *,
+        device_id: str, device_secret: str,
+    ):
         if not self._should_send(bc, block):
             return
-        cmd = {
-            "cmd": "SAFE_MODE_STOP",
-            "throttle": 0,
-            "brake_pressure": 100,
-            "ignition_cut": 1,
-            "timestamp": _now(),
-        }
         try:
-            ser.write((json.dumps(cmd) + "\n").encode())
+            payload = build_safe_stop_payload(block_index=getattr(block, "index", -1))
+            envelope = build_authenticated_envelope(
+                device_id, device_secret, "COMMAND", payload
+            )
+            ser.write(encode_authenticated_envelope(envelope))
             self._last_sent_at = time.time()
-            print("[ACTUATOR] SAFE_MODE_STOP sent to Arduino")
-        except Exception as e:
-            print(f"[ACTUATOR] Arduino command failed: {e}")
+            print("[ACTUATOR] Signed SAFE_MODE_STOP sent to Arduino bench node")
+        except (OSError, HardwareTransportError) as e:
+            print(f"[ACTUATOR] Arduino command rejected: {e}")
             return
         self.ecu_gateway.send_safe_mode_stop(block_index=getattr(block, "index", -1))
 
@@ -301,7 +301,7 @@ def run_arduino_mode(bc: SmartCarBlockchain):
                 event = str(item.payload["event"])
                 block = bc.push_telemetry(tel, event)
                 print(f"[CHAIN] block={block.index} event={event}")
-                actuator.maybe_send_arduino(ser, bc, block)
+                actuator.maybe_send_arduino(\n                    ser, bc, block,\n                    device_id=item.device_id,\n                    device_secret=verifier.device_secret(item.device_id),\n                )
     finally:
         ser.close()
 
