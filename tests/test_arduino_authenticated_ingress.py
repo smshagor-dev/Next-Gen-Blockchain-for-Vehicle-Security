@@ -84,6 +84,54 @@ class SerialIngressTests(unittest.TestCase):
         self.assertEqual(bc.push_telemetry.call_count, 1)
 
 
+    def test_silent_serial_peer_is_closed_after_idle_deadline(self):
+        class SilentSerial:
+            closed = False
+            def read(self, size):
+                return b""
+            def close(self):
+                self.closed = True
+
+        fake = SilentSerial()
+        ticks = iter(range(100))
+        env = {"SMARTCAR_HW_DEVICE_KEYS_JSON": '{"arduino-bench-01":"' + SECRET + '"}',
+               "SMARTCAR_HW_IDLE_TIMEOUT_SEC": "2",
+               "SMARTCAR_HW_MAX_SESSION_SEC": "30"}
+        with mock.patch.object(bridge, "serial") as serial, \
+             mock.patch.dict("os.environ", env), \
+             mock.patch.object(bridge.time, "monotonic", side_effect=lambda: next(ticks)), \
+             mock.patch.object(bridge, "SafeModeActuatorDispatcher"):
+            serial.Serial.return_value = fake
+            bc = mock.Mock()
+            with self.assertRaisesRegex(RuntimeError, "idle timeout"):
+                bridge.run_arduino_mode(bc)
+            bc.push_telemetry.assert_not_called()
+        self.assertTrue(fake.closed)
+
+    def test_trickle_serial_peer_is_closed_at_session_deadline(self):
+        class TrickleSerial:
+            closed = False
+            def read(self, size):
+                return b"x"
+            def close(self):
+                self.closed = True
+
+        fake = TrickleSerial()
+        ticks = iter(range(100))
+        env = {"SMARTCAR_HW_DEVICE_KEYS_JSON": '{"arduino-bench-01":"' + SECRET + '"}',
+               "SMARTCAR_HW_IDLE_TIMEOUT_SEC": "30",
+               "SMARTCAR_HW_MAX_SESSION_SEC": "5"}
+        with mock.patch.object(bridge, "serial") as serial, \
+             mock.patch.dict("os.environ", env), \
+             mock.patch.object(bridge.time, "monotonic", side_effect=lambda: next(ticks)), \
+             mock.patch.object(bridge, "SafeModeActuatorDispatcher"):
+            serial.Serial.return_value = fake
+            bc = mock.Mock()
+            with self.assertRaisesRegex(RuntimeError, "session lifetime exceeded"):
+                bridge.run_arduino_mode(bc)
+            bc.push_telemetry.assert_not_called()
+        self.assertTrue(fake.closed)
+
     def test_outbound_stop_is_authenticated_command(self):
         from hardware_transport_security import HardwareEnvelopeVerifier
         gate = mock.Mock()
