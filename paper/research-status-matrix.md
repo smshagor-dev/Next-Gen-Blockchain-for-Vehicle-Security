@@ -188,6 +188,24 @@ software verification and independent empirical research.
 - **Still blocked:** bounded concurrent sessions, durable replay state,
   authenticated ECU acknowledgments, independently wired E-stop, and HIL.
 
+## 2026-11-13 — Arduino serial multi-envelope deadline gate
+
+- **Implemented in draft PR #99:** enforce absolute serial session lifetime
+  before *each* ledger mutation within a batch of authenticated envelopes.
+  Previously only the outer serial read loop checked the lifetime, allowing
+  later envelopes in the same read to proceed after processing earlier ones.
+- **Regression added:** `test_multiple_signed_frames_cannot_cross_serial_session_deadline`
+  sends two distinct valid signed envelopes in one serial read, advances a
+  controlled monotonic clock during the first ledger mutation, and asserts
+  exactly one mutation/command dispatch plus serial port closure.
+- **Execution status:** code committed, test not executed in this connector
+  session. Run `python -m unittest tests.test_arduino_authenticated_ingress -v`
+  and full hardware regression CI before review/merge.
+- **Scientific boundary:** synthetic timing fault injection only, not a
+  measured serial throughput result or hardware safety evidence.
+- **Next:** bounded concurrent Pi TCP handling, restart-safe replay state,
+  authenticated firmware receiver/ack, independent physical e-stop/HIL.
+
 ## Research assertion / results gate
 
 - Real VeReMi CAM results are **auxiliary message-manipulation detection**
