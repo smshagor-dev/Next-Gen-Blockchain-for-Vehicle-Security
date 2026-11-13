@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from hardware_transport_security import HardwareEnvelopeVerifier, HardwareTransportError
+from command_ack_protocol import issue_receipt
 
 
 class DurableCommandNonceStore:
@@ -59,6 +60,7 @@ class SimulatedCommandReceiver:
     ACK describes simulator admission only, not physical command execution.
     """
     def __init__(self, device_keys: Mapping[str, str], database_path: str):
+        self.device_keys = dict(device_keys)
         self.verifier = HardwareEnvelopeVerifier(device_keys)
         self.store = DurableCommandNonceStore(database_path)
 
@@ -79,3 +81,23 @@ class SimulatedCommandReceiver:
             "actuation_performed": False,
             "physical_acknowledgment": False,
         }
+
+    def receive_with_receipt(self, frame: Any, *, expected_device_id: str,
+                             challenge: str) -> dict[str, object]:
+        """Durably admit once and return a challenge-bound simulation receipt.
+
+        A lost receipt cannot be recovered by resending the command: retry
+        receives a replay error. No exactly-once delivery or actuation implied.
+        """
+        secret = self.device_keys.get(expected_device_id)
+        if secret is None:
+            raise HardwareTransportError("HW_UNKNOWN_COMMAND_DEVICE", authenticated=False)
+        # Validate challenge and receipt configuration BEFORE claiming a nonce.
+        # Otherwise a malformed challenge could consume a valid command.
+        issue_receipt(secret, device_id=expected_device_id,
+                      command_nonce="0" * 32, challenge=challenge, admitted=False)
+        result = self.receive(frame, expected_device_id=expected_device_id)
+        receipt = issue_receipt(secret, device_id=result["device_id"],
+                                command_nonce=result["nonce"],
+                                challenge=challenge, admitted=True)
+        return {"admission": result, "receipt": receipt}
