@@ -206,6 +206,28 @@ software verification and independent empirical research.
 - **Next:** bounded concurrent Pi TCP handling, restart-safe replay state,
   authenticated firmware receiver/ack, independent physical e-stop/HIL.
 
+## 2026-11-13 — experimental persistent command nonce gate
+
+- **Implemented, locally verified (synthetic):** `experiments/hardware/durable_command_replay.py`
+  provides a SQLite WAL/FULL synchronous, transactional, unique
+  `(device,nonce)` claim for a **simulation-only** command receiver. Five
+  local Python unit tests passed, including reopen/restart rejection, two
+  independent database handles, identity separation and invalid storage
+  configuration. Python compilation passed.
+- **Actual command:** `cd experiments/hardware && python -m unittest -v
+  test_durable_command_replay && python -m py_compile
+  durable_command_replay.py test_durable_command_replay.py`.
+  Local result: **5 tests passed**. No physical hardware involved.
+- **Not integrated:** no production ECU receiver, command acknowledgment or
+  actuation path uses this gate. MAC/schema/freshness verification must
+  precede every nonce claim. Filesystem snapshot rollback can restore an
+  older database; WAL/FULL alone is not a trusted monotonic anchor, and
+  durability under real power loss has not been tested.
+- **Next code:** build a fully isolated authenticated command receiver
+  simulator that validates MAC, policy and interlock before durable claim,
+  emits authenticated acknowledgment only after commit, and exercises
+  crash-point fault injection. Keep all real CAN outputs disabled.
+
 ## Research assertion / results gate
 
 - Real VeReMi CAM results are **auxiliary message-manipulation detection**
