@@ -5,7 +5,7 @@ Updated 2026-11-13. No publication or hardware safety certification is implied.
 | Workstream | Status | Evidence / gap |
 | --- | --- | --- |
 | TCP admission capacity primitive | Implemented, unverified | BoundedSemaphore prevents unbounded handler threads; immediate socket close on saturation |
-| Loopback saturation regression | Implemented, unverified | Real TCP sockets test held session, rejected second peer and capacity recovery; execution pending |
+| Loopback saturation regression | Locally validated (isolated copy) | Two additional real loopback tests: partial-frame slow peer does not block independent admitted worker; saturated peer rejected without queue. Both passed locally 2026-11-13. Full repository CI pending |
 | Integration with hardware_bridge.run_pi_mode | Upcoming | Current production accept loop is sequential; this branch alone does NOT fix production Slowloris starvation |
 | Shared verifier / token-bucket / ledger thread safety | Blocked | Must serialize replay cache and budget updates and ledger mutation before enabling concurrency |
 | Authenticated ingress / interlocks | Partial | Existing draft branch and main differ; no physical emergency stop evidence |
@@ -21,7 +21,7 @@ Updated 2026-11-13. No publication or hardware safety certification is implied.
 `python -m unittest discover -s tests -p 'test_bounded_tcp_admission.py' -v`
 `python -m py_compile bounded_tcp_admission.py tests/test_bounded_tcp_admission.py`
 
-Tests were not executed in this connector environment. Do not merge as a production DoS fix until integration and live fault-injection validation.
+Two new tests in tests/test_slow_peer_admission.py passed (2/2) in a local isolated copy of the fetched admission implementation; this does not validate the full GitHub checkout or production Pi server. Original branch tests were not run. Do not merge as a production DoS fix until integration and live fault-injection validation.
 
-## Next coding task
+Additional command: `python -m unittest discover -s tests -p 'test_slow_peer_admission.py' -v`\n\n## Next coding task
 Refactor the existing authenticated Pi per-connection loop into a worker function, wire this bounded admission, protect shared verifier replay state and global token buckets with locks, serialize ledger mutations, then test slow-client starvation and concurrent authenticated sessions on real loopback sockets.
