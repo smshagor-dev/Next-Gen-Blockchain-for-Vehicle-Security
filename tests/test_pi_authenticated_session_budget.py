@@ -4,7 +4,25 @@ from unittest import mock
 
 import hardware_bridge as bridge
 from hardware_transport_security import build_authenticated_envelope, encode_authenticated_envelope
-from tests.test_arduino_authenticated_ingress import DEVICE, SECRET, payload
+from datetime import datetime, timezone
+
+DEVICE = "pi-bench-01"
+SECRET = "pi-bench-secret-" + "K" * 48
+
+
+def payload():
+    return {
+        "source": "pi", "timestamp": datetime.now(timezone.utc).isoformat(),
+        "speed": 12.0, "acceleration": 0.0, "fuel_level": 80.0,
+        "battery_voltage": 12.6, "engine_temp": 30.0, "gps_lat": 0.0,
+        "gps_lon": 0.0, "obstacle_distance": 30.0,
+        "emergency_brake_active": False, "steering_angle": 0.0,
+        "brake_pressure": 0.0, "throttle_position": 0.0, "rpm": 1000.0,
+        "odometer": 0.0, "driver_heart_rate_bpm": 70.0,
+        "driver_drowsiness_score": 0.0, "driver_unwell": False,
+        "event": "HW:PI:TELEMETRY",
+    }
+
 
 
 class FakeConnection:
