@@ -102,7 +102,7 @@ class SerialIngressTests(unittest.TestCase):
             raw = ser.write.call_args.args[0]
             self.assertNotIn(b'"cmd":', raw)
             verifier = HardwareEnvelopeVerifier({DEVICE: SECRET})
-            result = verifier.verify(raw.rstrip(b"\\n"), expected_kind="COMMAND")
+            result = verifier.verify(raw.removesuffix(b"\n"), expected_kind="COMMAND")
             self.assertEqual(result.device_id, DEVICE)
             ecu.return_value.send_safe_mode_stop.assert_called_once_with(block_index=17)
 
