@@ -38,6 +38,26 @@ software verification and independent empirical research.
 - **Verification gate:** `python -m unittest tests.test_arduino_authenticated_ingress -v`;
   not executed in this change. Keep PR draft pending CI and review.
 
+## 2026-11-13 — command protocol conformance and negative evidence
+
+- **Implemented:** eight isolated protocol tests in
+  `tests/test_hardware_command_protocol_conformance.py` covering directional
+  HMAC key separation, single-use nonce, direction confusion, MAC tamper,
+  stale timestamp, identity binding, unsafe-command rejection, and the
+  **known restart replay vulnerability**.
+- **Important negative evidence:** the final test deliberately demonstrates
+  that a newly initialized in-memory verifier accepts a previously authenticated
+  command while it remains fresh. This is **not** durable replay protection.
+  A production receiver must persist monotonic sequence/nonce state with
+  crash-safe storage or an independently authenticated challenge/response
+  session before any actuation is allowed.
+- **Blocked:** firmware receiver, signed acknowledgment, independent
+  interlock/e-stop, physical CAN bus isolation, power-loss tests and HIL.
+  No vehicle command was transmitted.
+- **Verification:** `python -m unittest tests.test_hardware_command_protocol_conformance -v`
+  and `python -m unittest tests.test_arduino_authenticated_ingress -v`
+  are required; tests were not executed in this connector session.
+
 ## Research assertion / results gate
 
 - Real VeReMi CAM results are **auxiliary message-manipulation detection**
