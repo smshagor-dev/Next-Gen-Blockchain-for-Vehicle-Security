@@ -133,6 +133,26 @@ software verification and independent empirical research.
 - **Next code task:** socket-level fake-clock tests of partial frames and
   auth deadline, then nonblocking bounded connection handling under load.
 
+## 2026-11-13 — TCP post-receive deadline enforcement
+
+- **Implemented in draft PR #99:** cap blocking `recv` timeout by the
+  remaining absolute session lifetime and authentication deadline, then
+  recheck both boundaries **after** `recv` returns and before verifying or
+  admitting any telemetry. This closes the boundary where a signed frame
+  received after the deadline could otherwise reach the ledger.
+- **Synthetic tests added (not executed here):**
+  `python -m unittest tests.test_hardware_transport_deadlines -v`;
+  covers exact authentication expiry, authenticated post-auth traffic,
+  session expiry and pre-deadline acceptance.
+- **Partial:** per-connection handling remains sequential; one client can
+  consume its allowed deadline before the next is serviced. Server-wide
+  admission/rate budgets are not equivalent to bounded concurrent service.
+- **Blocked:** CI execution, real socket fault injection, restart-persistent
+  replay state, receiver acknowledgments, firmware/HIL tests and independent
+  physical emergency-stop. No hardware safety or publishable latency claim.
+- **Next code task:** socket-level Slowloris tests with real loopback
+  connections and bounded concurrent session scheduling.
+
 ## Research assertion / results gate
 
 - Real VeReMi CAM results are **auxiliary message-manipulation detection**
