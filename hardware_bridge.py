@@ -426,6 +426,20 @@ def run_pi_mode(bc: SmartCarBlockchain):
                         # Verify MAC, freshness, replay nonce, schema, and per-
                         # connection identity before *any* ledger/actuation side effect.
                         for item in session.receive(data):
+                            # A single recv may contain many signed frames. MAC
+                            # verification can itself consume the remaining
+                            # session lifetime; recheck before EACH mutation.
+                            # First authentication must also complete before
+                            # its deadline, not merely before recv returns.
+                            try:
+                                deadline_check(
+                                    time.monotonic(),
+                                    session_deadline=deadline,
+                                    auth_deadline=authentication_deadline,
+                                    authenticated=accepted_frames > 0,
+                                )
+                            except DeadlineExpired as exc:
+                                raise HardwareTransportError(str(exc)) from exc
                             # Restore normal idle timeout after first valid MAC.
                             if accepted_frames == 0:
                                 conn.settimeout(idle_timeout)
