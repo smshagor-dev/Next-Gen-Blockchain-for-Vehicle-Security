@@ -285,12 +285,20 @@ def run_arduino_mode(bc: SmartCarBlockchain):
 
     # Remote commands remain subject to an independent bench interlock.
     actuator = SafeModeActuatorDispatcher()
+    # A silent or trickle-fed serial peer must not monopolize the bridge forever.
+    idle_timeout = max(1, min(30, get_int("SMARTCAR_HW_IDLE_TIMEOUT_SEC", 5)))
+    max_session_sec = max(5, min(600, get_int("SMARTCAR_HW_MAX_SESSION_SEC", 120)))
+    deadline = time.monotonic() + max_session_sec
+    last_progress = time.monotonic()
     try:
-        while True:
+        while time.monotonic() < deadline:
+            if time.monotonic() - last_progress >= idle_timeout:
+                raise RuntimeError("Arduino serial idle timeout; port quarantined")
             # Bounded read, including for a peer that never sends a newline.
             chunk = ser.read(1024)
             if not chunk:
                 continue
+            last_progress = time.monotonic()
             try:
                 verified = session.receive(chunk)
             except HardwareTransportError as exc:
@@ -306,6 +314,7 @@ def run_arduino_mode(bc: SmartCarBlockchain):
                     device_id=item.device_id,
                     device_secret=verifier.device_secret(item.device_id),
                 )
+        raise RuntimeError("Arduino serial session lifetime exceeded; port quarantined")
     finally:
         ser.close()
 
