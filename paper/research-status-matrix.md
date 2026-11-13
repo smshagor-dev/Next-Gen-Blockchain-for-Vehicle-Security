@@ -114,6 +114,25 @@ software verification and independent empirical research.
   wiring and hardware-in-the-loop validation. Draft PR #99 must not merge
   without executable checks.
 
+## 2026-11-13 — TCP pre-authentication DoS boundary
+
+- **Implemented on draft PR #99:** server-wide monotonic token bucket for TCP
+  connection admission (defaults: 4 accepts/sec, burst 8), charged before
+  untrusted parsing or MAC verification; unauthenticated sessions have a
+  3-second default absolute authentication deadline independent of trickle
+  bytes (configurable 1–15 seconds). Authenticated sessions regain the
+  normal idle timeout. Three deterministic budget unit tests added.
+- **Unverified:** tests were not executed in this connector run. Commands:
+  `python -m unittest tests.test_pre_auth_tcp_admission -v` and
+  `python -m unittest tests.test_hardware_bridge_security -v`.
+- **Remaining gaps:** blocking single-threaded accept architecture, kernel
+  backlog exhaustion, host-wide distributed DoS, durable replay protection,
+  ECU authenticated acknowledgment, physical interlock and independent E-stop
+  tests. Connection budget is process-local and resets on restart. This is
+  a software mitigation, not a publishable network resilience measurement.
+- **Next code task:** socket-level fake-clock tests of partial frames and
+  auth deadline, then nonblocking bounded connection handling under load.
+
 ## Research assertion / results gate
 
 - Real VeReMi CAM results are **auxiliary message-manipulation detection**
