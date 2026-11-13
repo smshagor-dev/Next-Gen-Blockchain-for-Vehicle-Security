@@ -6,7 +6,8 @@ software verification and independent empirical research.
 
 | Workstream | Status | Verified engineering/source evidence | Remaining scientific gate |
 | --- | --- | --- | --- |
-| Arduino serial authentication (draft, not validated) | PARTIAL — NEW DRAFT | Signed enrolled-device envelope required; bounded reads, MAC/freshness/replay checks before ledger mutation, port closed on quarantine; synthetic tests added | CI/local execution, serial firmware protocol interoperability, independent wired emergency-stop and HIL validation missing |\n| Hardware TCP ingress, bound messages, authenticated node sessions, replay and safety gate | MERGED, LAB VALIDATION BLOCKED | PR #74 was merged; source regression and GitHub security CI addressed software controls | Physical Pi/CAN bench and local emergency safety case not independently verified |
+| Arduino serial authentication (draft, not validated) | PARTIAL — NEW DRAFT | Signed enrolled-device envelope required; bounded reads, MAC/freshness/replay checks before ledger mutation, port closed on quarantine; synthetic tests added | CI/local execution, serial firmware protocol interoperability, independent wired emergency-stop and HIL validation missing |
+| Hardware TCP ingress, bound messages, authenticated node sessions, replay and safety gate | MERGED, LAB VALIDATION BLOCKED | PR #74 was merged; source regression and GitHub security CI addressed software controls | Physical Pi/CAN bench and local emergency safety case not independently verified |
 | V2X event admission | MERGED SOFTWARE PROTOTYPE | PR #80 merged opt-in off/shadow/enforce, authenticated-session-before-quorum policy; command-smuggling regression tests | Independent incident labels, prior-art originality analysis, correlated reporters and physical safety validation |
 | Network collusion and availability fault checks | NEW DRAFT PR #89 (issue #88) | Actual merged EvidenceAdmissionGate and research-only ConsistentSubsetAdmissionGate exercised on 13 scripted incidents with seed/jitter variations, selected-source roles and SHA manifests | Constructed fault models, not independently captured physical incidents or repeated simulator trials; published comparator and HIL evidence missing |
 | Source-CAM integrity | VERIFIED IMPORT, not event truth | PR #82 merged; official VeReMi NextGen v1.0.0 baseline and dataReplay archives SHA-verified and imported; receiver duplicates audited | CAM attacker bit does not mean a verified hazard incident or physical source attestation; distribution license review |
@@ -44,6 +45,13 @@ software verification and independent empirical research.
   source/metric mapping, defensible independent units, accurate citations,
   comparative baselines, uncertainty and limits. A software QA report is
   **not** an original research paper.
+
+## 2026-11-13 Arduino branch correctness repair
+
+- PR #99: corrected literal escaped newline tokens that made the `maybe_send_arduino` call invalid Python syntax (commit `15e1b0e`). Corrected test frame delimiter handling so it removes the actual LF byte rather than backslash and letter `n` (commit `4c7dae3`).
+- These are **source-level fixes only**; tests have not been executed in this run. Do not count regression coverage as passing or claim device interoperability.
+- Immediate next validation: `python -m py_compile hardware_bridge.py tests/test_arduino_authenticated_ingress.py` and `python -m unittest tests.test_arduino_authenticated_ingress -v` in an environment with project dependencies. Keep PR draft until executed and reviewed.
+- Next engineering task: directional key separation and firmware conformance, without changing local independent emergency control.
 
 ## Next substantive code tasks
 
