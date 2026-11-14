@@ -10,6 +10,7 @@ import hashlib
 import hmac
 import json
 import os
+import tempfile
 from pathlib import Path
 
 from attested_interval_join import (GROUP_FIELDS, evaluate_interval,
@@ -125,23 +126,35 @@ def seal_capture(manifest_bytes: bytes, pinned_manifest_sha256: str,
 
 
 def create_once(path: Path, payload: bytes) -> None:
-    """Do not silently replace pinned trials or previously signed receipts."""
+    """Publish fully fsynced evidence without exposing a partially written file.
+
+    A temporary file in the destination directory is fsynced first, then
+    hard-linked to the final name with no overwrite. The link is the atomic
+    visibility point. This is NOT atomicity across multiple receipt files.
+    """
     path = Path(path)
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    temporary = None
     try:
-        with os.fdopen(fd, "wb") as stream:
+        with tempfile.NamedTemporaryFile(
+                mode="wb", prefix=".capture-pending-", suffix=".tmp",
+                dir=path.parent, delete=False) as stream:
+            temporary = Path(stream.name)
+            if os.name == "posix":
+                os.chmod(temporary, 0o600)
             stream.write(payload)
             stream.flush()
             os.fsync(stream.fileno())
-    except BaseException:
-        # File may contain partial output. Never quietly retry or claim sealed.
-        raise
-    if os.name == "posix":
-        directory = os.open(str(path.parent), os.O_RDONLY)
-        try:
-            os.fsync(directory)
-        finally:
-            os.close(directory)
+        # os.link is exclusive: unlike os.replace it fails if target exists.
+        os.link(temporary, path)
+        if os.name == "posix":
+            directory = os.open(str(path.parent), os.O_RDONLY)
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def main() -> None:
