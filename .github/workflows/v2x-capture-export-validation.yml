@@ -6,6 +6,8 @@ on:
     paths:
       - "experiments/v2x/capture_export_producer.py"
       - "experiments/v2x/test_capture_export_producer.py"
+      - "experiments/v2x/verify_capture_receipt_pair.py"
+      - "experiments/v2x/test_verify_capture_receipt_pair.py"
       - "experiments/v2x/attested_interval_join.py"
       - "experiments/v2x/test_attested_interval_join.py"
       - "experiments/v2x/join_world_incidents.py"
@@ -37,6 +39,10 @@ jobs:
         env:
           PYTHONPATH: experiments/v2x
         run: python -m unittest discover -s experiments/v2x -p "test_capture_export_producer.py" -v
+      - name: Reject invalid or incomplete receipt pairs
+        env:
+          PYTHONPATH: experiments/v2x
+        run: python -m unittest discover -s experiments/v2x -p "test_verify_capture_receipt_pair.py" -v
       - name: Exercise signed interval checks
         env:
           PYTHONPATH: experiments/v2x
