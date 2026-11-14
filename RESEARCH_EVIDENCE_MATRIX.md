@@ -33,3 +33,16 @@ This matrix records engineering progress, **not scientific validation**. Exact M
 - **Synthetic test evidence:** `PYTHONPATH=experiments/v2x python -m unittest discover -s experiments/v2x -p 'test_attested_interval_join.py' -v` ran in isolated local Python with a locally reconstructed mirror of `join_world_incidents.py`: **15/15 passed**. Newly pushed GitHub file content hashes matched the locally tested files; the exact repository-wide test suite and CI have **not been executed**.
 - **Critical limitation:** No capture-interval attestation producer has been implemented or physically verified. A signed `capture_complete` flag is a hub's self-report, not proof of uninterrupted sensing, independently trusted annotators or a pre-registered experiment. No authentic incident-level efficacy evidence was generated; this test suite is NON-PUBLISHABLE as a main result.
 - **Next:** implement exporter-side canonical interval receipts, preserve an operator-pinned trial manifest before execution, validate producer/consumer interoperation and execute matched real incident trials under independent world truth; then independent cluster-aware comparisons.
+
+## 2026-11-15 — independent-trial statistical analysis protocol
+
+| Workstream | Status | Evidence and next step |
+| --- | --- | --- |
+| Hardware authentication, emergency isolation, physical actuation | PARTIAL / PHYSICAL LAB BLOCKED | Prior hardening is separate from a trusted, independently witnessed vehicle safety test. Do not infer emergency-stop reliability from software tests. |
+| Ledger durability and distributed finality | PARTIAL / INDEPENDENT FAULT LAB BLOCKED | Crash consistency and mock-contract finality are not physical/distributed finality evidence. |
+| Actual policy replay and source binding | DRAFT PRS #107/#108 | Keep pending changes isolated; source pins and offline replay are not independently authenticated observations. |
+| Independent cluster-level comparisons | IMPLEMENTED, CI PENDING | `experiments/v2x/analyze_independent_trials.py` accepts strict held-out test JSONL, equal baseline/candidate denominators and truth counts, unique claimed cluster/source IDs; computes paired cluster-mean accuracy difference, deterministic cluster bootstrap percentile CI and explicitly exploratory sign-flip p-value. 17 synthetic contract tests authored; **not field results**. |
+| Authentic multi-seed V2X/CAN study | BLOCKED | Requires external datasets, verified source hashes/licenses, independent label provenance, genuine session receipts, complete observation windows and independent trial collection. |
+| Publication | BLOCKED | No real cluster outcomes were analyzed in this change. n>=30 is NOT statistical significance. No claim of novel cryptography or physical safety. |
+
+Next implementation: adapt authenticated real receiver captures into immutable trial-level summaries with independent witness metadata and a predeclared trial split; execute separate baseline/candidate runs with real provenance. Validate this PR's workflow before merge.
