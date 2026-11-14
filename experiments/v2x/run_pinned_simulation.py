@@ -10,10 +10,14 @@ import argparse
 from datetime import datetime, timezone
 import json
 import os
+import signal
 from pathlib import Path
 import subprocess
 import tempfile
 import time
+
+if os.name == 'posix':
+    import resource
 
 from capture_export_producer import canonical, create_once
 from pin_policy_artifacts import sha, verify_pin
@@ -48,21 +52,50 @@ def execute_local_simulation(pin: bytes, pinned_sha256: str, manifest: bytes,
     command = [str(executable_path.resolve()), str(config_path.resolve())]
     started_utc = datetime.now(timezone.utc).isoformat()
     start = time.monotonic()
+    # On POSIX, enforce kernel file-size quotas BEFORE the child executes.
+    # This prevents a malicious simulator from filling disk while producing
+    # stdout/stderr; post-hoc file size checks alone are not a resource bound.
+    def limit_child_output():
+        resource.setrlimit(resource.RLIMIT_FSIZE,
+                           (max_output_bytes, max_output_bytes))
+
     with tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr:
+        process = subprocess.Popen(
+            command, stdin=subprocess.DEVNULL, stdout=stdout, stderr=stderr,
+            close_fds=True, start_new_session=(os.name == 'posix'),
+            preexec_fn=limit_child_output if os.name == 'posix' else None)
         try:
-            process = subprocess.run(command, stdin=subprocess.DEVNULL,
-                                     stdout=stdout, stderr=stderr, timeout=timeout_seconds,
-                                     check=False, close_fds=True)
-        except subprocess.TimeoutExpired as exc:
-            raise ValueError("simulation timed out; no successful run receipt") from exc
-        duration_ms = round((time.monotonic() - start) * 1000, 3)
-        if stdout.tell() > max_output_bytes or stderr.tell() > max_output_bytes:
-            raise ValueError("simulation exceeded output bound; no successful run receipt")
-        if process.returncode != 0:
-            raise ValueError("simulation exited unsuccessfully; no successful run receipt")
-        stdout.seek(0)
-        stderr.seek(0)
-        stdout_bytes, stderr_bytes = stdout.read(), stderr.read()
+            try:
+                process.wait(timeout=timeout_seconds)
+            except subprocess.TimeoutExpired as exc:
+                # Kill the entire POSIX process group, not just its leader.
+                # Otherwise child processes can continue writing after timeout.
+                if os.name == 'posix':
+                    os.killpg(process.pid, signal.SIGKILL)
+                else:
+                    process.kill()  # Windows descendants require a Job Object.
+                process.wait()
+                raise ValueError("simulation timed out; no successful run receipt") from exc
+            duration_ms = round((time.monotonic() - start) * 1000, 3)
+            stdout_size = os.fstat(stdout.fileno()).st_size
+            stderr_size = os.fstat(stderr.fileno()).st_size
+            if stdout_size > max_output_bytes or stderr_size > max_output_bytes:
+                raise ValueError("simulation exceeded output bound; no successful run receipt")
+            if process.returncode != 0:
+                # SIGXFSZ is the expected POSIX result when RLIMIT_FSIZE is hit.
+                if os.name == 'posix' and process.returncode == -signal.SIGXFSZ:
+                    raise ValueError("simulation exceeded output bound; no successful run receipt")
+                raise ValueError("simulation exited unsuccessfully; no successful run receipt")
+            stdout.seek(0)
+            stderr.seek(0)
+            stdout_bytes, stderr_bytes = stdout.read(), stderr.read()
+        finally:
+            if process.poll() is None:
+                if os.name == 'posix':
+                    os.killpg(process.pid, signal.SIGKILL)
+                else:
+                    process.kill()
+                process.wait()
     # A post-run digest detects changes before/after execution, not races
     # while a mutable executable/config is in use.
     if executable_path.read_bytes() != expected_executable or config_path.read_bytes() != expected_config:
@@ -76,7 +109,7 @@ def execute_local_simulation(pin: bytes, pinned_sha256: str, manifest: bytes,
         "executable_sha256": sha(expected_executable),
         "config_sha256": sha(expected_config),
         "command": command,
-        "process_pid_observed": process.pid if hasattr(process, "pid") else None,
+        "process_pid_observed": process.pid,
         "started_utc_local_clock": started_utc,
         "duration_ms_local_clock": duration_ms,
         "returncode": process.returncode,
@@ -88,6 +121,7 @@ def execute_local_simulation(pin: bytes, pinned_sha256: str, manifest: bytes,
         "limitations": [
             "Operator-controlled local simulation process; not independently witnessed.",
             "Pre/post hashes cannot exclude mutable executable race or process substitution.",
+            "POSIX child output is kernel-capped; Windows descendants and disk output remain only post-run checked.",
             "No real vehicle/CAN actuation, physical interlock, sensor uptime or policy efficacy verified.",
         ],
     }
