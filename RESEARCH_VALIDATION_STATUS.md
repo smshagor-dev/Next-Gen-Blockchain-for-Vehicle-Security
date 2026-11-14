@@ -59,3 +59,12 @@ Run next: `python -m unittest discover -s tests -p 'test_pi_byte_budget_compile_
 **Validation:** GitHub connector writes succeeded; local git ls-remote failed with DNS resolution of github.com, so full checkout and tests were not run. Run: `python -m unittest discover -s tests -p 'test_signed_telemetry_type_safety.py' -v`; then full suite and authenticated real-loopback race/Slowloris tests. Existing fixture data, microbenchmarks and communication formulas remain non-publishable primary evidence.
 
 **Next code task:** exercise the production Pi TCP server with authenticated concurrent loopback sessions and malformed-but-valid-MAC telemetry, then evaluate ledger crash consistency and safe actuation isolation. Do not merge without verification.
+
+
+## 2026-11-14 strict JSON numeric admission checkpoint
+
+**Code change:** Authenticated telemetry numeric fields now accept only JSON numeric types (Python int/float, excluding bool), not numeric-looking strings or containers. Finite-value checks remain in force. This prevents MAC-valid but schema-ambiguous strings such as `"0"` and `"12.5"` from being silently converted before ledger admission. Added regression cases for string/container rejection and valid integer/float preservation. Commits `f709b87`, `55c9af0`.
+
+**Verification:** GitHub writes succeeded. Local `git ls-remote` failed with `Could not resolve host: github.com`, so full-checkout tests were not executed; **implemented, unverified**. Run `python -m unittest discover -s tests -p 'test_signed_telemetry_type_safety.py' -v` on the branch. Review upstream sensor producers for any legacy string-encoded measurements before merging.
+
+**Next code task:** Add real authenticated concurrent loopback socket tests for production Pi ingress, including malformed-but-valid-MAC numeric strings, replay races, trickle-frame exhaustion, and worker recovery. Keep physical safety and publishability claims blocked.
