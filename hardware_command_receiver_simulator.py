@@ -7,11 +7,13 @@ key compromise, or a compromised enrolled sender.
 from __future__ import annotations
 
 import sqlite3
+import re
 from contextlib import closing
 from pathlib import Path
 from typing import Any, Mapping
 
 from hardware_transport_security import HardwareEnvelopeVerifier, HardwareTransportError
+from command_ack_protocol import issue_receipt
 
 
 class DurableCommandNonceStore:
@@ -62,7 +64,20 @@ class SimulatedCommandReceiver:
         self.verifier = HardwareEnvelopeVerifier(device_keys)
         self.store = DurableCommandNonceStore(database_path)
 
-    def receive(self, frame: Any, *, expected_device_id: str) -> dict[str, object]:
+    def receive(
+        self, frame: Any, *, expected_device_id: str,
+        requester_challenge: str | None = None,
+    ) -> dict[str, object]:
+        # A caller's fresh challenge is passed over an assumed trusted
+        # requester/receiver channel. It is not part of the COMMAND MAC:
+        # this module is a non-actuating simulator, not a production wire ACK.
+        # Validate before claiming a durable nonce so malformed requests do
+        # not consume one-time admissions.
+        if requester_challenge is not None:
+            if (type(requester_challenge) is not str
+                    or not re.fullmatch(r"[a-f0-9]{32,128}", requester_challenge)
+                    or len(requester_challenge) % 2):
+                raise HardwareTransportError("HW_REQUESTER_CHALLENGE_INVALID")
         verified = self.verifier.verify(
             frame, expected_kind="COMMAND", expected_device_id=expected_device_id
         )
@@ -72,10 +87,22 @@ class SimulatedCommandReceiver:
             raise HardwareTransportError("HW_DURABLE_REPLAY_STORAGE_UNAVAILABLE", authenticated=True) from exc
         if not claimed:
             raise HardwareTransportError("HW_DURABLE_COMMAND_REPLAY", authenticated=True)
-        return {
+        result: dict[str, object] = {
             "status": "SIMULATED_ADMISSION_ONLY",
             "device_id": verified.device_id,
             "nonce": verified.nonce,
             "actuation_performed": False,
             "physical_acknowledgment": False,
         }
+        if requester_challenge is not None:
+            # Sign only after the replay-resistant SQLite transaction has
+            # committed. Lost/duplicated acknowledgments cannot repeat a
+            # command and never imply physical command execution.
+            result["admission_receipt"] = issue_receipt(
+                self.verifier.device_secret(verified.device_id),
+                device_id=verified.device_id,
+                command_nonce=verified.nonce,
+                challenge=requester_challenge,
+                admitted=True,
+            )
+        return result
