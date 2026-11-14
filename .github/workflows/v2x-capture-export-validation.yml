@@ -1,0 +1,47 @@
+name: V2X Trial Manifest and Capture Receipts
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "experiments/v2x/capture_export_producer.py"
+      - "experiments/v2x/test_capture_export_producer.py"
+      - "experiments/v2x/attested_interval_join.py"
+      - "experiments/v2x/test_attested_interval_join.py"
+      - "experiments/v2x/join_world_incidents.py"
+      - "experiments/v2x/test_join_world_incidents.py"
+      - ".github/workflows/v2x-capture-export-validation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "experiments/v2x/**"
+      - ".github/workflows/v2x-capture-export-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  producer-consumer-contract:
+    name: Receipt contract / Python 3.11
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Check syntax and imports
+        run: python -m compileall -q experiments/v2x
+      - name: Exercise signed producer, consumer and world join
+        env:
+          PYTHONPATH: experiments/v2x
+        run: python -m unittest discover -s experiments/v2x -p "test_capture_export_producer.py" -v
+      - name: Exercise signed interval checks
+        env:
+          PYTHONPATH: experiments/v2x
+        run: python -m unittest discover -s experiments/v2x -p "test_attested_interval_join.py" -v
+      - name: Exercise independent world joins
+        env:
+          PYTHONPATH: experiments/v2x
+        run: python -m unittest discover -s experiments/v2x -p "test_join_world_incidents.py" -v
