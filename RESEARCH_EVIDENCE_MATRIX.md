@@ -70,3 +70,10 @@ This matrix records engineering progress, **not scientific validation**. Exact M
 | Next code task | UPCOMING | Integrate actual instrumented policy-run identifiers and independent witness/attestation; execute frozen policies on identically scheduled authentic multi-seed scenarios and aggregate by genuinely independent clusters |
 
 These deterministic protocol tests are **non-publishable main evidence**. This adapter is not a claim of original cryptography, sensor validity, or real comparative superiority. Never claim p-values demonstrate significance merely because n>=30.
+
+### Verified paired-capture contract evidence (2026-11-14)
+
+- **TESTED:** GitHub Actions `V2X Trial Manifest and Capture Receipts` run [43624931667](https://github.com/smshagor-dev/Next-Gen-Blockchain-for-Vehicle-Security/actions/runs/43624931667) completed **SUCCESS** on source commit `072a9662758f3892f163dbf63c143a9903063efa`. Job [132538551757](https://github.com/smshagor-dev/Next-Gen-Blockchain-for-Vehicle-Security/actions/runs/43624931667/job/132538551757) executed 17/17 new matched-cohort tests, including the actual CLI subprocess round-trip, 21 producer tests, 31 receipt-pair tests, 15 interval tests and 10 world-join tests. All passed (94 passing cases in the workflow, not 94 independent experiments).
+- **PARTIAL:** Both signed policy-assignment receipts are hub claims, not cryptographic proof of which executable policy actually ran. No authentic multi-seed experiments or independent observation-coverage measurements were performed. Exact McNemar p-value is **descriptive only** at a single claimed cluster and cannot establish significance for correlated incidents.
+- **BLOCKED:** Independently observed algorithm execution and sensor uptime; trustworthy incident annotations, authentic Veremi/CAN trials, physical local emergency-stop evidence; source-audited prior-art comparisons.
+- **NEXT:** Pin executable/configuration digests in a separately observed harness, run matched split trial traces under independent clocks and clusters, and report bootstrap uncertainty/effect sizes only after true independent replications.
