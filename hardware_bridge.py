@@ -52,25 +52,45 @@ def _now():
     return datetime.now(timezone.utc).isoformat()
 
 
+def _finite_telemetry_number(value, field):
+    """Reject non-finite and non-numeric signed telemetry before chain mutation."""
+    import math
+    if isinstance(value, bool):
+        raise ValueError(f"{field}: boolean is not a numeric measurement")
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"{field}: invalid numeric measurement") from exc
+    if not math.isfinite(number):
+        raise ValueError(f"{field}: non-finite numeric measurement")
+    return number
+
+
+def _strict_telemetry_bool(value, field):
+    if type(value) is not bool:
+        raise ValueError(f"{field}: expected boolean")
+    return value
+
+
 def to_telemetry(pkt: dict) -> TelemetryData:
     return TelemetryData(
-        speed=float(pkt.get("speed", 0.0)),
-        acceleration=float(pkt.get("acceleration", 0.0)),
-        fuel_level=float(pkt.get("fuel_level", 100.0)),
-        battery_voltage=float(pkt.get("battery_voltage", 12.6)),
-        engine_temp=float(pkt.get("engine_temp", 20.0)),
-        gps_lat=float(pkt.get("gps_lat", 0.0)),
-        gps_lon=float(pkt.get("gps_lon", 0.0)),
-        obstacle_distance=float(pkt.get("obstacle_distance", 999.0)),
-        emergency_brake_active=bool(pkt.get("emergency_brake_active", False)),
-        steering_angle=float(pkt.get("steering_angle", 0.0)),
-        brake_pressure=float(pkt.get("brake_pressure", 0.0)),
-        throttle_position=float(pkt.get("throttle_position", 0.0)),
-        rpm=float(pkt.get("rpm", 0.0)),
-        odometer=float(pkt.get("odometer", 0.0)),
-        driver_heart_rate_bpm=float(pkt.get("driver_heart_rate_bpm", 72.0)),
-        driver_drowsiness_score=float(pkt.get("driver_drowsiness_score", 0.0)),
-        driver_unwell=bool(pkt.get("driver_unwell", False)),
+        speed=_finite_telemetry_number(pkt.get("speed", 0.0), "speed"),
+        acceleration=_finite_telemetry_number(pkt.get("acceleration", 0.0), "acceleration"),
+        fuel_level=_finite_telemetry_number(pkt.get("fuel_level", 100.0), "fuel_level"),
+        battery_voltage=_finite_telemetry_number(pkt.get("battery_voltage", 12.6), "battery_voltage"),
+        engine_temp=_finite_telemetry_number(pkt.get("engine_temp", 20.0), "engine_temp"),
+        gps_lat=_finite_telemetry_number(pkt.get("gps_lat", 0.0), "gps_lat"),
+        gps_lon=_finite_telemetry_number(pkt.get("gps_lon", 0.0), "gps_lon"),
+        obstacle_distance=_finite_telemetry_number(pkt.get("obstacle_distance", 999.0), "obstacle_distance"),
+        emergency_brake_active=_strict_telemetry_bool(pkt.get("emergency_brake_active", False), "emergency_brake_active"),
+        steering_angle=_finite_telemetry_number(pkt.get("steering_angle", 0.0), "steering_angle"),
+        brake_pressure=_finite_telemetry_number(pkt.get("brake_pressure", 0.0), "brake_pressure"),
+        throttle_position=_finite_telemetry_number(pkt.get("throttle_position", 0.0), "throttle_position"),
+        rpm=_finite_telemetry_number(pkt.get("rpm", 0.0), "rpm"),
+        odometer=_finite_telemetry_number(pkt.get("odometer", 0.0), "odometer"),
+        driver_heart_rate_bpm=_finite_telemetry_number(pkt.get("driver_heart_rate_bpm", 72.0), "driver_heart_rate_bpm"),
+        driver_drowsiness_score=_finite_telemetry_number(pkt.get("driver_drowsiness_score", 0.0), "driver_drowsiness_score"),
+        driver_unwell=_strict_telemetry_bool(pkt.get("driver_unwell", False), "driver_unwell"),
         timestamp=str(pkt.get("timestamp", _now())),
     )
 
@@ -473,6 +493,8 @@ def run_pi_mode(bc: SmartCarBlockchain):
                         print(f"[CHAIN] block={block.index} event={event}")
             except HardwareTransportError as exc:
                 print(f"[HW BRIDGE] rejected Pi frame: {exc.reason}")
+            except (ValueError, TypeError, KeyError) as exc:
+                print(f"[HW BRIDGE] rejected malformed authenticated telemetry: {type(exc).__name__}")
             except socket.timeout:
                 print("[HW BRIDGE] Pi connection closed after idle timeout")
             except OSError:
