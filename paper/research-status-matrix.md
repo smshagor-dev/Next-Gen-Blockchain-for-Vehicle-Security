@@ -357,3 +357,9 @@ Draft branch `authenticate-arduino-serial-ingress` removes raw unsigned Arduino 
 - **IMPLEMENTED / UNVERIFIED:** Go `/save` uses a same-directory private temp file, file fsync, one rename, POSIX parent-directory fsync, and preserves the old destination on rename failure. Concurrent saves are serialized within one process and invalid chain snapshots are rejected.
 - **VALIDATION PENDING:** `cd api/go && go test -count=1 ./... && go vet ./...` and Linux `go test -race -count=1 ./...` must run on the reconciled branch. No physical power-loss or cross-process multiwriter durability claim.
 - **BLOCKED:** startup recovery, automatic per-append persistence, host rollback resistance, true consensus finality and hardware interlock evidence.
+
+## Zero-observation V2X interval accounting (draft PR #97)
+
+- **IMPLEMENTED / EXECUTION PENDING:** An independently labelled positive incident with an authenticated header-only capture is retained as a missed hazard (false negative), rather than excluded from the denominator. Empty world truth and malformed/headerless captures remain invalid.
+- **TEST COMMAND:** `PYTHONPATH=experiments/v2x python -m unittest discover -s experiments/v2x -p test_join_world_incidents.py -v` (not executed in this merge-resolution session).
+- **BLOCKED:** independently trusted ground truth, authenticated capture interval provenance and matched real incident evaluation. Synthetic regression fixtures are not publishable main results.

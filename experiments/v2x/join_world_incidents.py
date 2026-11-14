@@ -21,7 +21,7 @@ def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def rows_from_bytes(data: bytes, columns: tuple[str, ...]) -> list[dict[str, str]]:
+def rows_from_bytes(data: bytes, columns: tuple[str, ...], *, allow_empty: bool = False) -> list[dict[str, str]]:
     text = data.decode("utf-8-sig")
     import io
     reader = csv.DictReader(io.StringIO(text), strict=True)
@@ -29,7 +29,7 @@ def rows_from_bytes(data: bytes, columns: tuple[str, ...]) -> list[dict[str, str
     if len(headers) != len(set(headers)) or set(headers) != set(columns):
         raise ValueError("unexpected, duplicated or missing columns")
     rows = list(reader)
-    if not rows or any(None in row or any(not row[k] for k in columns) for row in rows):
+    if (not rows and not allow_empty) or any(None in row or any(not row[k] for k in columns) for row in rows):
         raise ValueError("empty or malformed rows")
     return rows
 
@@ -50,7 +50,7 @@ def evaluate(world_bytes: bytes, capture_bytes: bytes, receipt: dict,
         raise ValueError("operator-pinned source digest mismatch")
     verify_receipt(capture_bytes, receipt, key)
     world = rows_from_bytes(world_bytes, WORLD_COLUMNS)
-    captures = rows_from_bytes(capture_bytes, CAPTURE_COLUMNS)
+    captures = rows_from_bytes(capture_bytes, CAPTURE_COLUMNS, allow_empty=True)
     universe = {}
     groups = set()
     for row in world:
@@ -105,6 +105,7 @@ def evaluate(world_bytes: bytes, capture_bytes: bytes, receipt: dict,
             "decision_trace": trace,
             "limitations": ["HMAC proves hub export integrity only; no session MAC, annotator trust, or sensor attestation.",
                             "World labels and hub exports must originate from independently controlled trusted sources.",
+                            "An empty but authenticated capture is counted as zero relays, not silently dropped from availability evaluation.",
                             "This adapter does not evaluate V2X admission policy or constitute publishable experiments."]}
 
 

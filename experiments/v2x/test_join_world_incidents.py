@@ -43,6 +43,22 @@ class WorldJoinTests(unittest.TestCase):
         self.assertEqual(result["unobserved_positive_incidents"], 1)
         self.assertFalse(result["publication_ready"])
 
+    def test_authenticated_empty_capture_counts_all_hazards_as_missed(self):
+        capture = csv_bytes(CAP, [])
+        result = self.check(capture=capture)
+        self.assertEqual((result["tp"], result["fp"], result["tn"], result["fn"]), (0, 0, 1, 2))
+        self.assertEqual(result["unobserved_positive_incidents"], 2)
+        self.assertEqual(result["capture_rows"], 0)
+        self.assertFalse(result["publication_ready"])
+
+    def test_empty_world_still_rejected(self):
+        with self.assertRaisesRegex(ValueError, "empty or malformed"):
+            self.check(world=csv_bytes(WORLD, []))
+
+    def test_headerless_capture_rejected(self):
+        with self.assertRaisesRegex(ValueError, "columns"):
+            self.check(capture=b"")
+
     def test_pinned_world_tamper(self):
         with self.assertRaisesRegex(ValueError, "operator-pinned"):
             self.check(world_digest="0" * 64)
