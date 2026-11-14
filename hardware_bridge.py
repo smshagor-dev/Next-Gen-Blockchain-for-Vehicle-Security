@@ -388,9 +388,6 @@ def run_pi_mode(bc: SmartCarBlockchain):
     print(f"[HW BRIDGE] Authenticated Pi TCP mode listening on {host}:{port}")
 
     def handle_client(conn):
-            if not admission_budget.claim():
-                print("[HW BRIDGE] rejected connection: admission budget exceeded")
-                continue
             conn.settimeout(idle_timeout)
             session = AuthenticatedPiTelemetrySession(verifier)
             authentication_deadline = time.monotonic() + auth_timeout
