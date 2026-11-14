@@ -395,6 +395,8 @@ def run_pi_mode(bc: SmartCarBlockchain):
             session = AuthenticatedPiTelemetrySession(verifier)
             authentication_deadline = time.monotonic() + auth_timeout
             accepted_frames = 0
+            # Per-connection accounting must start before the first recv.
+            received_bytes = 0
             deadline = time.monotonic() + max_session_sec
             try:
                 while time.monotonic() < deadline:
