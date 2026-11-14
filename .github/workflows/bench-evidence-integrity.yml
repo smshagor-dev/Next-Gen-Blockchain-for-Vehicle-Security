@@ -1,0 +1,26 @@
+name: Non-actuating Bench Evidence Integrity
+
+on:
+  pull_request:
+    paths:
+      - 'experiments/hardware/audit_physical_evidence.py'
+      - 'tests/test_physical_evidence_audit.py'
+      - '.github/workflows/bench-evidence-integrity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  software-evidence-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Validate synthetic fixtures and fail-closed audit
+        run: |
+          python -m unittest tests.test_physical_evidence_audit -v
+          python -m py_compile experiments/hardware/audit_physical_evidence.py
