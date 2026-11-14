@@ -43,3 +43,10 @@ Next: run `python -m unittest discover -s tests -p 'test_pi_session_byte_budget.
 **Validation blocked:** `git ls-remote https://github.com/smshagor-dev/Next-Gen-Blockchain-for-Vehicle-Security.git HEAD` failed with `Could not resolve host: github.com` in the local execution environment. No full-checkout tests executed. GitHub connector commits succeeded.
 
 Run next: `python -m unittest discover -s tests -p 'test_pi_byte_budget_compile_regression.py' -v`, then `python -m unittest discover -s tests -p 'test_pi_session_byte_budget.py' -v` and authenticated real-loopback concurrency/replay tests. Do not merge until runtime and full regression validation; local hardwired emergency stop remains independent and unverified.
+
+
+## 2026-11-14 counter initialization verification checkpoint
+
+**Code repair:** Inspected the actual branch file through the GitHub connector and found the prior claimed initialization absent: `handle_client` incremented `received_bytes` before assignment. Added `received_bytes = 0` immediately before the receive loop (commit `1449102`). The existing `test_pi_byte_budget_compile_regression.py` specifically asserts one zero initialization preceding increment and limit guard; the previous branch would fail this assertion. This is a code correction, not evidence that the full test suite passes.
+
+**Status:** Pi byte budget implemented, **execution unverified**. Physical actuation and emergency-stop behavior unverified. Next: run source guard and real authenticated loopback concurrent replay/trickle tests on a complete checkout; then review ledger and actuator lock contention. No main-branch merge or publishable experiment claimed.
