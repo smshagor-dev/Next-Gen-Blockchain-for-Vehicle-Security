@@ -76,3 +76,12 @@ Run next: `python -m unittest discover -s tests -p 'test_pi_byte_budget_compile_
 **Validation:** GitHub connector writes succeeded; local checkout could not be cloned due to DNS failure. Neither full-suite nor new regression tests were executed in the repository. Command: `python -m unittest discover -s tests -p 'test_pi_lock_isolation.py' -v`.
 
 **Next:** Test concurrent signed telemetry on real loopback sockets while a remote command receiver intentionally stalls; measure ledger progress and worker recovery. Review actuator lock hold time and use of blockchain state outside ledger lock; run full suite before merging. Local emergency-stop remains independent and physical safety is unverified.
+
+
+## 2026-11-14 monotonic bench stop cooldown checkpoint
+
+**Implemented:** SafeModeActuatorDispatcher now uses time.monotonic() for its cooldown check and successful Arduino/Pi send timestamps, with an explicit None sentinel for the first eligible stop. Wall-clock adjustments can no longer extend or bypass this local rate-control interval. The independent local emergency control is untouched. Commit: 7db3270. Added executable isolated dispatcher tests (commit c382ab5), including first-command eligibility, cooldown expiry, disarmed gate and inactive safe-mode rejection.
+
+**Evidence:** Four assertions on an independently recreated cooldown logic snippet passed in local Python; this is NOT execution of the checked-in regression test or full hardware_bridge module. GitHub checkout DNS resolution remains unavailable. Run `python -m unittest discover -s tests -p 'test_actuator_monotonic_cooldown.py' -v` on a checkout, then complete full suite and authenticated loopback faults before merging. No physical actuation or independent emergency-stop evidence; not a publishable experimental result.
+
+**Next task:** Exercise production Pi ingress with concurrent authenticated loopback sessions, replay races, slow receivers and measured rejection latency. Verify dispatcher command serialization does not starve honest sessions; then address durable ledger crash consistency.
