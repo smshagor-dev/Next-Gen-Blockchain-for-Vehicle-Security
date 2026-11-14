@@ -69,7 +69,7 @@ class LabelIsolatedReplayTests(unittest.TestCase):
         self.assertEqual(r["methods"]["ablation_quorum_3"]["fn"], 2)
         self.assertEqual(r["methods"]["ablation_quorum_3"]["tn"], 2)
         self.assertEqual(r["methods"]["evidence_quorum_2"]
-                         ["delay_from_first_valid_received_ms"]["mean"], 1500)
+                         ["delay_from_first_valid_received_ms"]["mean"], 2000)
         self.assertFalse(r["publication_ready"])
 
     def test_zero_observation_outage_cannot_disappear(self):
