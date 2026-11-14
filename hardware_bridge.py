@@ -14,12 +14,14 @@ Then pushes into SmartCar blockchain pipeline (with edge/PoA/DID/ZKP/etc).
 import json
 import os
 import socket
+import threading
 import time
 from datetime import datetime, timezone
 from typing import Optional
 
 from env_config import load_project_env_once, get_env, get_int, get_bool
 from blockchain import SmartCarBlockchain, TelemetryData
+from bounded_tcp_admission import BoundedTCPAdmission
 from hardware_actuation_safety import BenchActuationGate
 from hardware_transport_deadlines import deadline_check, DeadlineExpired
 from hardware_transport_security import (
@@ -50,25 +52,54 @@ def _now():
     return datetime.now(timezone.utc).isoformat()
 
 
+def _finite_telemetry_number(value, field):
+    """Reject non-finite and non-numeric signed telemetry before chain mutation."""
+    import math
+    # JSON numbers must remain numbers: strings, booleans and containers are
+    # not valid authenticated sensor measurements, even if float() coerces them.
+    if type(value) not in (int, float):
+        raise ValueError(f"{field}: expected JSON number")
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"{field}: invalid numeric measurement") from exc
+    if not math.isfinite(number):
+        raise ValueError(f"{field}: non-finite numeric measurement")
+    return number
+
+
+def _strict_telemetry_bool(value, field):
+    if type(value) is not bool:
+        raise ValueError(f"{field}: expected boolean")
+    return value
+
+
 def to_telemetry(pkt: dict) -> TelemetryData:
+    # Safety-critical booleans must be explicitly supplied by an authenticated
+    # sender. Missing fields must not silently become a safe/healthy reading.
+    if type(pkt) is not dict:
+        raise ValueError("telemetry: expected JSON object")
+    for field in ("emergency_brake_active", "driver_unwell"):
+        if field not in pkt:
+            raise ValueError(f"{field}: required signed telemetry field")
     return TelemetryData(
-        speed=float(pkt.get("speed", 0.0)),
-        acceleration=float(pkt.get("acceleration", 0.0)),
-        fuel_level=float(pkt.get("fuel_level", 100.0)),
-        battery_voltage=float(pkt.get("battery_voltage", 12.6)),
-        engine_temp=float(pkt.get("engine_temp", 20.0)),
-        gps_lat=float(pkt.get("gps_lat", 0.0)),
-        gps_lon=float(pkt.get("gps_lon", 0.0)),
-        obstacle_distance=float(pkt.get("obstacle_distance", 999.0)),
-        emergency_brake_active=bool(pkt.get("emergency_brake_active", False)),
-        steering_angle=float(pkt.get("steering_angle", 0.0)),
-        brake_pressure=float(pkt.get("brake_pressure", 0.0)),
-        throttle_position=float(pkt.get("throttle_position", 0.0)),
-        rpm=float(pkt.get("rpm", 0.0)),
-        odometer=float(pkt.get("odometer", 0.0)),
-        driver_heart_rate_bpm=float(pkt.get("driver_heart_rate_bpm", 72.0)),
-        driver_drowsiness_score=float(pkt.get("driver_drowsiness_score", 0.0)),
-        driver_unwell=bool(pkt.get("driver_unwell", False)),
+        speed=_finite_telemetry_number(pkt.get("speed", 0.0), "speed"),
+        acceleration=_finite_telemetry_number(pkt.get("acceleration", 0.0), "acceleration"),
+        fuel_level=_finite_telemetry_number(pkt.get("fuel_level", 100.0), "fuel_level"),
+        battery_voltage=_finite_telemetry_number(pkt.get("battery_voltage", 12.6), "battery_voltage"),
+        engine_temp=_finite_telemetry_number(pkt.get("engine_temp", 20.0), "engine_temp"),
+        gps_lat=_finite_telemetry_number(pkt.get("gps_lat", 0.0), "gps_lat"),
+        gps_lon=_finite_telemetry_number(pkt.get("gps_lon", 0.0), "gps_lon"),
+        obstacle_distance=_finite_telemetry_number(pkt.get("obstacle_distance", 999.0), "obstacle_distance"),
+        emergency_brake_active=_strict_telemetry_bool(pkt.get("emergency_brake_active", False), "emergency_brake_active"),
+        steering_angle=_finite_telemetry_number(pkt.get("steering_angle", 0.0), "steering_angle"),
+        brake_pressure=_finite_telemetry_number(pkt.get("brake_pressure", 0.0), "brake_pressure"),
+        throttle_position=_finite_telemetry_number(pkt.get("throttle_position", 0.0), "throttle_position"),
+        rpm=_finite_telemetry_number(pkt.get("rpm", 0.0), "rpm"),
+        odometer=_finite_telemetry_number(pkt.get("odometer", 0.0), "odometer"),
+        driver_heart_rate_bpm=_finite_telemetry_number(pkt.get("driver_heart_rate_bpm", 72.0), "driver_heart_rate_bpm"),
+        driver_drowsiness_score=_finite_telemetry_number(pkt.get("driver_drowsiness_score", 0.0), "driver_drowsiness_score"),
+        driver_unwell=_strict_telemetry_bool(pkt.get("driver_unwell", False), "driver_unwell"),
         timestamp=str(pkt.get("timestamp", _now())),
     )
 
@@ -86,16 +117,19 @@ class GlobalTelemetryBudget:
         self.clock = clock or time.monotonic
         self.tokens = float(self.burst)
         self.last = self.clock()
+        # Shared by concurrent TCP handlers; protect the full refill/claim RMW.
+        self._lock = threading.Lock()
 
     def claim(self) -> bool:
-        now = self.clock()
-        elapsed = max(0.0, now - self.last)
-        self.last = now
-        self.tokens = min(float(self.burst), self.tokens + elapsed * self.rate)
-        if self.tokens < 1.0:
-            return False
-        self.tokens -= 1.0
-        return True
+        with self._lock:
+            now = self.clock()
+            elapsed = max(0.0, now - self.last)
+            self.last = now
+            self.tokens = min(float(self.burst), self.tokens + elapsed * self.rate)
+            if self.tokens < 1.0:
+                return False
+            self.tokens -= 1.0
+            return True
 
 
 class AuthenticatedPiTelemetrySession:
@@ -128,15 +162,15 @@ class SafeModeActuatorDispatcher:
         self.gate = gate if gate is not None else BenchActuationGate()
         # Opt in explicitly; never energize an actuator just by starting bridge.
         self.enabled = get_bool("SMARTCAR_HARD_STOP_ENABLED", False)
-        self._last_sent_at = 0.0
+        self._last_sent_at = None
         self._cooldown_sec = 0.8
         self.ecu_gateway = ECUCommandGateway(gate=self.gate)
 
     def _should_send(self, bc: SmartCarBlockchain, block) -> bool:
         if not self.enabled or not self.gate.is_armed():
             return False
-        now = time.time()
-        if now - self._last_sent_at < self._cooldown_sec:
+        now = time.monotonic()
+        if self._last_sent_at is not None and now - self._last_sent_at < self._cooldown_sec:
             return False
         return bool(getattr(bc, "safe_mode_active", False) or getattr(block, "safe_mode_activated", False))
 
@@ -152,7 +186,7 @@ class SafeModeActuatorDispatcher:
                 device_id, device_secret, "COMMAND", payload
             )
             ser.write(encode_authenticated_envelope(envelope))
-            self._last_sent_at = time.time()
+            self._last_sent_at = time.monotonic()
             print("[ACTUATOR] Signed SAFE_MODE_STOP sent to Arduino bench node")
         except (OSError, HardwareTransportError) as e:
             print(f"[ACTUATOR] Arduino command rejected: {e}")
@@ -176,7 +210,7 @@ class SafeModeActuatorDispatcher:
                 device_id, device_secret, "COMMAND", payload
             )
             conn.sendall(encode_authenticated_envelope(envelope))
-            self._last_sent_at = time.time()
+            self._last_sent_at = time.monotonic()
             print("[ACTUATOR] Signed SAFE_MODE_STOP sent to Pi bench node")
         except (OSError, HardwareTransportError) as e:
             print(f"[ACTUATOR] Pi command rejected: {e}")
@@ -364,6 +398,9 @@ def run_pi_mode(bc: SmartCarBlockchain):
     # A fully authenticated peer can still flood ledger writes; bound work
     # per connection independently of the framer byte and time limits.
     max_frames = max(1, min(10000, get_int("SMARTCAR_HW_MAX_FRAMES_PER_SESSION", 256)))
+    # Cap total ingress bytes independently of signed-frame count. A peer
+    # sending endless partial frames must not receive an unlimited CPU budget.
+    max_session_bytes = max(4096, min(8 * 1024 * 1024, get_int("SMARTCAR_HW_MAX_SESSION_BYTES", 262144)))
     global_budget = GlobalTelemetryBudget(
         get_int("SMARTCAR_HW_GLOBAL_FRAMES_PER_SEC", 32),
         get_int("SMARTCAR_HW_GLOBAL_FRAME_BURST", 64),
@@ -377,98 +414,118 @@ def run_pi_mode(bc: SmartCarBlockchain):
     )
     auth_timeout = max(1, min(15, get_int("SMARTCAR_HW_AUTH_TIMEOUT_SEC", 3)))
     actuator = SafeModeActuatorDispatcher()
+    verifier_lock = threading.Lock()  # Replay nonce check-and-claim must be atomic.
+    ledger_lock = threading.Lock()  # Chain mutations must be serialized.
+    actuator_lock = threading.Lock()  # Dispatcher cooldown and outbound command state are shared.
+    max_clients = max(1, min(64, get_int("SMARTCAR_HW_MAX_CLIENTS", 4)))
     print(f"[HW BRIDGE] Authenticated Pi TCP mode listening on {host}:{port}")
 
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as srv:
-        srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        srv.bind((host, port))
-        srv.listen(4)
-        while True:
-            conn, addr = srv.accept()
-            print(f"[HW BRIDGE] Pi connected: {addr[0]}:{addr[1]}")
-            with conn:
-                if not admission_budget.claim():
-                    print("[HW BRIDGE] rejected connection: admission budget exceeded")
-                    continue
-                conn.settimeout(idle_timeout)
-                session = AuthenticatedPiTelemetrySession(verifier)
-                authentication_deadline = time.monotonic() + auth_timeout
-                accepted_frames = 0
-                deadline = time.monotonic() + max_session_sec
-                try:
-                    while time.monotonic() < deadline:
-                        # Slowloris peers cannot keep the unauthenticated
-                        # session open by sending partial bytes indefinitely.
-                        if session.device_id is None:
-                            remaining = authentication_deadline - time.monotonic()
-                            if remaining <= 0:
-                                raise HardwareTransportError("HW_AUTH_DEADLINE_EXCEEDED")
-                            conn.settimeout(min(float(idle_timeout), remaining))
-                        # Also enforce the absolute session deadline at the
-                        # blocking syscall, not only at the next loop iteration.
-                        session_remaining = deadline - time.monotonic()
-                        if session_remaining <= 0:
-                            raise HardwareTransportError("HW_SESSION_DEADLINE_EXCEEDED")
-                        if session.device_id is None:
-                            conn.settimeout(min(float(idle_timeout), remaining, session_remaining))
-                        else:
-                            conn.settimeout(min(float(idle_timeout), session_remaining))
-                        data = conn.recv(4096)
-                        if not data:
-                            break
-                        # A complete signed frame arriving after the authentication
-                        # deadline must not be admitted merely because recv began
-                        # before the deadline. Likewise for session expiry.
-                        received_at = time.monotonic()
+    def handle_client(conn):
+            conn.settimeout(idle_timeout)
+            session = AuthenticatedPiTelemetrySession(verifier)
+            authentication_deadline = time.monotonic() + auth_timeout
+            accepted_frames = 0
+            # Per-connection accounting must start before the first recv.
+            received_bytes = 0
+            deadline = time.monotonic() + max_session_sec
+            try:
+                while time.monotonic() < deadline:
+                    # Slowloris peers cannot keep the unauthenticated
+                    # session open by sending partial bytes indefinitely.
+                    if session.device_id is None:
+                        remaining = authentication_deadline - time.monotonic()
+                        if remaining <= 0:
+                            raise HardwareTransportError("HW_AUTH_DEADLINE_EXCEEDED")
+                        conn.settimeout(min(float(idle_timeout), remaining))
+                    # Also enforce the absolute session deadline at the
+                    # blocking syscall, not only at the next loop iteration.
+                    session_remaining = deadline - time.monotonic()
+                    if session_remaining <= 0:
+                        raise HardwareTransportError("HW_SESSION_DEADLINE_EXCEEDED")
+                    if session.device_id is None:
+                        conn.settimeout(min(float(idle_timeout), remaining, session_remaining))
+                    else:
+                        conn.settimeout(min(float(idle_timeout), session_remaining))
+                    data = conn.recv(4096)
+                    if not data:
+                        break
+                    received_bytes += len(data)
+                    if received_bytes > max_session_bytes:
+                        raise HardwareTransportError("HW_SESSION_BYTE_BUDGET_EXCEEDED")
+                    # A complete signed frame arriving after the authentication
+                    # deadline must not be admitted merely because recv began
+                    # before the deadline. Likewise for session expiry.
+                    received_at = time.monotonic()
+                    try:
+                        deadline_check(
+                            received_at, session_deadline=deadline,
+                            auth_deadline=authentication_deadline,
+                            authenticated=session.device_id is not None,
+                        )
+                    except DeadlineExpired as exc:
+                        raise HardwareTransportError(str(exc)) from exc
+                    # Verify MAC, freshness, replay nonce, schema, and per-
+                    # connection identity before *any* ledger/actuation side effect.
+                    with verifier_lock:
+                        verified_items = session.receive(data)
+                    for item in verified_items:
+                        # A single recv may contain many signed frames. MAC
+                        # verification can itself consume the remaining
+                        # session lifetime; recheck before EACH mutation.
+                        # First authentication must also complete before
+                        # its deadline, not merely before recv returns.
                         try:
                             deadline_check(
-                                received_at, session_deadline=deadline,
+                                time.monotonic(),
+                                session_deadline=deadline,
                                 auth_deadline=authentication_deadline,
-                                authenticated=session.device_id is not None,
+                                authenticated=accepted_frames > 0,
                             )
                         except DeadlineExpired as exc:
                             raise HardwareTransportError(str(exc)) from exc
-                        # Verify MAC, freshness, replay nonce, schema, and per-
-                        # connection identity before *any* ledger/actuation side effect.
-                        for item in session.receive(data):
-                            # A single recv may contain many signed frames. MAC
-                            # verification can itself consume the remaining
-                            # session lifetime; recheck before EACH mutation.
-                            # First authentication must also complete before
-                            # its deadline, not merely before recv returns.
-                            try:
-                                deadline_check(
-                                    time.monotonic(),
-                                    session_deadline=deadline,
-                                    auth_deadline=authentication_deadline,
-                                    authenticated=accepted_frames > 0,
-                                )
-                            except DeadlineExpired as exc:
-                                raise HardwareTransportError(str(exc)) from exc
-                            # Restore normal idle timeout after first valid MAC.
-                            if accepted_frames == 0:
-                                conn.settimeout(idle_timeout)
-                            if accepted_frames >= max_frames:
-                                raise HardwareTransportError("HW_SESSION_FRAME_BUDGET_EXCEEDED", authenticated=True)
-                            if not global_budget.claim():
-                                raise HardwareTransportError("HW_GLOBAL_FRAME_BUDGET_EXCEEDED", authenticated=True)
-                            accepted_frames += 1
-                            tel = to_telemetry(item.payload)
-                            event = str(item.payload["event"])
+                        # Restore normal idle timeout after first valid MAC.
+                        if accepted_frames == 0:
+                            conn.settimeout(idle_timeout)
+                        if accepted_frames >= max_frames:
+                            raise HardwareTransportError("HW_SESSION_FRAME_BUDGET_EXCEEDED", authenticated=True)
+                        if not global_budget.claim():
+                            raise HardwareTransportError("HW_GLOBAL_FRAME_BUDGET_EXCEEDED", authenticated=True)
+                        accepted_frames += 1
+                        tel = to_telemetry(item.payload)
+                        event = str(item.payload["event"])
+                        with ledger_lock:
                             block = bc.push_telemetry(tel, event)
-                            print(f"[CHAIN] block={block.index} event={event}")
+                        # Network sendall may block for the peer's socket timeout.
+                        # Never hold the global chain lock while waiting on a peer.
+                        # Remote bench actuation remains gated and independent of
+                        # local hardwired emergency controls.
+                        with actuator_lock:
                             actuator.maybe_send_pi(
                                 conn, bc, block,
                                 device_id=item.device_id,
                                 device_secret=verifier.device_secret(item.device_id),
                             )
-                except HardwareTransportError as exc:
-                    print(f"[HW BRIDGE] rejected Pi frame: {exc.reason}")
-                except socket.timeout:
-                    print("[HW BRIDGE] Pi connection closed after idle timeout")
-                except OSError:
-                    print("[HW BRIDGE] Pi connection ended after network error")
-            print("[HW BRIDGE] Pi disconnected")
+                        print(f"[CHAIN] block={block.index} event={event}")
+            except HardwareTransportError as exc:
+                print(f"[HW BRIDGE] rejected Pi frame: {exc.reason}")
+            except (ValueError, TypeError, KeyError) as exc:
+                print(f"[HW BRIDGE] rejected malformed authenticated telemetry: {type(exc).__name__}")
+            except socket.timeout:
+                print("[HW BRIDGE] Pi connection closed after idle timeout")
+            except OSError:
+                print("[HW BRIDGE] Pi connection ended after network error")
+
+    admission = BoundedTCPAdmission(handle_client, max_clients=max_clients)
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as srv:
+        srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        srv.bind((host, port))
+        srv.listen(max_clients)
+        while True:
+            conn, addr = srv.accept()
+            if not admission_budget.claim():
+                conn.close()
+                continue
+            admission.dispatch(conn)
 
 def main():
     vehicle_id = get_env("SMARTCAR_VEHICLE_ID", "SMARTCAR_VIN_2024_BD_XYZ789")
