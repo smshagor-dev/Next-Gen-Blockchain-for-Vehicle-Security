@@ -369,7 +369,10 @@ def run_pi_mode(bc: SmartCarBlockchain):
     # A fully authenticated peer can still flood ledger writes; bound work
     # per connection independently of the framer byte and time limits.
     max_frames = max(1, min(10000, get_int("SMARTCAR_HW_MAX_FRAMES_PER_SESSION", 256)))
-    # Cap total ingress bytes independently of signed-frame count. A peer\n    # sending endless partial frames must not receive an unlimited CPU budget.\n    max_session_bytes = max(4096, min(8 * 1024 * 1024, get_int("SMARTCAR_HW_MAX_SESSION_BYTES", 262144)))\n    global_budget = GlobalTelemetryBudget(
+    # Cap total ingress bytes independently of signed-frame count. A peer
+    # sending endless partial frames must not receive an unlimited CPU budget.
+    max_session_bytes = max(4096, min(8 * 1024 * 1024, get_int("SMARTCAR_HW_MAX_SESSION_BYTES", 262144)))
+    global_budget = GlobalTelemetryBudget(
         get_int("SMARTCAR_HW_GLOBAL_FRAMES_PER_SEC", 32),
         get_int("SMARTCAR_HW_GLOBAL_FRAME_BURST", 64),
     )
@@ -414,7 +417,10 @@ def run_pi_mode(bc: SmartCarBlockchain):
                     data = conn.recv(4096)
                     if not data:
                         break
-                    received_bytes += len(data)\n                    if received_bytes > max_session_bytes:\n                        raise HardwareTransportError("HW_SESSION_BYTE_BUDGET_EXCEEDED")\n                    # A complete signed frame arriving after the authentication
+                    received_bytes += len(data)
+                    if received_bytes > max_session_bytes:
+                        raise HardwareTransportError("HW_SESSION_BYTE_BUDGET_EXCEEDED")
+                    # A complete signed frame arriving after the authentication
                     # deadline must not be admitted merely because recv began
                     # before the deadline. Likewise for session expiry.
                     received_at = time.monotonic()
