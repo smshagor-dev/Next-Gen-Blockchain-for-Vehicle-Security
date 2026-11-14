@@ -6,6 +6,11 @@ import hashlib
 import hmac
 import io
 import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
 import unittest
 
 from capture_export_producer import canonical, make_manifest, seal_capture
@@ -182,6 +187,38 @@ class SignedPairedCohortTests(unittest.TestCase):
     def test_large_mcnemar_is_finite(self):
         self.assertEqual(_mcnemar_exact(2000, 0), 2 / (1 << 2000))
         self.assertEqual(_mcnemar_exact(200, 200), 1.0)
+
+    def test_real_cli_emits_source_bound_comparison(self):
+        b, c = self.arm("baseline"), self.arm("candidate")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            inputs = {
+                "manifest": self.manifest, "world": self.world,
+                "baseline-capture": b["capture"], "candidate-capture": c["capture"],
+            }
+            for arm, obj in (("baseline", b), ("candidate", c)):
+                for field in ("export", "interval", "assignment"):
+                    inputs[arm + "-" + field + "-receipt"] = obj[field]
+                for field, key in zip(("export", "interval", "assignment"), obj["keys"]):
+                    inputs[arm + "-" + field + "-key"] = key
+            for name, payload in inputs.items():
+                (root / name).write_bytes(payload)
+            out = root / "comparison.json"
+            command = [
+                sys.executable, str(Path(__file__).with_name("paired_signed_capture_analysis.py")),
+                "--pinned-manifest-sha256", self.pin, "--output", str(out),
+            ]
+            for name in inputs:
+                command += ["--" + name, str(root / name)]
+            completed = subprocess.run(
+                command, env={**os.environ, "PYTHONPATH": str(Path(__file__).parent)},
+                capture_output=True, text=True, check=True)
+            summary = json.loads(completed.stdout)
+            result = json.loads(out.read_text(encoding="ascii"))
+            self.assertFalse(summary["publication_ready"])
+            self.assertEqual(result["world_incidents"], 4)
+            self.assertEqual(result["accuracy_difference_pp"], 50)
+            self.assertEqual(summary["output_sha256"], hashlib.sha256(out.read_bytes()).hexdigest())
 
     def test_wrong_version_rejected(self):
         b = self.arm("baseline")
