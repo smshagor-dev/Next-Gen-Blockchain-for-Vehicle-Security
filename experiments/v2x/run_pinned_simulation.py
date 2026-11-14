@@ -83,7 +83,9 @@ def execute_local_simulation(pin: bytes, pinned_sha256: str, manifest: bytes,
                 raise ValueError("simulation exceeded output bound; no successful run receipt")
             if process.returncode != 0:
                 # SIGXFSZ is the expected POSIX result when RLIMIT_FSIZE is hit.
-                if os.name == 'posix' and process.returncode == -signal.SIGXFSZ:
+                if os.name == 'posix' and (process.returncode == -signal.SIGXFSZ or
+                                           stdout_size >= max_output_bytes or
+                                           stderr_size >= max_output_bytes):
                     raise ValueError("simulation exceeded output bound; no successful run receipt")
                 raise ValueError("simulation exited unsuccessfully; no successful run receipt")
             stdout.seek(0)
