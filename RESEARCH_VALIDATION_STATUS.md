@@ -105,3 +105,14 @@ Run next: `python -m unittest discover -s tests -p 'test_pi_byte_budget_compile_
 **Matrix update:** Concurrent replay/tamper regression = implemented, execution pending. Authenticated production loopback and independent emergency control = blocked/unverified. Durable ledger crash consistency = partial. Authentic datasets, independent baselines, multi-seed statistics = upcoming/blocked.
 
 **Next code task:** Build real production `run_pi_mode` loopback integration harness with ephemeral port, concurrent signed clients and a stalled peer, asserting accepted chain mutations and worker recovery; collect measured timings without treating these regressions as independent scientific experiments.
+
+
+## 2026-11-14 authenticated socket-session regression checkpoint
+
+**Implemented:** Added `tests/test_authenticated_socket_session.py` (commit `d020e108`) exercising real local socketpair delivery with fragmented signed envelopes, a replay across distinct connection-session objects sharing one verifier, MAC tamper followed by valid nonce acceptance, and missing signed safety-state rejection. This exercises production `AuthenticatedPiTelemetrySession`, verifier and telemetry conversion, but **not** the full `run_pi_mode` accept loop, ledger mutation, hardware, or actuator dispatch.
+
+**Evidence:** File created on draft PR #101 branch. Local `git ls-remote` failed because github.com DNS resolution was unavailable; no full-checkout test execution, passing assertion, timing or paper-level outcome is claimed. Execute `python -m unittest discover -s tests -p 'test_authenticated_socket_session.py' -v` on a complete checkout, followed by the full suite. Any failing assumptions about envelope schema or frame delivery must be corrected before review.
+
+**Status matrix:** Signed TCP session framing/replay = implemented regression, unverified execution; production accept-loop fault injection = blocked; local emergency-stop = untouched, physically unverified; ledger durability = partial; original mechanism and real datasets = upcoming; independent adversarial baselines/statistics = blocked; manuscript evidence = blocked. Existing fixture CSVs, 3-peer sanity checks, 5-iteration microbenchmarks and offline formulas remain NON-PUBLISHABLE primary evidence.
+
+**Next substantive task:** Make the production `run_pi_mode` accept loop testable with injected socket/stop controls; execute concurrent authenticated loopback clients, stalled receiver and byte-budget exhaustion, collecting bounded runtime metrics and verifying that no rejected input mutates the ledger. Review crash-consistent ledger writes next. Do not merge unverified work.
