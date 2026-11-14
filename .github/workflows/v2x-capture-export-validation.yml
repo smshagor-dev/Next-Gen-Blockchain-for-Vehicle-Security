@@ -10,6 +10,8 @@ on:
       - "experiments/v2x/test_verify_capture_receipt_pair.py"
       - "experiments/v2x/pin_policy_artifacts.py"
       - "experiments/v2x/test_pin_policy_artifacts.py"
+      - "experiments/v2x/run_pinned_simulation.py"
+      - "experiments/v2x/test_run_pinned_simulation.py"
       - "experiments/v2x/paired_signed_capture_analysis.py"
       - "experiments/v2x/test_paired_signed_capture_analysis.py"
       - "experiments/v2x/attested_interval_join.py"
@@ -55,6 +57,10 @@ jobs:
         env:
           PYTHONPATH: experiments/v2x
         run: python -m unittest discover -s experiments/v2x -p "test_pin_policy_artifacts.py" -v
+      - name: Execute pinned offline simulation process and failure boundaries
+        env:
+          PYTHONPATH: experiments/v2x
+        run: python -m unittest discover -s experiments/v2x -p "test_run_pinned_simulation.py" -v
       - name: Exercise signed interval checks
         env:
           PYTHONPATH: experiments/v2x
