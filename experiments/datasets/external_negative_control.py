@@ -13,6 +13,7 @@ import csv
 import hashlib
 import json
 import re
+from collections import Counter
 from pathlib import Path
 
 SOURCE_DOI = "10.5281/zenodo.21644263"
@@ -56,11 +57,25 @@ def describe(source: Path, output: Path, *, expected_md5: str) -> dict:
                 or any(not h.strip() for h in headers)
                 or len(headers) != len(set(headers))):
             raise ValueError("invalid duplicate/empty/oversized CAM schema")
+        flag_columns = ("collisionWarningEngaged", "emergencyBrakeEngaged")
+        flag_positions = {name: headers.index(name) for name in flag_columns if name in headers}
+        flags = {name: Counter() for name in flag_positions}
+        station_pos = headers.index("stationId") if "stationId" in headers else None
+        receiver_pos = headers.index("receiverID") if "receiverID" in headers else None
+        station_ids: set[str] = set()
+        receiver_ids: set[str] = set()
         count = 0
         for row in reader:
             if len(row) != len(headers):
                 raise ValueError("truncated or irregular source CSV row")
             count += 1
+            for name, index in flag_positions.items():
+                value = row[index].strip()
+                flags[name][value if value else "MISSING"] += 1
+            if station_pos is not None and row[station_pos].strip():
+                station_ids.add(row[station_pos].strip())
+            if receiver_pos is not None and row[receiver_pos].strip():
+                receiver_ids.add(row[receiver_pos].strip())
             if count > MAX_ROWS:
                 raise ValueError("excessive CAM records")
         if count == 0:
@@ -72,6 +87,11 @@ def describe(source: Path, output: Path, *, expected_md5: str) -> dict:
         "source_filename": SOURCE_FILE,
         "observed_cam_rows": count,
         "source_columns": headers,
+        "reported_CAM_flag_counts_not_incident_truth": {
+            key: dict(sorted(values.items())) for key, values in flags.items()
+        },
+        "distinct_sender_station_ids_not_physical_identity": len(station_ids) if station_pos is not None else None,
+        "distinct_reported_receiver_ids_not_physical_identity": len(receiver_ids) if receiver_pos is not None else None,
         "source_size_bytes": source.stat().st_size,
         "source_md5": md5.hexdigest(),
         "source_sha256": sha256.hexdigest(),
