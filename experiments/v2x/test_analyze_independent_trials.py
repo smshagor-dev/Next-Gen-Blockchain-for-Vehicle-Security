@@ -28,7 +28,7 @@ class TrialAnalysisTests(unittest.TestCase):
         a = paired_cluster_analysis(self.data, bootstrap_draws=200)
         b = paired_cluster_analysis(self.data, bootstrap_draws=200)
         self.assertEqual(a, b)
-        self.assertEqual(a["mean_difference_pp"], 20.000000000000007)
+        self.assertAlmostEqual(a["mean_difference_pp"], 20)
         self.assertEqual(a["claimed_independent_clusters"], 3)
         self.assertFalse(a["publication_ready"])
 
