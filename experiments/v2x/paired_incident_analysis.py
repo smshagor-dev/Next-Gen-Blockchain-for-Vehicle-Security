@@ -12,7 +12,12 @@ from pathlib import Path
 
 def analyze(path):
     with Path(path).open(newline="", encoding="utf-8") as source:
-        rows = list(csv.DictReader(source))
+        reader = csv.DictReader(source)
+        if reader.fieldnames != ["incident_id", "truth", "baseline", "candidate"]:
+            raise ValueError("expected exactly incident_id,truth,baseline,candidate columns")
+        rows = list(reader)
+    if any(None in row or any(value is None for value in row.values()) for row in rows):
+        raise ValueError("ragged incident table")
     if not rows:
         raise ValueError("empty incident table")
     ids = set()
@@ -33,8 +38,15 @@ def analyze(path):
     candidate_only = sum(c == y and b != y for y, b, c in values)
     n = baseline_only + candidate_only
     if n:
-        tail = sum(math.comb(n, k) for k in range(min(baseline_only, candidate_only) + 1))
-        p = min(1.0, 2.0 * tail / (2 ** n))
+        # Exact integer tail avoids floating overflow for large incident cohorts.
+        # Sum the shorter binomial tail using an integer recurrence.
+        cutoff = min(baseline_only, candidate_only)
+        term = 1
+        tail = 1
+        for k in range(1, cutoff + 1):
+            term = term * (n - k + 1) // k
+            tail += term
+        p = min(1.0, (2 * tail) / (1 << n))
     else:
         p = 1.0
 
