@@ -35,3 +35,11 @@ Next: execute `python -m unittest discover -s tests -p 'test_pi_worker_integrati
 Pi TCP handler now counts all received bytes (including incomplete and invalid frames) and rejects sessions over SMARTCAR_HW_MAX_SESSION_BYTES before cryptographic verification. Default 262144 bytes; configuration clamped to 4096–8388608 bytes. Added tests/test_pi_session_byte_budget.py with two source-structure regression guards. Commits: 4e07d5b, 5075943. Tests not executed against a full checkout because GitHub DNS was unavailable locally. **Status: implemented, unverified.** These tests do not replace live socket experiments.
 
 Next: run `python -m unittest discover -s tests -p 'test_pi_session_byte_budget.py' -v`, then authenticated loopback replay-race and trickle-byte tests against the production handler. Measure CPU, RAM, rejection latency and honest-client throughput with matched baselines; do not use fixture-only outcomes as primary paper results.
+
+## 2026-11-14 byte-budget syntax repair checkpoint
+
+**Implemented (unverified):** Repaired literal escaped newline sequences accidentally inserted into `hardware_bridge.py` Pi handler, which prevented Python parsing; initialized `received_bytes = 0` for each accepted connection before its receive loop. Added `tests/test_pi_byte_budget_compile_regression.py` to check source compilation and counter/guard AST ordering without importing hardware dependencies. Commits: `0a293793`, `4506a11b`. This is a correctness repair, **not** a demonstrated DoS mitigation.
+
+**Validation blocked:** `git ls-remote https://github.com/smshagor-dev/Next-Gen-Blockchain-for-Vehicle-Security.git HEAD` failed with `Could not resolve host: github.com` in the local execution environment. No full-checkout tests executed. GitHub connector commits succeeded.
+
+Run next: `python -m unittest discover -s tests -p 'test_pi_byte_budget_compile_regression.py' -v`, then `python -m unittest discover -s tests -p 'test_pi_session_byte_budget.py' -v` and authenticated real-loopback concurrency/replay tests. Do not merge until runtime and full regression validation; local hardwired emergency stop remains independent and unverified.
