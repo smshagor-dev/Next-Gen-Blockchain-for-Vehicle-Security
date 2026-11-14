@@ -363,3 +363,9 @@ Draft branch `authenticate-arduino-serial-ingress` removes raw unsigned Arduino 
 - **IMPLEMENTED / EXECUTION PENDING:** An independently labelled positive incident with an authenticated header-only capture is retained as a missed hazard (false negative), rather than excluded from the denominator. Empty world truth and malformed/headerless captures remain invalid.
 - **TEST COMMAND:** `PYTHONPATH=experiments/v2x python -m unittest discover -s experiments/v2x -p test_join_world_incidents.py -v` (not executed in this merge-resolution session).
 - **BLOCKED:** independently trusted ground truth, authenticated capture interval provenance and matched real incident evaluation. Synthetic regression fixtures are not publishable main results.
+
+## Arduino serial ingress PR #98 reconciliation
+
+- **SUPERSEDED:** PR #98's unsigned JSON framing implementation is not safe to transplant: current main already requires enrolled authenticated serial envelopes, bounded streaming and quarantine. Preserve main's authentication and actuator gate.
+- **ADDED (NOT EXECUTED):** `tests/test_serial_ingress_bounds.py` now checks the authenticated-only serial entrypoint and bounded/quarantine source invariants. Run `python -m unittest discover -s tests -p 'test_serial_ingress_bounds.py' -v` plus `python -m unittest discover -s tests -p 'test_arduino_authenticated_ingress.py' -v` before merge.
+- **BLOCKED:** physical serial/ECU verification, independent local emergency stop and hardware interlocks; these tests are not paper efficacy evidence.
