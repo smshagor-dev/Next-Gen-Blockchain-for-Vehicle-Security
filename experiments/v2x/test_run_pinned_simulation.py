@@ -1,6 +1,7 @@
 """Synthetic subprocess contracts, never physical V2X experimental evidence."""
 import json
 import os
+import time
 from pathlib import Path
 import stat
 import tempfile
@@ -103,6 +104,35 @@ class PinnedSimulationTests(unittest.TestCase):
         self.digest = sha(self.pin)
         with self.assertRaisesRegex(ValueError, "unsuccessfully"):
             self.run_policy(baseline_executable=failing)
+
+    @unittest.skipUnless(os.name == "posix", "POSIX kernel file quota required")
+    def test_kernel_output_quota_rejects_unbounded_child(self):
+        noisy = (b"#!/usr/bin/env python3\\nimport os\\n"
+                 b"while True:\\n os.write(1,b'X'*4096)\\n")
+        noisy = noisy.replace(b"\\\\n", b"\\n")
+        self.exe.write_bytes(noisy)
+        self.pin = build_pin(self.manifest, noisy, self.other,
+                             self.config, self.other_config, "auth-only", "evidence-gate")
+        self.digest = sha(self.pin)
+        with self.assertRaisesRegex(ValueError, "output bound"):
+            self.run_policy(baseline_executable=noisy, max_output_bytes=8192)
+
+    @unittest.skipUnless(os.name == "posix", "POSIX process groups required")
+    def test_timeout_kills_descendant_writer(self):
+        marker = self.root / "late-writer"
+        child = (b"#!/usr/bin/env python3\\nimport os,sys,time\\n"
+                 b"if os.fork()==0:\\n time.sleep(0.6)\\n"
+                 b" open(sys.argv[1]+'.late','w').write('survived')\\n"
+                 b"else:\\n time.sleep(3)\\n")
+        child = child.replace(b"\\\\n", b"\\n")
+        self.exe.write_bytes(child)
+        self.pin = build_pin(self.manifest, child, self.other,
+                             self.config, self.other_config, "auth-only", "evidence-gate")
+        self.digest = sha(self.pin)
+        with self.assertRaisesRegex(ValueError, "timed out"):
+            self.run_policy(baseline_executable=child, timeout_seconds=0.1)
+        time.sleep(0.8)
+        self.assertFalse(Path(str(self.cfg) + ".late").exists())
 
     def test_invalid_timeout_rejected(self):
         with self.assertRaisesRegex(ValueError, "timeout"):
