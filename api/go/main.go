@@ -93,7 +93,7 @@ type State struct {
 }
 
 type apiServer struct {
-	saveMu       sync.Mutex // serializes snapshots so older /save cannot overwrite newer /save
+	saveMu       sync.Mutex // serialize snapshots to avoid stale /save overwrites
 	state        *State
 	secret       []byte
 	dataDir      string
@@ -169,7 +169,7 @@ func consensusSecurityOutput() map[string]any {
 		"hash_collision_resistance":                 true,
 		"retroactive_tamper_evidence":               true,
 		"protects_against_forward_majority_control": false,
-		"notes": majorityAttackNote,
+		"notes":                                     majorityAttackNote,
 	}
 }
 
