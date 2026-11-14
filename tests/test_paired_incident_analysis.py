@@ -34,6 +34,30 @@ class PairedIncidentAnalysisTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.run_rows([("a", 1, 2, 1)])
 
+    def test_large_discordance_does_not_overflow(self):
+        result = self.run_rows([(str(i), 1, 0, 1) for i in range(2000)])
+        self.assertEqual(result["candidate_only_correct"], 2000)
+        self.assertLess(result["mcnemar_exact_two_sided_p"], 1e-100)
+
+    def test_balanced_discordance_has_unit_p_value(self):
+        rows = [(str(i), 1, 0, 1) for i in range(100)]
+        rows += [(str(i), 1, 1, 0) for i in range(100, 200)]
+        self.assertEqual(self.run_rows(rows)["mcnemar_exact_two_sided_p"], 1.0)
+
+    def test_ragged_csv_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "incidents.csv"
+            path.write_text("incident_id,truth,baseline,candidate\\na,1,0,1,extra\\n")
+            with self.assertRaises(ValueError):
+                analyze(path)
+
+    def test_unexpected_schema_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "incidents.csv"
+            path.write_text("incident_id,truth,baseline\\na,1,0\\n")
+            with self.assertRaises(ValueError):
+                analyze(path)
+
 
 if __name__ == "__main__":
     unittest.main()
