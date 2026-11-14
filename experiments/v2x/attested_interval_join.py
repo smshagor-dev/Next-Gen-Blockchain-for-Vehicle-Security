@@ -36,7 +36,7 @@ def receipt_payload(receipt: dict) -> bytes:
     if not isinstance(receipt, dict) or set(receipt) != set(FIELDS) | {"hmac_sha256"}:
         raise ValueError("invalid interval receipt schema")
     fields = {name: receipt[name] for name in FIELDS}
-    if fields["schema_version"] != 1 or type(fields["capture_complete"]) is not bool:
+    if type(fields["schema_version"]) is not int or fields["schema_version"] != 1 or type(fields["capture_complete"]) is not bool:
         raise ValueError("unsupported interval receipt version or completion flag")
     if any(not isinstance(fields[name], str) or not fields[name]
            for name in (*GROUP_FIELDS, "capture_sha256", "window_start", "window_end")):
@@ -55,6 +55,9 @@ def evaluate_interval(world: bytes, capture: bytes, export_receipt: dict,
     """
     if not interval_key or not isinstance(interval_receipt, dict) or not isinstance(interval_receipt.get("hmac_sha256"), str):
         raise ValueError("missing authenticated interval receipt")
+    mac = interval_receipt["hmac_sha256"]
+    if len(mac) != 64 or any(c not in "0123456789abcdef" for c in mac):
+        raise ValueError("invalid interval receipt HMAC encoding")
     signed = receipt_payload(interval_receipt)
     expected_mac = hmac.new(interval_key, signed, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(expected_mac, interval_receipt["hmac_sha256"]):
