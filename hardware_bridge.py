@@ -21,6 +21,7 @@ from typing import Optional
 
 from env_config import load_project_env_once, get_env, get_int, get_bool
 from blockchain import SmartCarBlockchain, TelemetryData
+from bounded_tcp_admission import BoundedTCPAdmission
 from hardware_actuation_safety import BenchActuationGate
 from hardware_transport_deadlines import deadline_check, DeadlineExpired
 from hardware_transport_security import (
@@ -381,98 +382,108 @@ def run_pi_mode(bc: SmartCarBlockchain):
     )
     auth_timeout = max(1, min(15, get_int("SMARTCAR_HW_AUTH_TIMEOUT_SEC", 3)))
     actuator = SafeModeActuatorDispatcher()
+    verifier_lock = threading.Lock()  # Replay nonce check-and-claim must be atomic.
+    ledger_lock = threading.Lock()  # Chain mutation and dispatcher state are not reentrant.
+    max_clients = max(1, min(64, get_int("SMARTCAR_HW_MAX_CLIENTS", 4)))
     print(f"[HW BRIDGE] Authenticated Pi TCP mode listening on {host}:{port}")
 
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as srv:
-        srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        srv.bind((host, port))
-        srv.listen(4)
-        while True:
-            conn, addr = srv.accept()
-            print(f"[HW BRIDGE] Pi connected: {addr[0]}:{addr[1]}")
-            with conn:
-                if not admission_budget.claim():
-                    print("[HW BRIDGE] rejected connection: admission budget exceeded")
-                    continue
-                conn.settimeout(idle_timeout)
-                session = AuthenticatedPiTelemetrySession(verifier)
-                authentication_deadline = time.monotonic() + auth_timeout
-                accepted_frames = 0
-                deadline = time.monotonic() + max_session_sec
-                try:
-                    while time.monotonic() < deadline:
-                        # Slowloris peers cannot keep the unauthenticated
-                        # session open by sending partial bytes indefinitely.
-                        if session.device_id is None:
-                            remaining = authentication_deadline - time.monotonic()
-                            if remaining <= 0:
-                                raise HardwareTransportError("HW_AUTH_DEADLINE_EXCEEDED")
-                            conn.settimeout(min(float(idle_timeout), remaining))
-                        # Also enforce the absolute session deadline at the
-                        # blocking syscall, not only at the next loop iteration.
-                        session_remaining = deadline - time.monotonic()
-                        if session_remaining <= 0:
-                            raise HardwareTransportError("HW_SESSION_DEADLINE_EXCEEDED")
-                        if session.device_id is None:
-                            conn.settimeout(min(float(idle_timeout), remaining, session_remaining))
-                        else:
-                            conn.settimeout(min(float(idle_timeout), session_remaining))
-                        data = conn.recv(4096)
-                        if not data:
-                            break
-                        # A complete signed frame arriving after the authentication
-                        # deadline must not be admitted merely because recv began
-                        # before the deadline. Likewise for session expiry.
-                        received_at = time.monotonic()
+    def handle_client(conn):
+            if not admission_budget.claim():
+                print("[HW BRIDGE] rejected connection: admission budget exceeded")
+                continue
+            conn.settimeout(idle_timeout)
+            session = AuthenticatedPiTelemetrySession(verifier)
+            authentication_deadline = time.monotonic() + auth_timeout
+            accepted_frames = 0
+            deadline = time.monotonic() + max_session_sec
+            try:
+                while time.monotonic() < deadline:
+                    # Slowloris peers cannot keep the unauthenticated
+                    # session open by sending partial bytes indefinitely.
+                    if session.device_id is None:
+                        remaining = authentication_deadline - time.monotonic()
+                        if remaining <= 0:
+                            raise HardwareTransportError("HW_AUTH_DEADLINE_EXCEEDED")
+                        conn.settimeout(min(float(idle_timeout), remaining))
+                    # Also enforce the absolute session deadline at the
+                    # blocking syscall, not only at the next loop iteration.
+                    session_remaining = deadline - time.monotonic()
+                    if session_remaining <= 0:
+                        raise HardwareTransportError("HW_SESSION_DEADLINE_EXCEEDED")
+                    if session.device_id is None:
+                        conn.settimeout(min(float(idle_timeout), remaining, session_remaining))
+                    else:
+                        conn.settimeout(min(float(idle_timeout), session_remaining))
+                    data = conn.recv(4096)
+                    if not data:
+                        break
+                    # A complete signed frame arriving after the authentication
+                    # deadline must not be admitted merely because recv began
+                    # before the deadline. Likewise for session expiry.
+                    received_at = time.monotonic()
+                    try:
+                        deadline_check(
+                            received_at, session_deadline=deadline,
+                            auth_deadline=authentication_deadline,
+                            authenticated=session.device_id is not None,
+                        )
+                    except DeadlineExpired as exc:
+                        raise HardwareTransportError(str(exc)) from exc
+                    # Verify MAC, freshness, replay nonce, schema, and per-
+                    # connection identity before *any* ledger/actuation side effect.
+                    with verifier_lock:
+                        verified_items = session.receive(data)
+                    for item in verified_items:
+                        # A single recv may contain many signed frames. MAC
+                        # verification can itself consume the remaining
+                        # session lifetime; recheck before EACH mutation.
+                        # First authentication must also complete before
+                        # its deadline, not merely before recv returns.
                         try:
                             deadline_check(
-                                received_at, session_deadline=deadline,
+                                time.monotonic(),
+                                session_deadline=deadline,
                                 auth_deadline=authentication_deadline,
-                                authenticated=session.device_id is not None,
+                                authenticated=accepted_frames > 0,
                             )
                         except DeadlineExpired as exc:
                             raise HardwareTransportError(str(exc)) from exc
-                        # Verify MAC, freshness, replay nonce, schema, and per-
-                        # connection identity before *any* ledger/actuation side effect.
-                        for item in session.receive(data):
-                            # A single recv may contain many signed frames. MAC
-                            # verification can itself consume the remaining
-                            # session lifetime; recheck before EACH mutation.
-                            # First authentication must also complete before
-                            # its deadline, not merely before recv returns.
-                            try:
-                                deadline_check(
-                                    time.monotonic(),
-                                    session_deadline=deadline,
-                                    auth_deadline=authentication_deadline,
-                                    authenticated=accepted_frames > 0,
-                                )
-                            except DeadlineExpired as exc:
-                                raise HardwareTransportError(str(exc)) from exc
-                            # Restore normal idle timeout after first valid MAC.
-                            if accepted_frames == 0:
-                                conn.settimeout(idle_timeout)
-                            if accepted_frames >= max_frames:
-                                raise HardwareTransportError("HW_SESSION_FRAME_BUDGET_EXCEEDED", authenticated=True)
-                            if not global_budget.claim():
-                                raise HardwareTransportError("HW_GLOBAL_FRAME_BUDGET_EXCEEDED", authenticated=True)
-                            accepted_frames += 1
-                            tel = to_telemetry(item.payload)
-                            event = str(item.payload["event"])
+                        # Restore normal idle timeout after first valid MAC.
+                        if accepted_frames == 0:
+                            conn.settimeout(idle_timeout)
+                        if accepted_frames >= max_frames:
+                            raise HardwareTransportError("HW_SESSION_FRAME_BUDGET_EXCEEDED", authenticated=True)
+                        if not global_budget.claim():
+                            raise HardwareTransportError("HW_GLOBAL_FRAME_BUDGET_EXCEEDED", authenticated=True)
+                        accepted_frames += 1
+                        tel = to_telemetry(item.payload)
+                        event = str(item.payload["event"])
+                        with ledger_lock:
                             block = bc.push_telemetry(tel, event)
-                            print(f"[CHAIN] block={block.index} event={event}")
                             actuator.maybe_send_pi(
                                 conn, bc, block,
                                 device_id=item.device_id,
                                 device_secret=verifier.device_secret(item.device_id),
                             )
-                except HardwareTransportError as exc:
-                    print(f"[HW BRIDGE] rejected Pi frame: {exc.reason}")
-                except socket.timeout:
-                    print("[HW BRIDGE] Pi connection closed after idle timeout")
-                except OSError:
-                    print("[HW BRIDGE] Pi connection ended after network error")
-            print("[HW BRIDGE] Pi disconnected")
+                        print(f"[CHAIN] block={block.index} event={event}")
+            except HardwareTransportError as exc:
+                print(f"[HW BRIDGE] rejected Pi frame: {exc.reason}")
+            except socket.timeout:
+                print("[HW BRIDGE] Pi connection closed after idle timeout")
+            except OSError:
+                print("[HW BRIDGE] Pi connection ended after network error")
+
+    admission = BoundedTCPAdmission(handle_client, max_clients=max_clients)
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as srv:
+        srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        srv.bind((host, port))
+        srv.listen(max_clients)
+        while True:
+            conn, addr = srv.accept()
+            if not admission_budget.claim():
+                conn.close()
+                continue
+            admission.dispatch(conn)
 
 def main():
     vehicle_id = get_env("SMARTCAR_VEHICLE_ID", "SMARTCAR_VIN_2024_BD_XYZ789")
