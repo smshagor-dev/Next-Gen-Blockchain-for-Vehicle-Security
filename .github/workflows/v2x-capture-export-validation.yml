@@ -8,6 +8,8 @@ on:
       - "experiments/v2x/test_capture_export_producer.py"
       - "experiments/v2x/verify_capture_receipt_pair.py"
       - "experiments/v2x/test_verify_capture_receipt_pair.py"
+      - "experiments/v2x/pin_policy_artifacts.py"
+      - "experiments/v2x/test_pin_policy_artifacts.py"
       - "experiments/v2x/paired_signed_capture_analysis.py"
       - "experiments/v2x/test_paired_signed_capture_analysis.py"
       - "experiments/v2x/attested_interval_join.py"
@@ -49,6 +51,10 @@ jobs:
         env:
           PYTHONPATH: experiments/v2x
         run: python -m unittest discover -s experiments/v2x -p "test_paired_signed_capture_analysis.py" -v
+      - name: Reject modified executable and policy configuration artifacts
+        env:
+          PYTHONPATH: experiments/v2x
+        run: python -m unittest discover -s experiments/v2x -p "test_pin_policy_artifacts.py" -v
       - name: Exercise signed interval checks
         env:
           PYTHONPATH: experiments/v2x
