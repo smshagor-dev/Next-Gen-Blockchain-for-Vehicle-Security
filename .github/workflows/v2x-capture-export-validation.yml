@@ -12,6 +12,8 @@ on:
       - "experiments/v2x/test_pin_policy_artifacts.py"
       - "experiments/v2x/run_pinned_simulation.py"
       - "experiments/v2x/test_run_pinned_simulation.py"
+      - "experiments/v2x/verify_execution_capture_binding.py"
+      - "experiments/v2x/test_verify_execution_capture_binding.py"
       - "experiments/v2x/paired_signed_capture_analysis.py"
       - "experiments/v2x/test_paired_signed_capture_analysis.py"
       - "experiments/v2x/attested_interval_join.py"
@@ -61,6 +63,10 @@ jobs:
         env:
           PYTHONPATH: experiments/v2x
         run: python -m unittest discover -s experiments/v2x -p "test_run_pinned_simulation.py" -v
+      - name: Verify pinned simulator output is identical to signed capture
+        env:
+          PYTHONPATH: experiments/v2x
+        run: python -m unittest discover -s experiments/v2x -p "test_verify_execution_capture_binding.py" -v
       - name: Exercise signed interval checks
         env:
           PYTHONPATH: experiments/v2x
