@@ -126,7 +126,7 @@ class ExecutionCaptureBindingTests(unittest.TestCase):
             self.verify()
 
     def test_mismatched_capture_receipt(self):
-        with self.assertRaisesRegex(ValueError, "capture"):
+        with self.assertRaisesRegex(ValueError, "duplicate"):
             self.verify(export_receipt_bytes=self.export.replace(
                 b'"capture_sha256":', b'"capture_sha256":"bad","capture_sha256":'))
 
