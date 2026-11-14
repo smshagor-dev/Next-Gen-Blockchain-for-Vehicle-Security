@@ -155,15 +155,15 @@ class SafeModeActuatorDispatcher:
         self.gate = gate if gate is not None else BenchActuationGate()
         # Opt in explicitly; never energize an actuator just by starting bridge.
         self.enabled = get_bool("SMARTCAR_HARD_STOP_ENABLED", False)
-        self._last_sent_at = 0.0
+        self._last_sent_at = None
         self._cooldown_sec = 0.8
         self.ecu_gateway = ECUCommandGateway(gate=self.gate)
 
     def _should_send(self, bc: SmartCarBlockchain, block) -> bool:
         if not self.enabled or not self.gate.is_armed():
             return False
-        now = time.time()
-        if now - self._last_sent_at < self._cooldown_sec:
+        now = time.monotonic()
+        if self._last_sent_at is not None and now - self._last_sent_at < self._cooldown_sec:
             return False
         return bool(getattr(bc, "safe_mode_active", False) or getattr(block, "safe_mode_activated", False))
 
@@ -179,7 +179,7 @@ class SafeModeActuatorDispatcher:
                 device_id, device_secret, "COMMAND", payload
             )
             ser.write(encode_authenticated_envelope(envelope))
-            self._last_sent_at = time.time()
+            self._last_sent_at = time.monotonic()
             print("[ACTUATOR] Signed SAFE_MODE_STOP sent to Arduino bench node")
         except (OSError, HardwareTransportError) as e:
             print(f"[ACTUATOR] Arduino command rejected: {e}")
@@ -203,7 +203,7 @@ class SafeModeActuatorDispatcher:
                 device_id, device_secret, "COMMAND", payload
             )
             conn.sendall(encode_authenticated_envelope(envelope))
-            self._last_sent_at = time.time()
+            self._last_sent_at = time.monotonic()
             print("[ACTUATOR] Signed SAFE_MODE_STOP sent to Pi bench node")
         except (OSError, HardwareTransportError) as e:
             print(f"[ACTUATOR] Pi command rejected: {e}")
