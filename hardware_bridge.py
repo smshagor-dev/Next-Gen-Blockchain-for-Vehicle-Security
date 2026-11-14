@@ -408,7 +408,8 @@ def run_pi_mode(bc: SmartCarBlockchain):
     auth_timeout = max(1, min(15, get_int("SMARTCAR_HW_AUTH_TIMEOUT_SEC", 3)))
     actuator = SafeModeActuatorDispatcher()
     verifier_lock = threading.Lock()  # Replay nonce check-and-claim must be atomic.
-    ledger_lock = threading.Lock()  # Chain mutation and dispatcher state are not reentrant.
+    ledger_lock = threading.Lock()  # Chain mutations must be serialized.
+    actuator_lock = threading.Lock()  # Dispatcher cooldown and outbound command state are shared.
     max_clients = max(1, min(64, get_int("SMARTCAR_HW_MAX_CLIENTS", 4)))
     print(f"[HW BRIDGE] Authenticated Pi TCP mode listening on {host}:{port}")
 
@@ -487,6 +488,11 @@ def run_pi_mode(bc: SmartCarBlockchain):
                         event = str(item.payload["event"])
                         with ledger_lock:
                             block = bc.push_telemetry(tel, event)
+                        # Network sendall may block for the peer's socket timeout.
+                        # Never hold the global chain lock while waiting on a peer.
+                        # Remote bench actuation remains gated and independent of
+                        # local hardwired emergency controls.
+                        with actuator_lock:
                             actuator.maybe_send_pi(
                                 conn, bc, block,
                                 device_id=item.device_id,
