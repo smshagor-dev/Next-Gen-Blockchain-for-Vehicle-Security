@@ -49,3 +49,10 @@ This matrix records engineering progress, **not scientific validation**. Exact M
 - Added regression cases checking that the final path does not exist until the fully written staging file is published and that a simulated hard-link failure leaves no published target or temporary file.
 - **Validation pending on latest commit:** new GitHub Actions checks must pass before merge; earlier passing CI on a prior commit does not validate this change.
 - **Residual limitation:** the two separately published receipt files still do not form one atomic transaction; independently verify the pair and digest bindings. External pre-run pinning and physical capture coverage remain unproven.
+
+## 2026-11-14 — receipt pair fail-closed verification
+
+- **IMPLEMENTED IN DRAFT PR #107:** `experiments/v2x/verify_capture_receipt_pair.py` verifies BOTH signed receipt files, operator-pinned canonical manifest, matching capture SHA-256, independent HMAC keys, matching trial window, and explicit complete-interval assertion before scoring. Missing, malformed, duplicate-key, extra-field, mismatched or tampered receipts fail closed. A partial two-file publication cannot be mistaken for a completed observation by this verifier.
+- **TESTS AUTHORED:** `experiments/v2x/test_verify_capture_receipt_pair.py` exercises valid pair, missing halves, duplicate JSON keys, forged hashes, tampered HMACs, mismatched external pin and signed incomplete interval. CI workflow now includes this test module. Actual new-commit CI outcome must be checked before claiming success.
+- **STILL PARTIAL:** This is logical pair verification, not an atomic two-file filesystem transaction, independent timestamp, authenticated real sensor uptime or physical actuation safety. A hub can sign a false completeness assertion. Real field experiments and independent provenance remain blocked.
+- **NEXT:** Run CI and fix regressions; independently anchor manifest timestamp and signed coverage witness, then validate actual receiver captures and matched replay/DoS trials.
