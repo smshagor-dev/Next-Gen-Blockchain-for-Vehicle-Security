@@ -86,6 +86,18 @@ class SignedIntervalTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "incomplete"):
             self.run_join(receipt_change={"capture_complete": False})
 
+    def test_boolean_schema_version_rejected(self):
+        with self.assertRaisesRegex(ValueError, "version"):
+            self.run_join(receipt_change={"schema_version": True})
+
+    def test_nonhex_hmac_rejected(self):
+        with self.assertRaisesRegex(ValueError, "HMAC encoding"):
+            self.run_join(receipt_change={"hmac_sha256": "☃" * 64}, sign=False)
+
+    def test_capture_receipt_binding_rejected(self):
+        with self.assertRaisesRegex(ValueError, "bind this capture"):
+            self.run_join(receipt_change={"capture_sha256": "0" * 64})
+
     def test_naive_capture_time_rejected(self):
         capture = self.capture.replace(b"00:00:03Z", b"00:00:03")
         with self.assertRaisesRegex(ValueError, "timezone"):
