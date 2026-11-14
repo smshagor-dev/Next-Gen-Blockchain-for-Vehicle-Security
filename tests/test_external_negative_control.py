@@ -66,6 +66,27 @@ class ExternalNegativeControlTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "delimiters"):
             describe(self.path, self.output, expected_md5=md5)
 
+
+    def test_descriptive_sender_warning_flags_are_not_hazard_ground_truth(self):
+        md5 = self.write(
+            "stationId,receiverID,collisionWarningEngaged,emergencyBrakeEngaged\n"
+            "node1,rsu1,true,false\n"
+            "node1,rsu1,false,true\n"
+            "node2,rsu2,,false\n"
+        )
+        result = describe(self.path, self.output, expected_md5=md5)
+        self.assertEqual(
+            result["reported_CAM_flag_counts_not_incident_truth"]["collisionWarningEngaged"],
+            {"MISSING": 1, "false": 1, "true": 1},
+        )
+        self.assertEqual(
+            result["distinct_sender_station_ids_not_physical_identity"], 2
+        )
+        self.assertEqual(
+            result["distinct_reported_receiver_ids_not_physical_identity"], 2
+        )
+        self.assertFalse(result["v2x_incident_accuracy_measurable"])
+
     def test_invalid_md5_pin_refused(self):
         self.write("id,time\n1,0\n")
         with self.assertRaisesRegex(ValueError, "invalid externally pinned"):
