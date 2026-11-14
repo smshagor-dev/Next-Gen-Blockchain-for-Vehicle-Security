@@ -75,6 +75,13 @@ def _strict_telemetry_bool(value, field):
 
 
 def to_telemetry(pkt: dict) -> TelemetryData:
+    # Safety-critical booleans must be explicitly supplied by an authenticated
+    # sender. Missing fields must not silently become a safe/healthy reading.
+    if type(pkt) is not dict:
+        raise ValueError("telemetry: expected JSON object")
+    for field in ("emergency_brake_active", "driver_unwell"):
+        if field not in pkt:
+            raise ValueError(f"{field}: required signed telemetry field")
     return TelemetryData(
         speed=_finite_telemetry_number(pkt.get("speed", 0.0), "speed"),
         acceleration=_finite_telemetry_number(pkt.get("acceleration", 0.0), "acceleration"),
