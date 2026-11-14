@@ -42,3 +42,10 @@ This matrix records engineering progress, **not scientific validation**. Exact M
 - **PARTIAL:** Distinct receipt files are individually fsynced and exclusive, not one atomic two-file commit. An interrupted second write may leave an unmatched first receipt; consumers must require both. Signed completion proves only the hub assertion, not uninterrupted sensing, independent annotations, independent cluster identity or hardware safety.
 - **BLOCKED:** Independent pre-registration/time witness; source-authenticated production receiver export and complete coverage witness; genuine VeReMi NextGen/CAN independent incident truth and matched baseline trials; physical emergency-stop and power-cut evidence. Synthetic fixtures remain NON-PUBLISHABLE main results.
 - **UPCOMING:** Execute PR CI, fix regressions, anchor manifests and real capture evidence with independent provenance and run preregistered matched-split incident campaigns.
+
+### Evidence file publication hardening (2026-11-14 follow-up)
+
+- Replaced direct O_EXCL target writes with same-directory temporary staging, full file fsync and exclusive hard-link publication, followed by POSIX directory fsync. This prevents observers from seeing partially written **individual** manifests or receipts and prevents silent replacement of preexisting outputs.
+- Added regression cases checking that the final path does not exist until the fully written staging file is published and that a simulated hard-link failure leaves no published target or temporary file.
+- **Validation pending on latest commit:** new GitHub Actions checks must pass before merge; earlier passing CI on a prior commit does not validate this change.
+- **Residual limitation:** the two separately published receipt files still do not form one atomic transaction; independently verify the pair and digest bindings. External pre-run pinning and physical capture coverage remain unproven.
