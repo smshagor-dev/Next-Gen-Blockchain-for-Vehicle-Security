@@ -33,3 +33,17 @@ This matrix records engineering progress, **not scientific validation**. Exact M
 - **Synthetic test evidence:** `PYTHONPATH=experiments/v2x python -m unittest discover -s experiments/v2x -p 'test_attested_interval_join.py' -v` ran in isolated local Python with a locally reconstructed mirror of `join_world_incidents.py`: **15/15 passed**. Newly pushed GitHub file content hashes matched the locally tested files; the exact repository-wide test suite and CI have **not been executed**.
 - **Critical limitation:** No capture-interval attestation producer has been implemented or physically verified. A signed `capture_complete` flag is a hub's self-report, not proof of uninterrupted sensing, independently trusted annotators or a pre-registered experiment. No authentic incident-level efficacy evidence was generated; this test suite is NON-PUBLISHABLE as a main result.
 - **Next:** implement exporter-side canonical interval receipts, preserve an operator-pinned trial manifest before execution, validate producer/consumer interoperation and execute matched real incident trials under independent world truth; then independent cluster-aware comparisons.
+
+## 2026-11-15 — externally sourced dataset audit protocol
+
+| Research item | State | Verified scope and remaining gap |
+| --- | --- | --- |
+| Hardware ingress and actuation isolation | PARTIAL | Prior hardening exists; independently witnessed physical interlocks remain blocked |
+| Ledger finality | PARTIAL | Crash consistency hardening is not proof of distributed consensus finality |
+| Independent incident policy replay | PARTIAL | Separate draft PR #108 implements identical trace replay with independent labels; real captures absent |
+| Multi-cluster inference | PARTIAL | Separate draft PR #109 addresses pseudo-replication; authentic independent clusters absent |
+| Dataset provenance and leakage prevention | IMPLEMENTED, CI PENDING | `experiments/v2x/audit_external_dataset.py` requires externally pinned manifest, original archive bytes and SHA-256, exact split index bytes and SHA-256, release/source/license/annotation/extractor metadata, disjoint source-group split assignment, duplicate-record rejection and per-split label counts. Sixteen synthetic adversarial tests authored |
+| VeReMi NextGen / realistic CAN real source ingest | BLOCKED | No original publisher archive or independently checked license supplied. The new tool treats archive bytes as opaque and cannot authenticate claims or parse domain formats |
+| Physical safety, independent experiments, manuscript | BLOCKED | No HIL witness, independent trial replication or validated effect-size evidence. No scientific claims from synthetic fixtures |
+
+Test: `PYTHONPATH=experiments/v2x python -m unittest discover -s experiments/v2x -p 'test_audit_external_dataset.py' -v`. Do not claim CI passed until the workflow result is checked. Next task: implement format-specific authentic VeReMi NextGen and CAN parsers against original publisher archives, derive group IDs from trusted session/vehicle/time metadata, and check independent recording leakage before any inference.
