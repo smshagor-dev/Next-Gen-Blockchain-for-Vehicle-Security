@@ -37,6 +37,20 @@ class SignedTelemetryValidationTests(unittest.TestCase):
         self.assertFalse(result["emergency_brake_active"])
         self.assertTrue(result["driver_unwell"])
 
+    def test_rejects_coercible_strings_and_containers(self):
+        # MAC validity does not make a JSON string a sensor number.
+        for field in ("speed", "gps_lon", "obstacle_distance", "brake_pressure"):
+            for value in ("0", "12.5", "1e309", "", None, [], {}, [12]):
+                with self.subTest(field=field, value=repr(value)):
+                    with self.assertRaises(ValueError):
+                        convert({field: value})
+
+    def test_preserves_valid_integer_and_float_numbers(self):
+        result = convert({"speed": 0, "rpm": 1250, "gps_lat": -33.8})
+        self.assertEqual(result["speed"], 0.0)
+        self.assertEqual(result["rpm"], 1250.0)
+        self.assertEqual(result["gps_lat"], -33.8)
+
     def test_rejects_bool_in_numeric_field(self):
         with self.assertRaises(ValueError):
             convert({"speed": True})
