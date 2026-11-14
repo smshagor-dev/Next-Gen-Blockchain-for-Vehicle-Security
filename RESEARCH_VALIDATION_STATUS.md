@@ -94,3 +94,14 @@ Run next: `python -m unittest discover -s tests -p 'test_pi_byte_budget_compile_
 **Regression coverage:** `tests/test_required_signed_safety_fields.py` uses AST-isolated executable tests for explicit safe values, missing brake state, missing driver state, ambiguous boolean and non-finite numeric rejection (commit `f9f23ef`). No test execution against full checkout in this run. Command: `python -m unittest discover -s tests -p 'test_required_signed_safety_fields.py' -v`. Existing signed producers must be checked for compatibility before merging.
 
 **Status matrix:** Signed schema admission = partial, pending producer compatibility and authenticated loopback validation. Hardware actuation = blocked pending independent interlock verification. Ledger crash consistency = partial. Dataset provenance, independent multi-seed adversarial baselines and publishable statistical evidence = blocked. **Next code task:** production authenticated concurrent loopback replay and slow-receiver tests; verify fail-closed missing-field rejection before ledger writes. No publishable primary result or hardware safety certification claimed.
+
+
+## 2026-11-14 concurrent signed-envelope executable regression checkpoint
+
+**Implemented (commit ee22673):** Added `tests/test_concurrent_signed_envelope_security.py` with a real 32-thread barrier race against the shared enrolled-device verifier, requiring exactly one accepted nonce and 31 replay rejections. Added a tampered-payload/MAC rejection test ensuring a failed forgery cannot consume the legitimate nonce, plus a cross-session identity-binding rejection test ensuring the legitimate nonce remains usable. These use production cryptographic transport primitives rather than source-only AST checks. No hardware or real network is exercised.
+
+**Validation:** Reviewed verifier implementation: MAC is checked before identity/payload checks; nonce claim occurs under its internal RLock. GitHub file write succeeded. Tests have **not** been executed against a full checkout, so results and branch compatibility remain unverified. Run `python -m unittest discover -s tests -p 'test_concurrent_signed_envelope_security.py' -v`, followed by full suite. No statistical or publication claim.
+
+**Matrix update:** Concurrent replay/tamper regression = implemented, execution pending. Authenticated production loopback and independent emergency control = blocked/unverified. Durable ledger crash consistency = partial. Authentic datasets, independent baselines, multi-seed statistics = upcoming/blocked.
+
+**Next code task:** Build real production `run_pi_mode` loopback integration harness with ephemeral port, concurrent signed clients and a stalled peer, asserting accepted chain mutations and worker recovery; collect measured timings without treating these regressions as independent scientific experiments.
