@@ -56,3 +56,17 @@ This matrix records engineering progress, **not scientific validation**. Exact M
 - **TESTS AUTHORED:** `experiments/v2x/test_verify_capture_receipt_pair.py` exercises valid pair, missing halves, duplicate JSON keys, forged hashes, tampered HMACs, mismatched external pin and signed incomplete interval. CI workflow now includes this test module. Actual new-commit CI outcome must be checked before claiming success.
 - **STILL PARTIAL:** This is logical pair verification, not an atomic two-file filesystem transaction, independent timestamp, authenticated real sensor uptime or physical actuation safety. A hub can sign a false completeness assertion. Real field experiments and independent provenance remain blocked.
 - **NEXT:** Run CI and fix regressions; independently anchor manifest timestamp and signed coverage witness, then validate actual receiver captures and matched replay/DoS trials.
+
+## 2026-11-14 — paired signed-capture campaign adapter (issue #92; scientific comparison follow-up to #79/#88)
+
+| Gate | State | Evidence / remaining gate |
+| --- | --- | --- |
+| Same source and matching splits | IMPLEMENTED IN DRAFT #107 | One operator-pinned manifest and one independently supplied world-incident universe drive both arms; missing incidents are scored as absence, not discarded |
+| Method identity integrity | PARTIAL | Detached, independently keyed assignment HMACs bind each capture to baseline/candidate arm and planned method name. **Hub self-claims cannot prove which algorithm actually executed** |
+| Adversarial integrity tests | ADDED, CI OUTCOME PENDING | 17 synthetic tests cover mismatched arm, signed wrong method, tampered role HMAC, duplicate keys, swapped captures, replay, unverified relay, wrong world pin, zero-observation intervals and a real CLI round-trip |
+| Direct paired estimates | IMPLEMENTED, **DESCRIPTIVE ONLY** | Both arm confusion counts, accuracy difference in percentage points, exact McNemar descriptive p-value, full per-incident rows and cryptographic source digests |
+| Independent inference | BLOCKED | The tool accepts one seed/cluster at a time. Repeated correlated incidents cannot be treated as independent units; no confidence interval or significance claim is appropriate from this output |
+| Authentic physical/field observations | BLOCKED | No source-authenticated receiver exports, independently witnessed continuous capture, independently curated world truth, or HIL safety evidence |
+| Next code task | UPCOMING | Integrate actual instrumented policy-run identifiers and independent witness/attestation; execute frozen policies on identically scheduled authentic multi-seed scenarios and aggregate by genuinely independent clusters |
+
+These deterministic protocol tests are **non-publishable main evidence**. This adapter is not a claim of original cryptography, sensor validity, or real comparative superiority. Never claim p-values demonstrate significance merely because n>=30.
