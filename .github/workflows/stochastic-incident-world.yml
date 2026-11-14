@@ -1,0 +1,54 @@
+name: Stochastic Incident World Research
+
+on:
+  pull_request:
+    paths:
+      - 'experiments/v2x/stochastic_world_trials.py'
+      - 'experiments/v2x/consistent_subset_admission.py'
+      - 'v2x_evidence_admission.py'
+      - 'tests/test_stochastic_world_trials.py'
+      - '.github/workflows/stochastic-incident-world.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reproducible-software-study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run deterministic contract and regression tests
+        run: python -m unittest tests.test_stochastic_world_trials -v
+      - name: Run frozen 64-seed experiment
+        run: |
+          python -m experiments.v2x.stochastic_world_trials \
+            --output-dir "${{ runner.temp }}/stochastic-v2x" \
+            --seeds 64 --per-scenario 16
+      - name: Assert no false publication or hardware claims
+        env:
+          RESULT_DIR: ${{ runner.temp }}/stochastic-v2x
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          root = Path(os.environ['RESULT_DIR'])
+          summary = json.loads((root / 'summary.json').read_text())
+          manifest = json.loads((root / 'manifest.json').read_text())
+          assert summary['publication_ready'] is False
+          assert summary['physical_hardware_validated'] is False
+          assert summary['independent_external_incident_labels'] is False
+          assert summary['transport_mac_verified_in_this_runner'] is False
+          assert manifest['publication_ready'] is False
+          print("Software-only claim boundaries verified")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stochastic-v2x-synthetic-world-only
+          path: ${{ runner.temp }}/stochastic-v2x/
+          if-no-files-found: error
+          retention-days: 14
