@@ -55,8 +55,10 @@ def _now():
 def _finite_telemetry_number(value, field):
     """Reject non-finite and non-numeric signed telemetry before chain mutation."""
     import math
-    if isinstance(value, bool):
-        raise ValueError(f"{field}: boolean is not a numeric measurement")
+    # JSON numbers must remain numbers: strings, booleans and containers are
+    # not valid authenticated sensor measurements, even if float() coerces them.
+    if type(value) not in (int, float):
+        raise ValueError(f"{field}: expected JSON number")
     try:
         number = float(value)
     except (TypeError, ValueError, OverflowError) as exc:
