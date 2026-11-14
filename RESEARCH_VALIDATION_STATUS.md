@@ -85,3 +85,12 @@ Run next: `python -m unittest discover -s tests -p 'test_pi_byte_budget_compile_
 **Evidence:** Four assertions on an independently recreated cooldown logic snippet passed in local Python; this is NOT execution of the checked-in regression test or full hardware_bridge module. GitHub checkout DNS resolution remains unavailable. Run `python -m unittest discover -s tests -p 'test_actuator_monotonic_cooldown.py' -v` on a checkout, then complete full suite and authenticated loopback faults before merging. No physical actuation or independent emergency-stop evidence; not a publishable experimental result.
 
 **Next task:** Exercise production Pi ingress with concurrent authenticated loopback sessions, replay races, slow receivers and measured rejection latency. Verify dispatcher command serialization does not starve honest sessions; then address durable ledger crash consistency.
+
+
+## 2026-11-14 required signed safety-state checkpoint
+
+**Implemented, not runtime verified:** Authenticated telemetry conversion now requires explicit `emergency_brake_active` and `driver_unwell` fields. Previously absent fields silently defaulted to false, making an omitted safety condition indistinguishable from an authenticated safe reading. No hardware actuation or independent emergency-stop path changed. Commit `07585114`.
+
+**Regression coverage:** `tests/test_required_signed_safety_fields.py` uses AST-isolated executable tests for explicit safe values, missing brake state, missing driver state, ambiguous boolean and non-finite numeric rejection (commit `f9f23ef`). No test execution against full checkout in this run. Command: `python -m unittest discover -s tests -p 'test_required_signed_safety_fields.py' -v`. Existing signed producers must be checked for compatibility before merging.
+
+**Status matrix:** Signed schema admission = partial, pending producer compatibility and authenticated loopback validation. Hardware actuation = blocked pending independent interlock verification. Ledger crash consistency = partial. Dataset provenance, independent multi-seed adversarial baselines and publishable statistical evidence = blocked. **Next code task:** production authenticated concurrent loopback replay and slow-receiver tests; verify fail-closed missing-field rejection before ledger writes. No publishable primary result or hardware safety certification claimed.
