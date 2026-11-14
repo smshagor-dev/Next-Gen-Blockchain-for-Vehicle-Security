@@ -185,6 +185,33 @@ class ProducerContractTests(unittest.TestCase):
             if os.name == "posix":
                 self.assertEqual(file.stat().st_mode & 0o777, 0o600)
 
+    def test_exclusive_publication_never_exposes_partial_target(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "sealed.json"
+            original_link = os.link
+
+            def observe_before_link(src, dst):
+                self.assertFalse(target.exists())
+                self.assertEqual(Path(src).read_bytes(), self.manifest)
+                return original_link(src, dst)
+
+            with patch("capture_export_producer.os.link", side_effect=observe_before_link):
+                create_once(target, self.manifest)
+            self.assertEqual(target.read_bytes(), self.manifest)
+            self.assertEqual(list(Path(directory).glob(".capture-pending-*")), [])
+
+    def test_failed_exclusive_link_does_not_publish_or_leak_staging(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "sealed.json"
+            with patch("capture_export_producer.os.link",
+                       side_effect=OSError("simulated publication failure")):
+                with self.assertRaisesRegex(OSError, "publication failure"):
+                    create_once(target, self.manifest)
+            self.assertFalse(target.exists())
+            self.assertEqual(list(Path(directory).glob(".capture-pending-*")), [])
+
     def test_cli_plan_and_seal_roundtrip(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
