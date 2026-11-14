@@ -109,7 +109,6 @@ class PinnedSimulationTests(unittest.TestCase):
     def test_kernel_output_quota_rejects_unbounded_child(self):
         noisy = (b"#!/usr/bin/env python3\nimport os\n"
                  b"while True:\n os.write(1,b'X'*4096)\n")
-        noisy = noisy.replace(b"\\\n", b"\n")
         self.exe.write_bytes(noisy)
         self.pin = build_pin(self.manifest, noisy, self.other,
                              self.config, self.other_config, "auth-only", "evidence-gate")
@@ -124,7 +123,6 @@ class PinnedSimulationTests(unittest.TestCase):
                  b"if os.fork()==0:\n time.sleep(0.6)\n"
                  b" open(sys.argv[1]+'.late','w').write('survived')\n"
                  b"else:\n time.sleep(3)\n")
-        child = child.replace(b"\\\n", b"\n")
         self.exe.write_bytes(child)
         self.pin = build_pin(self.manifest, child, self.other,
                              self.config, self.other_config, "auth-only", "evidence-gate")
