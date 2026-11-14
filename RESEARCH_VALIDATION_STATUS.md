@@ -68,3 +68,11 @@ Run next: `python -m unittest discover -s tests -p 'test_pi_byte_budget_compile_
 **Verification:** GitHub writes succeeded. Local `git ls-remote` failed with `Could not resolve host: github.com`, so full-checkout tests were not executed; **implemented, unverified**. Run `python -m unittest discover -s tests -p 'test_signed_telemetry_type_safety.py' -v` on the branch. Review upstream sensor producers for any legacy string-encoded measurements before merging.
 
 **Next code task:** Add real authenticated concurrent loopback socket tests for production Pi ingress, including malformed-but-valid-MAC numeric strings, replay races, trickle-frame exhaustion, and worker recovery. Keep physical safety and publishability claims blocked.
+
+## 2026-11-14 outbound network lock-isolation checkpoint
+
+**Implemented, not runtime-validated:** Pi handler now releases the global ledger mutation lock before calling the potentially blocking socket-based `actuator.maybe_send_pi`. A separate `actuator_lock` serializes shared dispatcher cooldown and command state. Added `tests/test_pi_lock_isolation.py` with AST assertions that the ledger lock contains `push_telemetry` but not remote actuation. Commits: `8eccf3c`, `4994bf5`. This reduces cross-client head-of-line blocking from outbound sends but does not establish real-time guarantees or safe physical actuation.
+
+**Validation:** GitHub connector writes succeeded; local checkout could not be cloned due to DNS failure. Neither full-suite nor new regression tests were executed in the repository. Command: `python -m unittest discover -s tests -p 'test_pi_lock_isolation.py' -v`.
+
+**Next:** Test concurrent signed telemetry on real loopback sockets while a remote command receiver intentionally stalls; measure ledger progress and worker recovery. Review actuator lock hold time and use of blockchain state outside ledger lock; run full suite before merging. Local emergency-stop remains independent and physical safety is unverified.
