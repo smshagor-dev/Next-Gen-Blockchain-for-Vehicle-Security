@@ -1,0 +1,31 @@
+name: Durable Simulated Command Receipts
+
+on:
+  pull_request:
+    paths:
+      - 'command_ack_protocol.py'
+      - 'hardware_command_receiver_simulator.py'
+      - 'tests/test_command_ack_protocol.py'
+      - 'tests/test_hardware_command_receiver_simulator.py'
+      - 'tests/test_simulated_admission_receipts_integration.py'
+      - '.github/workflows/durable-simulated-command-receipts.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  simulated-command-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify simulated command issuance and durable nonce anti-replay
+        run: |
+          python -m unittest tests.test_command_ack_protocol -v
+          python -m unittest tests.test_hardware_command_receiver_simulator -v
+          python -m unittest tests.test_simulated_admission_receipts_integration -v
+          python -m py_compile hardware_command_receiver_simulator.py command_ack_protocol.py
