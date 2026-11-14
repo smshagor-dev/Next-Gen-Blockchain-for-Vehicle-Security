@@ -50,3 +50,12 @@ Run next: `python -m unittest discover -s tests -p 'test_pi_byte_budget_compile_
 **Code repair:** Inspected the actual branch file through the GitHub connector and found the prior claimed initialization absent: `handle_client` incremented `received_bytes` before assignment. Added `received_bytes = 0` immediately before the receive loop (commit `1449102`). The existing `test_pi_byte_budget_compile_regression.py` specifically asserts one zero initialization preceding increment and limit guard; the previous branch would fail this assertion. This is a code correction, not evidence that the full test suite passes.
 
 **Status:** Pi byte budget implemented, **execution unverified**. Physical actuation and emergency-stop behavior unverified. Next: run source guard and real authenticated loopback concurrent replay/trickle tests on a complete checkout; then review ledger and actuator lock contention. No main-branch merge or publishable experiment claimed.
+
+
+## 2026-11-14 signed telemetry semantic validation checkpoint
+
+**Implemented, not yet runtime verified:** Production hardware_bridge.to_telemetry now rejects NaN/Infinity, invalid numeric types and ambiguous safety boolean coercion before blockchain mutation; Pi handler catches malformed authenticated telemetry and closes that session. New executable AST-isolated regression tests in tests/test_signed_telemetry_type_safety.py cover non-finite values, safety booleans, valid finite telemetry and numeric bool rejection. Commits: a3602fb, 4765209. Scope is semantic admission hardening, not cryptographic novelty or physical actuator certification.
+
+**Validation:** GitHub connector writes succeeded; local git ls-remote failed with DNS resolution of github.com, so full checkout and tests were not run. Run: `python -m unittest discover -s tests -p 'test_signed_telemetry_type_safety.py' -v`; then full suite and authenticated real-loopback race/Slowloris tests. Existing fixture data, microbenchmarks and communication formulas remain non-publishable primary evidence.
+
+**Next code task:** exercise the production Pi TCP server with authenticated concurrent loopback sessions and malformed-but-valid-MAC telemetry, then evaluate ledger crash consistency and safe actuation isolation. Do not merge without verification.
