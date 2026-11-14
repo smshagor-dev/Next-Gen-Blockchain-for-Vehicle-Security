@@ -165,7 +165,7 @@ class SignedPairedCohortTests(unittest.TestCase):
             self.check(pin="0" * 64)
 
     def test_world_label_tamper_rejected(self):
-        with self.assertRaisesRegex(ValueError, "operator-pinned"):
+        with self.assertRaisesRegex(ValueError, "source-mismatched"):
             self.check(world=self.world.replace(b"hazard,1", b"hazard,0"))
 
     def test_replay_in_one_arm_rejected(self):
