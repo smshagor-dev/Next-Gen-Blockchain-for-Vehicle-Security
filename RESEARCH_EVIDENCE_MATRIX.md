@@ -67,3 +67,15 @@ Test command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experim
 - **Implemented:** replaced obsolete test with explicit regression checks that the ECU transport is never initialized, forced legacy gateway flags do not forward to CAN/serial output, and private output helpers fail closed.
 - **Validation:** original pinned replay workflow 43685231640 passed before this correction; changed Security Baseline regression is **not yet revalidated** as of this entry.
 - **Scientific limitation:** these are mocked software safety checks, not tests on a physical ECU, emergency control circuit, or independent safety certification.
+
+## 2026-11-15 — numeric overflow and signed metadata boundary (draft)
+
+| Area | Status | Evidence and next step |
+| --- | --- | --- |
+| Authenticated telemetry parser fail-closed behavior | Implemented in draft; CI pending | `hardware_transport_security.py` catches huge JSON integer-to-float overflow as `HardwareTransportError`, and rejects non-string event, source and observation timestamp rather than stringifying them |
+| Synthetic adversarial regression | Authored, execution unverified | Seven tests in `tests/test_hardware_numeric_metadata_boundary.py`, including a valid authenticated envelope roundtrip. Dedicated CI workflow added. Exact local checkout blocked by GitHub DNS failure; do not claim test pass |
+| Hardware control | Unchanged | No ECU/CAN actuation path enabled. Local emergency stop remains independent |
+| Authentic experiments and scientific efficacy | Blocked | No genuine external VeReMi NextGen/CAN trial, physical interlock measurement, or independently validated attack outcomes generated |
+| Next code task | Upcoming | Validate CI, integrate pending ingress freshness PRs and measure authenticated TCP loopback rejection latency, CPU/RAM, reconnect load and safe emergency isolation |
+
+This is security engineering evidence, not publishable incident-level detection effectiveness. An enrolled malicious node can still send a syntactically valid but false reading; independently sourced truth and matched baselines are required.
