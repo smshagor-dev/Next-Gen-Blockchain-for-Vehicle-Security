@@ -67,3 +67,16 @@ Test command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experim
 - **Implemented:** replaced obsolete test with explicit regression checks that the ECU transport is never initialized, forced legacy gateway flags do not forward to CAN/serial output, and private output helpers fail closed.
 - **Validation:** original pinned replay workflow 43685231640 passed before this correction; changed Security Baseline regression is **not yet revalidated** as of this entry.
 - **Scientific limitation:** these are mocked software safety checks, not tests on a physical ECU, emergency control circuit, or independent safety certification.
+
+## 2026-11-15 — real local socket admission saturation (draft, not scientific main results)
+
+| Item | State | Evidence / limitation |
+| --- | --- | --- |
+| Saturated admission boundedness | Locally measured | `tests/test_admission_runtime.py` uses actual OS socket pairs, two occupied worker slots and 100 overload attempts; confirms 100 rejects, peak active 2, slot recovery after release |
+| Worker exception recovery | Locally tested | Synthetic worker fault raises in daemon thread; admission slot is released, although Python emits an uncaught thread exception |
+| Five-replicate runtime measurement | Locally measured | `experiments/v2x/bench_local_admission_saturation.py` with 4 blocked workers, 1,000 rejected socketpair attempts per replicate, 5 replicates. Median per-rejection dispatch times (microseconds): 1.498, 1.421, 1.416, 1.399, 1.392; per-replicate p99: 7.577, 4.062, 6.117, 11.472, 32.423. CPU process time per batch (ms): 9.924, 7.372, 8.020, 12.552, 16.386. Raw observation: `experiments/v2x/observations/local_socketpair_admission_2026-11-15.json` |
+| Exact repository CI | Pending | New `bounded-hardware-ingress-runtime.yml` exercises the repository test against actual mainline module. Local tests used a reconstructed copy of the mainline module and passed 2/2; no CI pass claimed |
+| Full network ingress / MAC / ledger / DoS | Upcoming | This benchmark measures only admission dispatcher under sequential overload, not real TCP, concurrent attacker connections, authentication, ledger throughput or end-to-end latency |
+| Independent vehicle hardware safety | Blocked | No vehicle, CAN interface, physical emergency stop, hardware-in-the-loop, or independent laboratory access. Results are **NON-PUBLISHABLE main evidence** |
+
+**Next implementation:** run end-to-end loopback TCP with authenticated and invalid hardware envelopes, verify global budgets and absolute deadlines, then perform isolated process CPU/RAM/latency measurements with several independent seeds and explicit threat scenarios. Never infer publication-level significance from n >= 30.
