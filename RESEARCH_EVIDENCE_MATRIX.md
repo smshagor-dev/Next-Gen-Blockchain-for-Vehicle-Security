@@ -67,3 +67,16 @@ Test command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experim
 - **Implemented:** replaced obsolete test with explicit regression checks that the ECU transport is never initialized, forced legacy gateway flags do not forward to CAN/serial output, and private output helpers fail closed.
 - **Validation:** original pinned replay workflow 43685231640 passed before this correction; changed Security Baseline regression is **not yet revalidated** as of this entry.
 - **Scientific limitation:** these are mocked software safety checks, not tests on a physical ECU, emergency control circuit, or independent safety certification.
+
+## 2026-11-15 — remote safe-stop command isolation (draft)
+
+| Workstream | State | Evidence / limitation |
+| --- | --- | --- |
+| Remote actuator authorization | Implemented on draft; verification pending | `SafeModeActuatorDispatcher` no longer transmits signed `COMMAND` envelopes to Arduino/Pi merely because ledger safe mode is active and bench gate is armed. This closes the sender-only authorization gap; remote actuator transport is deliberately disabled |
+| ECU output | Existing fail-closed boundary retained | `ECUCommandGateway` still refuses CAN/serial output |
+| Regression coverage | Authored, unverified | Five mocked tests cover serial, TCP, environment opt-in, ECU direct helpers and emergency/sensor combinations. Run `PYTHONPATH=. python -m unittest discover -s tests -p 'test_network_actuation_isolation.py' -v` and full security suite before merge |
+| Local physical emergency stop | Not verified | Software code does not test physical emergency circuit, persistence across power loss or actuator isolation |
+| Formal-model conformance | Partial | Draft #130/#131 assume no network actuation; this change aligns production command *output* boundary, but does not prove full temporal conformance or independent receiver-side authorization |
+| Scientific efficacy | Blocked | No authentic V2X/CAN held-out trials, independent attack truth, HIL or measured effect sizes added |
+
+**Next:** run exact CI and investigate any legacy tests that expect unsafe network stop delivery; verify signed telemetry ingestion remains unaffected. Then add differential production/model traces and externally witnessed power-loss emergency tests before considering physical command output. Never use these mocked regressions as main scientific results.
