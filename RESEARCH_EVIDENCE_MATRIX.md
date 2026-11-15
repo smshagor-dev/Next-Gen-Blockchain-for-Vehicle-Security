@@ -67,3 +67,16 @@ Test command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experim
 - **Implemented:** replaced obsolete test with explicit regression checks that the ECU transport is never initialized, forced legacy gateway flags do not forward to CAN/serial output, and private output helpers fail closed.
 - **Validation:** original pinned replay workflow 43685231640 passed before this correction; changed Security Baseline regression is **not yet revalidated** as of this entry.
 - **Scientific limitation:** these are mocked software safety checks, not tests on a physical ECU, emergency control circuit, or independent safety certification.
+
+## 2026-11-16 — Paired incident universe coverage (draft)
+
+| Workstream | Status | Evidence / limitation |
+| --- | --- | --- |
+| World-universe denominator | Implemented, synthetic contract only | `experiments/v2x/audit_trial_coverage.py` uses every independently supplied world incident; missing method predictions are scored as no-alert, including positive false negatives |
+| Candidate/baseline symmetry | Implemented | Both methods use exactly the same world IDs; reject unknown IDs, duplicate IDs, invalid binary labels, ragged CSV and unexpected columns |
+| Reproducibility | Partial | SHA-256 of three source CSV files, explicit incident/cluster counts, confusion counts; no external source authenticity attested |
+| Regression evidence | Locally verified equivalent isolated script: 7/7 synthetic tests; repository CI pending | Run `python -m unittest tests.test_audit_trial_coverage -v` from repo root; GitHub checkout DNS unavailable locally |
+| Authentic incident efficacy | Blocked | No independent incident truth provenance, source capture completeness proof, or authentic held-out candidate/baseline predictions |
+| Next | Upcoming | Integrate pinned trial receipt and complete capture interval; fail on source identity mismatch, then execute matched multi-seed trials and cluster-level uncertainty |
+
+These synthetic checks are not publication-ready attack detection results. Missing prediction means no alert only when the world-universe manifest and trial capture interval are independently complete; otherwise no scientific inference is warranted.
