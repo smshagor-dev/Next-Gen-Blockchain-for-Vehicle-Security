@@ -46,3 +46,10 @@ This matrix records engineering progress, **not scientific validation**. Exact M
 | Next | Upcoming | Validate genuine licensed CAN source parser against publisher schema, link recording-level annotations and source provenance, then compare methods on identical disjoint recordings with cluster-aware uncertainty |
 
 Test command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experiments/v2x -p 'test_normalize_can_recording.py' -v`. Source pins prove byte integrity relative to operator supplied hash, **not publisher authenticity**. No synthetic fixture is a publishable main result.
+
+## 2026-11-15 — strict replay parser hardening (draft)
+
+- **Implemented:** replay JSONL now rejects duplicate fields (including authentication/evidence gates and incident IDs), non-finite JSON constants and invalid UTF-8 before any decision is produced. This closes parser ambiguity that could cause different replay tools to interpret different gates from identical bytes.
+- **Regression coverage:** five adversarial/valid-input cases added to `test_replay_isolated_commands.py`; CI not yet confirmed. This is a synthetic parser-integrity check, **not** attack-detection effectiveness evidence.
+- **Remaining:** independent truth join PR #117, pinned-trial PR #118 and policy-output cross-check PR #119 remain separate pending review. No authentic CAN/VeReMi dataset, physical safety or publication-ready comparison is established here.
+- **Next code task:** integrate complete incident universe and capture receipts after validating pending PRs, then run identical held-out baseline/candidate cohorts.
