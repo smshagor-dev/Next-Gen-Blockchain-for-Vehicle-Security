@@ -67,3 +67,11 @@ Test command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experim
 - **Implemented:** replaced obsolete test with explicit regression checks that the ECU transport is never initialized, forced legacy gateway flags do not forward to CAN/serial output, and private output helpers fail closed.
 - **Validation:** original pinned replay workflow 43685231640 passed before this correction; changed Security Baseline regression is **not yet revalidated** as of this entry.
 - **Scientific limitation:** these are mocked software safety checks, not tests on a physical ECU, emergency control circuit, or independent safety certification.
+
+## 2026-11-15 — cluster influence sensitivity (draft)
+
+- **Implemented:** `experiments/v2x/cluster_influence_analysis.py` computes paired candidate-minus-baseline accuracy effects with each independent cluster omitted in turn, reports effect range and possible sign reversal. This is an influence diagnostic, not inferential significance.
+- **Regression contracts authored:** `tests/test_cluster_influence_analysis.py` covers cluster dominance, uniform improvement, duplicate IDs, insufficient clusters, nonbinary predictions and extra columns.
+- **Validation:** repository checkout failed with `Could not resolve host: github.com`; exact tests and CI are **unverified**. Synthetic examples are **not publishable scientific observations**.
+- **Blocked:** genuine independent incident/recording clusters, publisher-verified dataset hashes and labels, matched held-out candidate/baseline predictions, physical interlocks.
+- **Next code task:** run `python -m unittest discover -s tests -p 'test_cluster_influence_analysis.py' -v` in the full checkout; link out-of-band pinned replay manifests to paired cluster IDs, fail closed on incomplete joins, then execute independent real cohorts.
