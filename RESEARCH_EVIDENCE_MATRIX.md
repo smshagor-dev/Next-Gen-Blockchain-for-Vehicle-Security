@@ -61,9 +61,9 @@ Test command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experim
 
 **Next code task:** connect pinned trial verification to independent truth join and capture-interval receipt with consistent incident universes, then run verified publisher-sourced held-out multi-seed cohorts. No physical ECU tests or publishable efficacy claims are implied.
 
-## 2026-11-15 — policy replay cross-check (stacked draft)
+## 2026-11-15 — PR #118 Security Baseline regression follow-up
 
-- **Implemented:** verifier recomputes every simulation-only verdict from the pinned replay input using `replay_isolated_commands.replay` and rejects fabricated/omitted decisions, inconsistent summaries and inflated evidence classification.
-- **Regression coverage authored:** three additional adversarial cases (forged verdict, omitted decision, falsified evidence class); original integrity fixtures updated to valid replay schema. GitHub CI and repository tests **not yet verified**.
-- **Limitation:** both verifier and replay share code, so this is an integrity consistency check, not an independent implementation, authentic observation, or real-world safety proof. A maliciously modified policy implementation could still produce consistent but incorrect decisions; policy executable hash must be externally trusted.
-- **Next:** join independent incident truth and capture-interval receipts to the verified replay, enforce complete incident universe, and run real matched cohorts with authentic provenance.
+- **Confirmed failure:** Security Baseline run 43685231526 failed in `tests.test_hardware_bridge_security.BridgeSecurityTests.test_ecu_interlock_is_rechecked_before_output`; its expectation that ECU `_init_transport` is called contradicts the deliberately disabled CAN/serial output introduced by earlier safety hardening.
+- **Implemented:** replaced obsolete test with explicit regression checks that the ECU transport is never initialized, forced legacy gateway flags do not forward to CAN/serial output, and private output helpers fail closed.
+- **Validation:** original pinned replay workflow 43685231640 passed before this correction; changed Security Baseline regression is **not yet revalidated** as of this entry.
+- **Scientific limitation:** these are mocked software safety checks, not tests on a physical ECU, emergency control circuit, or independent safety certification.
