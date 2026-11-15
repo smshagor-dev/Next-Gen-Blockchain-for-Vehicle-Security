@@ -1,0 +1,17 @@
+name: Pinned V2X replay trial integrity
+on:
+  pull_request:
+    paths:
+      - 'experiments/v2x/verify_pinned_replay_trial.py'
+      - 'experiments/v2x/test_verify_pinned_replay_trial.py'
+      - '.github/workflows/pinned-v2x-replay-trial.yml'
+  workflow_dispatch:
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m unittest discover -s experiments/v2x -p 'test_verify_pinned_replay_trial.py' -v
