@@ -228,88 +228,42 @@ class ECUCommandGateway:
         self._can_bus = None
         self._ser = None
         self._init_ok = False
-        if self.enabled and self.gate.is_armed():
-            self._init_transport()
+        # No receiver-authenticated CAN/serial command protocol exists.
+        # Never initialize an ECU output bus, even with a bench interlock.
+        # Local hardwired emergency stop is independent of this bridge.
+        self._init_ok = False
 
     def _init_transport(self):
-        if self.mode == "can":
-            # Never downgrade a failed CAN transport to unsigned serial actuation.
-            self._init_can()
-        elif self.mode == "serial":
-            # No authenticated ECU serial receiver protocol exists yet.
-            print("[ECU] unsigned serial actuation disabled")
-            self._init_ok = False
-        else:
-            print("[ECU] unsupported transport; actuation disabled")
-            self._init_ok = False
+        """Fail closed: no receiver-authenticated ECU command protocol exists."""
+        self._init_ok = False
+        return False
 
     def _init_can(self):
-        if can is None:
-            print("[ECU] python-can not installed; CAN actuation unavailable")
-            return
-        channel = get_env("SMARTCAR_ECU_CAN_CHANNEL", "can0")
-        bustype = get_env("SMARTCAR_ECU_CAN_BUSTYPE", "socketcan")
-        bitrate = get_int("SMARTCAR_ECU_CAN_BITRATE", 500000)
-        try:
-            self._can_bus = can.interface.Bus(channel=channel, interface=bustype, bitrate=bitrate)
-            self._init_ok = True
-            print(f"[ECU] CAN connected channel={channel} bustype={bustype} bitrate={bitrate}")
-        except Exception as e:
-            print(f"[ECU] CAN init failed: {e}")
-            self._can_bus = None
-            self._init_ok = False
+        """Never open a CAN output interface from the remote telemetry bridge."""
+        self._init_ok = False
+        return False
 
     def _init_serial(self):
-        if serial is None:
-            print("[ECU] pyserial not installed; ECU serial unavailable")
-            return
-        port = get_env("SMARTCAR_ECU_SERIAL_PORT", "COM5")
-        baud = get_int("SMARTCAR_ECU_SERIAL_BAUD", 115200)
-        try:
-            self._ser = serial.Serial(port=port, baudrate=baud, timeout=0.2)
-            self._init_ok = True
-            print(f"[ECU] Serial connected port={port} baud={baud}")
-        except Exception as e:
-            self._ser = None
-            self._init_ok = False
-            print(f"[ECU] Serial init failed: {e}")
+        """Never open an unsigned serial ECU output interface."""
+        self._init_ok = False
+        return False
 
     def send_safe_mode_stop(self, block_index: int = -1):
-        # CAN payloads have only an additive checksum, not receiver-verified
-        # authentication or replay protection. Never actuate a vehicle from
-        # this prototype until a separately reviewed ECU protocol exists.
-        # Local hardwired emergency control is outside this software path.
-        if self.mode == "can":
-            print("[ECU] CAN actuation disabled: authenticated receiver protocol missing")
-            return
-        if not self.enabled or not self._init_ok or not self.gate.is_armed():
-            return
-        if self.mode == "can":
-            self._send_can_safe_stop(block_index)
-            return
-        # Unsigned serial ECU actuation is deliberately unavailable.
+        """No remote stop actuation; physical local emergency stop remains independent.
+
+        A signed network envelope or operator-controlled bench permit cannot
+        authorize a CAN/serial command without an independently verified ECU
+        receiver, nonce protocol, and physical safety interlock.
+        """
+        return False
 
     def _send_can_safe_stop(self, block_index: int):
-        if self._can_bus is None:
-            return
-        arbitration_id = int(get_env("SMARTCAR_ECU_CAN_ARB_ID", "0x18FF50E5"), 16)
-        throttle_cut = 0
-        brake = 100
-        ignition_cut = 1
-        block_low = block_index & 0xFF
-        block_high = (block_index >> 8) & 0xFF
-        checksum = (0xA5 + throttle_cut + brake + ignition_cut + block_low + block_high) & 0xFF
-        payload = [0xA5, 0x5A, throttle_cut, brake, ignition_cut, block_low, block_high, checksum]
-        try:
-            msg = can.Message(arbitration_id=arbitration_id, data=payload, is_extended_id=True)
-            self._can_bus.send(msg, timeout=0.2)
-            print(f"[ECU] SAFE_MODE_STOP sent over CAN id={hex(arbitration_id)} block={block_index}")
-        except Exception as e:
-            print(f"[ECU] CAN send failed: {e}")
+        """Legacy direct-call path must not bypass receiver authorization."""
+        return False
 
     def _send_serial_safe_stop(self, block_index: int):
-        # Unsigned serial ECU actuation is deliberately disabled.
-        return
+        """Legacy direct-call path must not bypass receiver authorization."""
+        return False
 
 
 def run_arduino_mode(bc: SmartCarBlockchain):

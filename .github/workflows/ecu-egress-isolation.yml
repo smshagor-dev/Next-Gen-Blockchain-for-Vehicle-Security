@@ -1,0 +1,32 @@
+name: ECU Egress Isolation Contract
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "hardware_bridge.py"
+      - "tests/test_ecu_egress_isolation.py"
+      - ".github/workflows/ecu-egress-isolation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "hardware_bridge.py"
+      - "tests/test_ecu_egress_isolation.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fail-closed-ecu-egress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile affected modules
+        run: python -m py_compile hardware_bridge.py tests/test_ecu_egress_isolation.py
+      - name: Test ECU isolation without hardware
+        run: python -m unittest discover -s tests -p 'test_ecu_egress_isolation.py' -v
