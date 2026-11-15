@@ -47,9 +47,23 @@ This matrix records engineering progress, **not scientific validation**. Exact M
 
 Test command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experiments/v2x -p 'test_normalize_can_recording.py' -v`. Source pins prove byte integrity relative to operator supplied hash, **not publisher authenticity**. No synthetic fixture is a publishable main result.
 
-## 2026-11-15 — strict replay parser hardening (draft)
 
-- **Implemented:** replay JSONL now rejects duplicate fields (including authentication/evidence gates and incident IDs), non-finite JSON constants and invalid UTF-8 before any decision is produced. This closes parser ambiguity that could cause different replay tools to interpret different gates from identical bytes.
-- **Regression coverage:** five adversarial/valid-input cases added to `test_replay_isolated_commands.py`; CI not yet confirmed. This is a synthetic parser-integrity check, **not** attack-detection effectiveness evidence.
-- **Remaining:** independent truth join PR #117, pinned-trial PR #118 and policy-output cross-check PR #119 remain separate pending review. No authentic CAN/VeReMi dataset, physical safety or publication-ready comparison is established here.
-- **Next code task:** integrate complete incident universe and capture receipts after validating pending PRs, then run identical held-out baseline/candidate cohorts.
+## 2026-11-15 — externally pinned held-out replay trial (draft PR)
+
+| Workstream | State | Evidence and limitation |
+| --- | --- | --- |
+| Replay manifest binding | Implemented, validation pending | `verify_pinned_replay_trial.py` checks an out-of-band manifest SHA-256, exact trial identity and held-out split, UTC interval ordering, and byte-level digests of replay input, truth, capture and policy |
+| Decision consistency | Implemented, validation pending | Rejects duplicate IDs/JSON keys, unknown verdicts, inconsistent counts and replay input digest mismatch |
+| Synthetic regressions | Authored, CI pending | 12 isolated adversarial unit cases and dedicated GitHub Actions workflow; do not treat as scientific efficacy results |
+| External preregistration | Blocked | An operator-supplied hash is not proof of independent timestamping or preregistration |
+| Capture and ground truth authenticity | Blocked | No independent uptime proof, publisher-authenticated dataset or independent annotation attestation |
+| Matched experimental cohorts | Upcoming | Integrate with independent truth join in PR #117 after review; verify incident coverage and baseline/candidate symmetry before statistical analysis |
+
+**Next code task:** connect pinned trial verification to independent truth join and capture-interval receipt with consistent incident universes, then run verified publisher-sourced held-out multi-seed cohorts. No physical ECU tests or publishable efficacy claims are implied.
+
+## 2026-11-15 — PR #118 Security Baseline regression follow-up
+
+- **Confirmed failure:** Security Baseline run 43685231526 failed in `tests.test_hardware_bridge_security.BridgeSecurityTests.test_ecu_interlock_is_rechecked_before_output`; its expectation that ECU `_init_transport` is called contradicts the deliberately disabled CAN/serial output introduced by earlier safety hardening.
+- **Implemented:** replaced obsolete test with explicit regression checks that the ECU transport is never initialized, forced legacy gateway flags do not forward to CAN/serial output, and private output helpers fail closed.
+- **Validation:** original pinned replay workflow 43685231640 passed before this correction; changed Security Baseline regression is **not yet revalidated** as of this entry.
+- **Scientific limitation:** these are mocked software safety checks, not tests on a physical ECU, emergency control circuit, or independent safety certification.

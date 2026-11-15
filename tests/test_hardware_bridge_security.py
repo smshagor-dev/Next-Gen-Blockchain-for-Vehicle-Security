@@ -144,18 +144,49 @@ class BridgeSecurityTests(unittest.TestCase):
         self.assertEqual(verified.payload["block_index"], 7)
         gateway.return_value.send_safe_mode_stop.assert_called_once_with(block_index=7)
 
-    def test_ecu_interlock_is_rechecked_before_output(self):
+    def test_ecu_transport_is_never_initialized_even_when_bench_armed(self):
+        # The unauthenticated CAN/serial ECU path was intentionally disabled.
+        # Re-enabling a bench gate or setting the legacy environment variable
+        # must not open either transport.
         gate = FakeGate(True)
         with mock.patch.dict(os.environ, {"SMARTCAR_ECU_CONTROL_ENABLED": "1"}), \
-             mock.patch.object(bridge.ECUCommandGateway, "_init_transport") as init:
+             mock.patch.object(bridge.ECUCommandGateway, "_init_transport") as init, \
+             mock.patch.object(bridge.ECUCommandGateway, "_init_can") as init_can, \
+             mock.patch.object(bridge.ECUCommandGateway, "_init_serial") as init_serial:
             gateway = bridge.ECUCommandGateway(gate=gate)
-            init.assert_called_once()
+            init.assert_not_called()
+            init_can.assert_not_called()
+            init_serial.assert_not_called()
+        self.assertFalse(gateway._init_ok)
+        self.assertIsNone(gateway._can_bus)
+        self.assertIsNone(gateway._ser)
+
+    def test_ecu_output_fails_closed_even_if_legacy_flags_are_forced(self):
+        # Model a stale caller manually forcing the old internal state.
+        # Both local-gate states must remain unable to route network requests
+        # to CAN/serial; local hardware emergency control stays independent.
+        gate = FakeGate(True)
+        with mock.patch.dict(os.environ, {"SMARTCAR_ECU_CONTROL_ENABLED": "1"}):
+            gateway = bridge.ECUCommandGateway(gate=gate)
         gateway._init_ok = True
-        gateway.mode = "can"
-        gate.armed = False
-        with mock.patch.object(gateway, "_send_can_safe_stop") as send:
-            gateway.send_safe_mode_stop(block_index=4)
-        send.assert_not_called()
+        with mock.patch.object(gateway, "_send_can_safe_stop") as send_can, \
+             mock.patch.object(gateway, "_send_serial_safe_stop") as send_serial:
+            for mode in ("can", "serial"):
+                gateway.mode = mode
+                for armed in (True, False):
+                    gate.armed = armed
+                    self.assertFalse(gateway.send_safe_mode_stop(block_index=4))
+            send_can.assert_not_called()
+            send_serial.assert_not_called()
+
+    def test_legacy_private_ecu_output_helpers_also_fail_closed(self):
+        gateway = bridge.ECUCommandGateway(gate=FakeGate(True))
+        self.assertFalse(gateway._init_transport())
+        self.assertFalse(gateway._init_can())
+        self.assertFalse(gateway._init_serial())
+        self.assertFalse(gateway._send_can_safe_stop(block_index=4))
+        self.assertFalse(gateway._send_serial_safe_stop(block_index=4))
+        self.assertFalse(gateway._init_ok)
 
 
 if __name__ == "__main__":
