@@ -1,0 +1,24 @@
+name: Simulation-only V2X command boundary
+on:
+  push:
+    paths:
+      - 'experiments/v2x/model_command_authority.py'
+      - 'experiments/v2x/simulated_command_adapter.py'
+      - 'experiments/v2x/test_simulated_command_adapter.py'
+      - '.github/workflows/v2x-simulation-command-boundary.yml'
+  pull_request:
+    paths:
+      - 'experiments/v2x/model_command_authority.py'
+      - 'experiments/v2x/simulated_command_adapter.py'
+      - 'experiments/v2x/test_simulated_command_adapter.py'
+      - '.github/workflows/v2x-simulation-command-boundary.yml'
+jobs:
+  simulation-boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: PYTHONPATH=experiments/v2x python -m unittest discover -s experiments/v2x -p 'test_simulated_command_adapter.py' -v
+      - run: PYTHONPATH=experiments/v2x python experiments/v2x/model_command_authority.py
