@@ -2,12 +2,12 @@
 
 | Area | State | Evidence and next step |
 |---|---|---|
-| Authenticated hardware ingress and actuation isolation | Partial | Draft PR #101 contains hardening and regression harnesses; full production loopback, physical interlocks and emergency stop remain unverified |
+| Authenticated hardware ingress and actuation isolation | Partial | Merged PR #101 contains hardening and regression harnesses; full production loopback, physical interlocks and emergency stop remain unverified |
 | Ledger crash consistency and finality | Partial | Issues #91 and #95 remain distinct from proof of distributed finality; execute process-crash and restart recovery on actual save path |
 | Evidence-gated V2X admission | Partial | Specify externally sourced incident universe, authorization invariants, matched baselines and formal counterexamples |
 | Authentic VeReMi NextGen / CAN provenance | Blocked | No independently verified raw datasets and incident-ground-truth manifest recorded in this change |
 | Independent attack experiments | Blocked | No publishable multi-seed replay, spoof, insider, DoS or fault experiment generated in this change |
-| Paired statistical comparison | Partial | `experiments/v2x/paired_incident_analysis.py` computes confusion counts and exact two-sided McNemar on aligned incident IDs; 8 synthetic regression cases authored (including 2,000 discordances, balanced pairs, malformed CSV); new cases not executed in repository because GitHub DNS checkout failed; CI not verified |
+| Paired statistical comparison | Partial | `experiments/v2x/paired_incident_analysis.py` computes confusion counts and exact two-sided McNemar on aligned incident IDs; synthetic regression cases authored (including 2,000 discordances, balanced pairs, malformed CSV); new cases not executed in repository because GitHub DNS checkout failed; CI not verified |
 | Runtime scaling / uncertainty | Upcoming | Add independent scenario seeds, clustered uncertainty intervals, effect sizes, throughput, CPU/RAM, latency and source digests |
 | Paper and numeric claims | Blocked | Do not use fixture CSVs, 3-peer sanity checks, 5-iteration microbenchmarks or offline formulas as main results |
 
@@ -34,9 +34,15 @@ This matrix records engineering progress, **not scientific validation**. Exact M
 - **Critical limitation:** No capture-interval attestation producer has been implemented or physically verified. A signed `capture_complete` flag is a hub's self-report, not proof of uninterrupted sensing, independently trusted annotators or a pre-registered experiment. No authentic incident-level efficacy evidence was generated; this test suite is NON-PUBLISHABLE as a main result.
 - **Next:** implement exporter-side canonical interval receipts, preserve an operator-pinned trial manifest before execution, validate producer/consumer interoperation and execute matched real incident trials under independent world truth; then independent cluster-aware comparisons.
 
-## 2026-11-15 — source-pinned SocketCAN text log ingestion
+## 2026-11-15 — pinned offline CAN recording normalization
 
-- **Implemented in isolated draft branch:** `experiments/v2x/ingest_socketcan_log.py` parses the exact classic SocketCAN `candump -L` text form into deterministic label-free CSV, requiring an operator-provided raw SHA-256, recording ID, explicit timestamp, valid 11/29-bit CAN ID, up-to-eight-byte payload, chronological order and optional pinned interface. CAN-FD/RTR/error/other formats fail closed. No replay to vehicle or inference of attack labels.
-- **Synthetic tests authored:** 17 contract tests including malformed input, out-of-range ID, timestamp rollback, malicious CSV recording ID, frame count/size exhaustion, source tampering and actual subprocess CLI. Dedicated GitHub Actions workflow added; **CI not yet verified at time of commit**.
-- **Status: PARTIAL, NOT PUBLISHABLE.** This parser is independent of draft PR #111's generic CAN CSV normalization. It does not fetch or authenticate a publisher dataset, verify physical clocks, establish ground truth, or make a recording-level train/test split. SHA-256 only binds bytes to an externally chosen pin.
-- **Upcoming:** verify CI, implement publisher-specific archive manifest/annotation mapping with immutable recording-group IDs, reconcile with PR #110's disjoint split audit and PR #111's normalization; then run matched policy experiments on authentic independent data. Existing fixture CSVs and microbenchmarks remain non-publishable.
+| Area | Status | Evidence / next |
+| --- | --- | --- |
+| CAN frame normalization | Implemented; CI verification pending | New `experiments/v2x/normalize_can_recording.py` validates external SHA-256 pin, strict unlabeled timestamp_us/CAN ID/byte-length/data schema, 11/29-bit identifier range, monotonic microsecond timestamps, CAN/CAN-FD payload lengths, frame and byte bounds; outputs deterministic normalized frames and a SHA-256 manifest |
+| CAN adversarial fixture regression | Authored; CI verification pending | 17 synthetic tests for zero-byte frames, payload mismatches, tamper, labels in source, invalid identifiers, timestamps, ragged CSV, frame bound, deterministic digest and empty captures. **Not actual CAN dataset observations** |
+| Source archive authenticity | Blocked | External pin is operator supplied; no independently downloaded publisher archive, trusted checksum, dataset license or source metadata in this run. Previous PR #110 separately audits provenance and disjoint splits |
+| Incident truth and authentic V2X/CAN attacks | Blocked | Adapter intentionally never infers attack labels from CAN IDs or frame content. Requires separately authenticated annotation source and recording-group-disjoint splits before scientific inference |
+| Physical hardware safety | Blocked | Offline CSV only; no CAN interface, vehicle actuator or independent emergency-stop witness exercised |
+| Next | Upcoming | Validate genuine licensed CAN source parser against publisher schema, link recording-level annotations and source provenance, then compare methods on identical disjoint recordings with cluster-aware uncertainty |
+
+Test command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experiments/v2x -p 'test_normalize_can_recording.py' -v`. Source pins prove byte integrity relative to operator supplied hash, **not publisher authenticity**. No synthetic fixture is a publishable main result.
