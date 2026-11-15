@@ -1,0 +1,34 @@
+name: SocketCAN Pinned Recording Ingest
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "experiments/v2x/ingest_socketcan_log.py"
+      - "experiments/v2x/test_ingest_socketcan_log.py"
+      - ".github/workflows/v2x-socketcan-ingest.yml"
+  push:
+    branches: [main]
+    paths:
+      - "experiments/v2x/ingest_socketcan_log.py"
+      - "experiments/v2x/test_ingest_socketcan_log.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  socketcan-parser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile SocketCAN ingest
+        run: python -m compileall -q experiments/v2x/ingest_socketcan_log.py experiments/v2x/test_ingest_socketcan_log.py
+      - name: Run 17 adversarial synthetic ingest tests
+        env:
+          PYTHONPATH: "experiments/v2x"
+        run: python -m unittest discover -s experiments/v2x -p "test_ingest_socketcan_log.py" -v
