@@ -2,12 +2,12 @@
 
 | Area | State | Evidence and next step |
 |---|---|---|
-| Authenticated hardware ingress and actuation isolation | Partial | Draft PR #101 contains hardening and regression harnesses; full production loopback, physical interlocks and emergency stop remain unverified |
+| Authenticated hardware ingress and actuation isolation | Partial | Merged PR #101 contains hardening and regression harnesses; full production loopback, physical interlocks and emergency stop remain unverified |
 | Ledger crash consistency and finality | Partial | Issues #91 and #95 remain distinct from proof of distributed finality; execute process-crash and restart recovery on actual save path |
 | Evidence-gated V2X admission | Partial | Specify externally sourced incident universe, authorization invariants, matched baselines and formal counterexamples |
 | Authentic VeReMi NextGen / CAN provenance | Blocked | No independently verified raw datasets and incident-ground-truth manifest recorded in this change |
 | Independent attack experiments | Blocked | No publishable multi-seed replay, spoof, insider, DoS or fault experiment generated in this change |
-| Paired statistical comparison | Partial | `experiments/v2x/paired_incident_analysis.py` computes confusion counts and exact two-sided McNemar on aligned incident IDs; 8 synthetic regression cases authored (including 2,000 discordances, balanced pairs, malformed CSV); new cases not executed in repository because GitHub DNS checkout failed; CI not verified |
+| Paired statistical comparison | Partial | `experiments/v2x/paired_incident_analysis.py` computes confusion counts and exact two-sided McNemar on aligned incident IDs; synthetic regression cases authored (including 2,000 discordances, balanced pairs, malformed CSV); new cases not executed in repository because GitHub DNS checkout failed; CI not verified |
 | Runtime scaling / uncertainty | Upcoming | Add independent scenario seeds, clustered uncertainty intervals, effect sizes, throughput, CPU/RAM, latency and source digests |
 | Paper and numeric claims | Blocked | Do not use fixture CSVs, 3-peer sanity checks, 5-iteration microbenchmarks or offline formulas as main results |
 
@@ -34,15 +34,78 @@ This matrix records engineering progress, **not scientific validation**. Exact M
 - **Critical limitation:** No capture-interval attestation producer has been implemented or physically verified. A signed `capture_complete` flag is a hub's self-report, not proof of uninterrupted sensing, independently trusted annotators or a pre-registered experiment. No authentic incident-level efficacy evidence was generated; this test suite is NON-PUBLISHABLE as a main result.
 - **Next:** implement exporter-side canonical interval receipts, preserve an operator-pinned trial manifest before execution, validate producer/consumer interoperation and execute matched real incident trials under independent world truth; then independent cluster-aware comparisons.
 
-## 2026-11-15 — independent-trial statistical analysis protocol
+## 2026-11-14 — pinned trial manifest + capture exporter (issue #92 follow-up)
 
-| Workstream | Status | Evidence and next step |
+- **IMPLEMENTED (DRAFT, NOT YET VALIDATED):** New experiments/v2x/capture_export_producer.py creates a canonical trial plan bound to experiment/scenario/seed/split, window, cluster identifier, matched baseline/candidate identifiers and independent world CSV digest. It uses exclusive file creation, file fsync and POSIX directory fsync. Printed SHA-256 requires external pre-run pinning; creating the file itself does not establish pre-registration.
+- **IMPLEMENTED:** Seal requires a previously pinned manifest digest, two distinct HMAC secrets and validates source universe, scope, capture timestamp boundaries, unknown incidents, replayed nonces and unverified relays. Signed export and interval receipts interoperate with the existing conservative consumer. Explicit capture_complete is a hub self-assertion, never automatically inferred.
+- **TESTS VERIFIED IN GITHUB ACTIONS:** Ubuntu Python 3.11 run 43613905380 completed SUCCESS on the PR commit; experiments/v2x/test_capture_export_producer.py covers real subprocess CLI plan/seal, zero-capture false negatives, tamper, identity, time, replay, credentials and output overwrite. Dedicated Ubuntu Python 3.11 workflow compiles code and executes producer, interval and world-join suites. Command: PYTHONPATH=experiments/v2x python -m unittest discover -s experiments/v2x -p test_capture_export_producer.py -v. CI workflow passed, but no independent physical or field experiments occurred; additional repository-wide and cross-platform checks remain separate.
+- **PARTIAL:** Distinct receipt files are individually fsynced and exclusive, not one atomic two-file commit. An interrupted second write may leave an unmatched first receipt; consumers must require both. Signed completion proves only the hub assertion, not uninterrupted sensing, independent annotations, independent cluster identity or hardware safety.
+- **BLOCKED:** Independent pre-registration/time witness; source-authenticated production receiver export and complete coverage witness; genuine VeReMi NextGen/CAN independent incident truth and matched baseline trials; physical emergency-stop and power-cut evidence. Synthetic fixtures remain NON-PUBLISHABLE main results.
+- **UPCOMING:** Execute PR CI, fix regressions, anchor manifests and real capture evidence with independent provenance and run preregistered matched-split incident campaigns.
+
+### Evidence file publication hardening (2026-11-14 follow-up)
+
+- Replaced direct O_EXCL target writes with same-directory temporary staging, full file fsync and exclusive hard-link publication, followed by POSIX directory fsync. This prevents observers from seeing partially written **individual** manifests or receipts and prevents silent replacement of preexisting outputs.
+- Added regression cases checking that the final path does not exist until the fully written staging file is published and that a simulated hard-link failure leaves no published target or temporary file.
+- **Validation pending on latest commit:** new GitHub Actions checks must pass before merge; earlier passing CI on a prior commit does not validate this change.
+- **Residual limitation:** the two separately published receipt files still do not form one atomic transaction; independently verify the pair and digest bindings. External pre-run pinning and physical capture coverage remain unproven.
+
+## 2026-11-14 — receipt pair fail-closed verification
+
+- **IMPLEMENTED IN DRAFT PR #107:** `experiments/v2x/verify_capture_receipt_pair.py` verifies BOTH signed receipt files, operator-pinned canonical manifest, matching capture SHA-256, independent HMAC keys, matching trial window, and explicit complete-interval assertion before scoring. Missing, malformed, duplicate-key, extra-field, mismatched or tampered receipts fail closed. A partial two-file publication cannot be mistaken for a completed observation by this verifier.
+- **TESTS AUTHORED:** `experiments/v2x/test_verify_capture_receipt_pair.py` exercises valid pair, missing halves, duplicate JSON keys, forged hashes, tampered HMACs, mismatched external pin and signed incomplete interval. CI workflow now includes this test module. Actual new-commit CI outcome must be checked before claiming success.
+- **STILL PARTIAL:** This is logical pair verification, not an atomic two-file filesystem transaction, independent timestamp, authenticated real sensor uptime or physical actuation safety. A hub can sign a false completeness assertion. Real field experiments and independent provenance remain blocked.
+- **NEXT:** Run CI and fix regressions; independently anchor manifest timestamp and signed coverage witness, then validate actual receiver captures and matched replay/DoS trials.
+
+## 2026-11-14 — paired signed-capture campaign adapter (issue #92; scientific comparison follow-up to #79/#88)
+
+| Gate | State | Evidence / remaining gate |
 | --- | --- | --- |
-| Hardware authentication, emergency isolation, physical actuation | PARTIAL / PHYSICAL LAB BLOCKED | Prior hardening is separate from a trusted, independently witnessed vehicle safety test. Do not infer emergency-stop reliability from software tests. |
-| Ledger durability and distributed finality | PARTIAL / INDEPENDENT FAULT LAB BLOCKED | Crash consistency and mock-contract finality are not physical/distributed finality evidence. |
-| Actual policy replay and source binding | DRAFT PRS #107/#108 | Keep pending changes isolated; source pins and offline replay are not independently authenticated observations. |
-| Independent cluster-level comparisons | IMPLEMENTED, CI PENDING | `experiments/v2x/analyze_independent_trials.py` accepts strict held-out test JSONL, equal baseline/candidate denominators and truth counts, unique claimed cluster/source IDs; computes paired cluster-mean accuracy difference, deterministic cluster bootstrap percentile CI and explicitly exploratory sign-flip p-value. 17 synthetic contract tests authored; **not field results**. |
-| Authentic multi-seed V2X/CAN study | BLOCKED | Requires external datasets, verified source hashes/licenses, independent label provenance, genuine session receipts, complete observation windows and independent trial collection. |
-| Publication | BLOCKED | No real cluster outcomes were analyzed in this change. n>=30 is NOT statistical significance. No claim of novel cryptography or physical safety. |
+| Same source and matching splits | IMPLEMENTED IN DRAFT #107 | One operator-pinned manifest and one independently supplied world-incident universe drive both arms; missing incidents are scored as absence, not discarded |
+| Method identity integrity | PARTIAL | Detached, independently keyed assignment HMACs bind each capture to baseline/candidate arm and planned method name. **Hub self-claims cannot prove which algorithm actually executed** |
+| Adversarial integrity tests | ADDED, CI OUTCOME PENDING | 17 synthetic tests cover mismatched arm, signed wrong method, tampered role HMAC, duplicate keys, swapped captures, replay, unverified relay, wrong world pin, zero-observation intervals and a real CLI round-trip |
+| Direct paired estimates | IMPLEMENTED, **DESCRIPTIVE ONLY** | Both arm confusion counts, accuracy difference in percentage points, exact McNemar descriptive p-value, full per-incident rows and cryptographic source digests |
+| Independent inference | BLOCKED | The tool accepts one seed/cluster at a time. Repeated correlated incidents cannot be treated as independent units; no confidence interval or significance claim is appropriate from this output |
+| Authentic physical/field observations | BLOCKED | No source-authenticated receiver exports, independently witnessed continuous capture, independently curated world truth, or HIL safety evidence |
+| Next code task | UPCOMING | Integrate actual instrumented policy-run identifiers and independent witness/attestation; execute frozen policies on identically scheduled authentic multi-seed scenarios and aggregate by genuinely independent clusters |
 
-Next implementation: adapt authenticated real receiver captures into immutable trial-level summaries with independent witness metadata and a predeclared trial split; execute separate baseline/candidate runs with real provenance. Validate this PR's workflow before merge.
+These deterministic protocol tests are **non-publishable main evidence**. This adapter is not a claim of original cryptography, sensor validity, or real comparative superiority. Never claim p-values demonstrate significance merely because n>=30.
+
+### Verified paired-capture contract evidence (2026-11-14)
+
+- **TESTED:** GitHub Actions `V2X Trial Manifest and Capture Receipts` run [43624931667](https://github.com/smshagor-dev/Next-Gen-Blockchain-for-Vehicle-Security/actions/runs/43624931667) completed **SUCCESS** on source commit `072a9662758f3892f163dbf63c143a9903063efa`. Job [132538551757](https://github.com/smshagor-dev/Next-Gen-Blockchain-for-Vehicle-Security/actions/runs/43624931667/job/132538551757) executed 17/17 new matched-cohort tests, including the actual CLI subprocess round-trip, 21 producer tests, 31 receipt-pair tests, 15 interval tests and 10 world-join tests. All passed (94 passing cases in the workflow, not 94 independent experiments).
+- **PARTIAL:** Both signed policy-assignment receipts are hub claims, not cryptographic proof of which executable policy actually ran. No authentic multi-seed experiments or independent observation-coverage measurements were performed. Exact McNemar p-value is **descriptive only** at a single claimed cluster and cannot establish significance for correlated incidents.
+- **BLOCKED:** Independently observed algorithm execution and sensor uptime; trustworthy incident annotations, authentic Veremi/CAN trials, physical local emergency-stop evidence; source-audited prior-art comparisons.
+- **NEXT:** Pin executable/configuration digests in a separately observed harness, run matched split trial traces under independent clocks and clusters, and report bootstrap uncertainty/effect sizes only after true independent replications.
+
+## 2026-11-14 — executable/configuration pre-run pin integrity (follow-up)
+
+- **IMPLEMENTED IN DRAFT PR #107:** `experiments/v2x/pin_policy_artifacts.py` hashes the exact baseline and candidate executable bytes and configuration bytes, binds them to the existing planned method names and trial manifest SHA-256, and emits an exclusive immutable-on-create pin. Verification requires the independently retained pin digest and byte-for-byte original artifacts.
+- **TESTS AUTHORED:** `experiments/v2x/test_pin_policy_artifacts.py` has 12 synthetic adversarial cases for binary tampering, configuration changes, swapped artifacts, forged pin digest, duplicate keys, wrong method, invalid version and missing binary. Dedicated CI test step added; no CI success is claimed for the latest code until it completes.
+- **LIMITATION:** This is pre-run *artifact integrity*, NOT proof that a particular executable ran, proof of external preregistration timestamp, trustworthy sensor coverage or physical emergency actuation. The hash must be pinned externally before the trial. No authentic field experiment or scientific efficacy measurement was performed.
+- **NEXT CODE TASK:** Independently observed launcher with measured executable/config digests, OS process identity and run/capture receipt binding; verify actual execution under controlled simulated incident trials. Preserve local emergency control outside all network policy gates.
+
+- **CI VERIFIED (2026-11-14):** [V2X receipt workflow run 43625928701](https://github.com/smshagor-dev/Next-Gen-Blockchain-for-Vehicle-Security/actions/runs/43625928701), job 132541598180 completed SUCCESS at commit `962858c83bedeac1f4792b775ca7be7ebcd238e3`: 12/12 new policy-pin tests passed, together with 21 producer, 31 receipt pair, 17 matched-cohort, 15 interval and 10 independent-world tests (106 contract tests total). These are synthetic validation cases, **not 106 research observations**.
+
+## 2026-11-14 — bounded pinned offline process execution (follow-up to #92)
+
+- **IMPLEMENTED IN DRAFT #107:** `experiments/v2x/run_pinned_simulation.py` launches the explicitly pinned baseline or candidate executable without a shell, with fixed two-argument argv, externally pinned binary/config bytes, pre/post digest checks, wall-clock timeout, bounded stdout/stderr files, fail-closed nonzero exit and exclusive fsynced receipt output. The receipt includes trial/pin/config/executable digests, output digests, local clock duration and process return code. No vehicle/CAN command or physical actuation is implemented.
+- **TESTS ADDED:** 13 synthetic subprocess contracts, including actual local executable run, wrong arm, changed executable/config, symlink rejection, timeout, nonzero exit and output bound. Command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experiments/v2x -p 'test_run_pinned_simulation.py' -v`. CI result pending until verified.
+- **PARTIAL:** This is a LOCAL operator-controlled observation; hashes before and after execution do not prove what ran in between or establish an independent witness. Process output is not authenticated sensor coverage, and a signed policy name is not actual method attestation.
+- **BLOCKED:** Independently witnessed execution, genuine policy trace linkage, authentic incident universe, matched multi-seed baseline trials, hardware safety and emergency-stop evidence.
+- **NEXT:** Bind immutable policy image or sandboxed process identity and its run-output trace to capture receipts, then independently verify matched multi-cluster observations and effect uncertainty.
+
+## 2026-11-14 — simulator stdout / capture linkage (issue #92 follow-up)
+
+- **IMPLEMENTED IN DRAFT PR #107:** `experiments/v2x/verify_execution_capture_binding.py` rejects execution receipts whose pinned executable/configuration/manifest digests, policy arm, process exit status, stdout SHA-256 or stdout byte count do not match the independently supplied trial and capture files. It additionally requires the previously verified export and interval HMACs and signed policy-assignment receipt. The capture must be the simulator's **exact stdout bytes**; no inferred CSV transformations are permitted.
+- **TESTS AUTHORED (pending CI at commit):** `experiments/v2x/test_verify_execution_capture_binding.py` adds 15 synthetic adversarial regressions for digest/size mismatches, wrong policy, invalid process exit, duplicate receipt keys, forged role assignment, modified capture, false publication-ready claim and valid end-to-end receipt binding. Command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experiments/v2x -p test_verify_execution_capture_binding.py -v`. This is software contract evidence, NOT scientific incident results.
+- **PARTIAL:** The local runner's output digest can be tied to a signed hub capture. The runner is operator-controlled and the receipt is not independently signed by a process witness. An on-disk pre/post hash is not proof of an immutable executable during execution. The existing runner still lacks hard real-time memory/CPU caps and the signed `capture_complete` claim is not independently observed.
+- **BLOCKED:** Authenticated external sensor/world truth; independent execution and capture witness; actual vehicle interlocks and emergency stop; genuine multi-seed VeReMi NextGen/CAN experiments.
+- **NEXT CODE TASK:** Add a separate trusted witness or instrumented launcher that records observed binary/config process identity and capture coverage, enforce actual resource limits, then run reproducible matched-policy trials with external incident labels and independent cluster sampling. No claims of publication readiness or statistical significance.
+
+## 2026-11-14 — bounded simulator subprocess execution (draft #107)
+
+- **Implemented, validation pending:** `run_pinned_simulation.py` now starts an actual child process with a distinct POSIX process group and enforces a kernel `RLIMIT_FSIZE` quota on stdout and stderr file descriptors. Timeout kills the process group, including forked descendants, rather than killing only the parent process. Process PID is recorded from `Popen`, replacing the previous null `subprocess.run` PID. Two new POSIX adversarial tests exercise an infinite output producer and a forked delayed writer after timeout.
+- **Safety scope:** This hardens an offline simulation harness; it does **not** actuate CAN, ECUs or local emergency controls. Windows lacks the POSIX file-size/process-group guarantees here; a Windows Job Object and portable streaming enforcement remain upcoming. On POSIX, the quota is per output file, not a global disk/cgroup quota; CPU/RAM, filesystem metadata and all descendants are not independently attested.
+- **Validation:** CI on the latest code must pass before this is considered verified. No actual V2X field measurements, source-independent labels, sensor uptime evidence or publishable efficacy results are claimed.
+- **Next code:** Verify bounded subprocess behavior on CI and close any regression; implement a Windows Job Object equivalent and Linux memory/CPU quotas, then execute independently sourced matched incident campaigns with source provenance.
