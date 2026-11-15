@@ -1,0 +1,18 @@
+name: Isolated V2X replay safety
+on:
+  pull_request:
+    paths:
+      - 'experiments/v2x/replay_isolated_commands.py'
+      - 'experiments/v2x/test_replay_isolated_commands.py'
+      - '.github/workflows/isolated-v2x-replay.yml'
+  workflow_dispatch:
+jobs:
+  safety-replay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run adversarial safety invariant tests
+        run: PYTHONPATH=experiments/v2x python -m unittest discover -s experiments/v2x -p 'test_replay_isolated_commands.py' -v
