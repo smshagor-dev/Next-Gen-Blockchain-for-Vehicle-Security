@@ -67,3 +67,15 @@ Test command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experim
 - **Implemented:** replaced obsolete test with explicit regression checks that the ECU transport is never initialized, forced legacy gateway flags do not forward to CAN/serial output, and private output helpers fail closed.
 - **Validation:** original pinned replay workflow 43685231640 passed before this correction; changed Security Baseline regression is **not yet revalidated** as of this entry.
 - **Scientific limitation:** these are mocked software safety checks, not tests on a physical ECU, emergency control circuit, or independent safety certification.
+
+## 2026-11-15 — bounded multi-step emergency/restart model (draft)
+
+| Area | State | Evidence and next step |
+| --- | --- | --- |
+| Abstract emergency safety transitions | Implemented, repository CI pending | `experiments/v2x/check_emergency_state_machine.py` explores restart, sensor faults/recovery, physical emergency/reset, and gated remote commands through depth 7 |
+| Bounded model verification | Local contract test passed | Isolated local Python exploration found 28 reachable state/depth pairs, 360 transitions and 0 invariant violations; 10/10 local tests passed on equivalent source. GitHub CI is not yet verified |
+| Physical interlock and persistence | **Blocked** | The model **assumes** an external persistent emergency latch and trusted local reset; no physical ECU or process-crash test validates those assumptions |
+| Production conformance | **Upcoming** | Build stateful differential tests against actual command dispatch path and prove reset cannot originate from network inputs |
+| Scientific efficacy | **Blocked** | No independent incident dataset or matched multi-seed experiments; model checking is software specification evidence, not detection performance |
+
+No novelty claim for cryptography, consensus finality, or physical safety follows from this abstract model. The model uses a reduced state space and no asynchronous timing or actuator dynamics. Do not cite 360 transitions as independent empirical trials.
