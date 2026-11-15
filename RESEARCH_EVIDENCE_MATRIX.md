@@ -67,3 +67,16 @@ Test command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experim
 - **Implemented:** replaced obsolete test with explicit regression checks that the ECU transport is never initialized, forced legacy gateway flags do not forward to CAN/serial output, and private output helpers fail closed.
 - **Validation:** original pinned replay workflow 43685231640 passed before this correction; changed Security Baseline regression is **not yet revalidated** as of this entry.
 - **Scientific limitation:** these are mocked software safety checks, not tests on a physical ECU, emergency control circuit, or independent safety certification.
+
+## 2026-11-15 — independent V2X trial-cluster aggregation (draft)
+
+| Item | State | Evidence / limitation |
+| --- | --- | --- |
+| Pinned multi-cohort comparison | Implemented, review pending | New `experiments/v2x/aggregate_pinned_cohorts.py` checks externally pinned manifest SHA-256 and every paired CSV digest; refuses duplicate trial IDs, reused cluster IDs or declared source groups |
+| Descriptive effect and uncertainty | Implemented, synthetic only | Reconstructs paired confusion counts and candidate-minus-baseline accuracy, cluster-resampled 95% percentile interval with deterministic seed; never interprets n>=30 as significance |
+| Tests | Local checks passed; GitHub CI pending | 12/12 synthetic contract tests passed in isolated Python, including tamper, duplicate source group, duplicate incident, nonbinary truth, missing trial and one-cluster rejection. Exact pushed repository suite not yet verified |
+| Scientific provenance | Blocked | A source-group string and operator SHA-256 pin are assertions, not publisher authentication, independent ground truth or proof of preregistration |
+| Independent efficacy trials | Blocked | No authentic VeReMi NextGen/CAN observations, independent multi-seed experiments, vehicle hardware or external lab evidence in this change |
+| Upcoming | Next code task | Wire reviewed PR #121's paired capture outputs into cohort manifest creation; add independent publisher source checks, controlled attack cohorts and runtime measurements |
+
+This is research infrastructure, **not a publishable efficacy result**. The percentile interval can under-cover with few independent clusters and cannot establish a causal effect. Source-group disjointness is checked only against declared identifiers.
