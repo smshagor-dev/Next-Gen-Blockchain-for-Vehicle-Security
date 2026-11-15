@@ -79,3 +79,15 @@ Test command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experim
 | Next code task | Upcoming | Enforce policy-defined maximum observation age relative to independently verified reception time, with bounded clock-skew tests and real TCP-loopback latency/DoS trials |
 
 This is a provenance-integrity engineering correction, not a new cryptographic primitive or publishable research efficacy result. No actual hardware experiment was performed.
+
+## 2026-11-15 — host-reception observation age policy (stacked on draft #125)
+
+| Area | State | Evidence / next step |
+| --- | --- | --- |
+| Authenticated telemetry observation freshness | Implemented, unverified | `hardware_observation_freshness.py` rejects signed sensor timestamps older than 15 seconds or more than 2 seconds in the future by default, with bounded operator configuration; called before ledger writes for BOTH Arduino and Pi TCP paths |
+| Local emergency / ECU isolation | Preserved in code | No new remote CAN/serial actuation capability; no physical hardwired interlock test |
+| Synthetic contract tests | Authored, execution blocked | Twelve tests for stale/future boundary, malformed timestamps, naive/non-UTC host clock, invalid policy and fractional seconds; `PYTHONPATH=. python -m unittest discover -s tests -p 'test_hardware_observation_freshness.py' -v`. GitHub raw checkout from this execution environment failed due to DNS; CI pending. Do not claim tests passed |
+| Device clock trust | Blocked | MAC authenticates a device's timestamp *claim*, not sensor uptime, synchronization, or true measurement time. Host UTC wall clock can jump; independent hardware time and physical event trace needed |
+| Independent V2X/CAN efficacy | Blocked | No authentic publisher-verified incident dataset, multi-seed attack efficacy or matched-baseline observation in this change |
+
+**Next code task:** capture host ingress UTC once at first complete signed-frame receipt and bind it to the exact verified envelope, rather than sampling the clock immediately before each ledger mutation; then execute real TCP loopback under delayed ledger operations, replay/future skew and wall-clock adjustments, and independently measure rejection rates/CPU/RAM/latency. This policy is a software safety guard, not publishable scientific efficacy evidence.
