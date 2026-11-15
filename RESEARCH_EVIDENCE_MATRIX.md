@@ -2,12 +2,12 @@
 
 | Area | State | Evidence and next step |
 |---|---|---|
-| Authenticated hardware ingress and actuation isolation | Partial | Draft PR #101 contains hardening and regression harnesses; full production loopback, physical interlocks and emergency stop remain unverified |
+| Authenticated hardware ingress and actuation isolation | Partial | Merged PR #101 contains hardening and regression harnesses; full production loopback, physical interlocks and emergency stop remain unverified |
 | Ledger crash consistency and finality | Partial | Issues #91 and #95 remain distinct from proof of distributed finality; execute process-crash and restart recovery on actual save path |
 | Evidence-gated V2X admission | Partial | Specify externally sourced incident universe, authorization invariants, matched baselines and formal counterexamples |
 | Authentic VeReMi NextGen / CAN provenance | Blocked | No independently verified raw datasets and incident-ground-truth manifest recorded in this change |
 | Independent attack experiments | Blocked | No publishable multi-seed replay, spoof, insider, DoS or fault experiment generated in this change |
-| Paired statistical comparison | Partial | `experiments/v2x/paired_incident_analysis.py` computes confusion counts and exact two-sided McNemar on aligned incident IDs; 8 synthetic regression cases authored (including 2,000 discordances, balanced pairs, malformed CSV); new cases not executed in repository because GitHub DNS checkout failed; CI not verified |
+| Paired statistical comparison | Partial | `experiments/v2x/paired_incident_analysis.py` computes confusion counts and exact two-sided McNemar on aligned incident IDs; synthetic regression cases authored (including 2,000 discordances, balanced pairs, malformed CSV); new cases not executed in repository because GitHub DNS checkout failed; CI not verified |
 | Runtime scaling / uncertainty | Upcoming | Add independent scenario seeds, clustered uncertainty intervals, effect sizes, throughput, CPU/RAM, latency and source digests |
 | Paper and numeric claims | Blocked | Do not use fixture CSVs, 3-peer sanity checks, 5-iteration microbenchmarks or offline formulas as main results |
 
@@ -34,9 +34,15 @@ This matrix records engineering progress, **not scientific validation**. Exact M
 - **Critical limitation:** No capture-interval attestation producer has been implemented or physically verified. A signed `capture_complete` flag is a hub's self-report, not proof of uninterrupted sensing, independently trusted annotators or a pre-registered experiment. No authentic incident-level efficacy evidence was generated; this test suite is NON-PUBLISHABLE as a main result.
 - **Next:** implement exporter-side canonical interval receipts, preserve an operator-pinned trial manifest before execution, validate producer/consumer interoperation and execute matched real incident trials under independent world truth; then independent cluster-aware comparisons.
 
-## 2026-11-15 — Close legacy ECU egress bypass (separate draft PR)
+## 2026-11-15 — pinned offline CAN recording normalization
 
-- **Implemented, validation pending:** The main-branch `ECUCommandGateway` was still capable of initializing a CAN output interface when a bench permit was present. Although its public `send_safe_mode_stop` refused CAN commands, direct calls to `_send_can_safe_stop` could still emit an unauthenticated CAN frame. The new fail-closed gateway does not open a CAN or serial output transport and refuses all public and legacy private ECU command paths, even if an old transport is injected.
-- **Engineering tests:** `tests/test_ecu_egress_isolation.py` tests explicitly enabled/armed bench configurations, direct legacy method calls, and network safe-mode dispatch with mocked CAN/serial buses. Run `python -m unittest discover -s tests -p 'test_ecu_egress_isolation.py' -v`; a dedicated workflow verifies these tests. Passing CI must be independently checked before merge.
-- **Safety boundary:** A signed network packet and a file-based bench permit are insufficient authorization for physical ECU commands. Local physical emergency stop remains an independent hardware responsibility; no hardware proof, ISO 26262 certification, independent receiver verification, or actual vehicle actuation is claimed.
-- **Upcoming:** Verify CI and regressions; add an independently reviewed ECU receiver protocol with physical emergency interlock only in a controlled hardware test environment. Continue publisher-source VeReMi/CAN provenance and multi-seed research experiments on separate branches; synthetic mocks are not publication-quality results.
+| Area | Status | Evidence / next |
+| --- | --- | --- |
+| CAN frame normalization | Implemented; CI verification pending | New `experiments/v2x/normalize_can_recording.py` validates external SHA-256 pin, strict unlabeled timestamp_us/CAN ID/byte-length/data schema, 11/29-bit identifier range, monotonic microsecond timestamps, CAN/CAN-FD payload lengths, frame and byte bounds; outputs deterministic normalized frames and a SHA-256 manifest |
+| CAN adversarial fixture regression | Authored; CI verification pending | 17 synthetic tests for zero-byte frames, payload mismatches, tamper, labels in source, invalid identifiers, timestamps, ragged CSV, frame bound, deterministic digest and empty captures. **Not actual CAN dataset observations** |
+| Source archive authenticity | Blocked | External pin is operator supplied; no independently downloaded publisher archive, trusted checksum, dataset license or source metadata in this run. Previous PR #110 separately audits provenance and disjoint splits |
+| Incident truth and authentic V2X/CAN attacks | Blocked | Adapter intentionally never infers attack labels from CAN IDs or frame content. Requires separately authenticated annotation source and recording-group-disjoint splits before scientific inference |
+| Physical hardware safety | Blocked | Offline CSV only; no CAN interface, vehicle actuator or independent emergency-stop witness exercised |
+| Next | Upcoming | Validate genuine licensed CAN source parser against publisher schema, link recording-level annotations and source provenance, then compare methods on identical disjoint recordings with cluster-aware uncertainty |
+
+Test command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experiments/v2x -p 'test_normalize_can_recording.py' -v`. Source pins prove byte integrity relative to operator supplied hash, **not publisher authenticity**. No synthetic fixture is a publishable main result.
