@@ -1,0 +1,28 @@
+name: V2X Remote Authority Safety Model
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "experiments/v2x/model_command_authority.py"
+      - "experiments/v2x/test_model_command_authority.py"
+      - ".github/workflows/v2x-command-authority-model.yml"
+  push:
+    branches: [main]
+    paths:
+      - "experiments/v2x/model_command_authority.py"
+      - "experiments/v2x/test_model_command_authority.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  finite-state-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m compileall -q experiments/v2x/model_command_authority.py experiments/v2x/test_model_command_authority.py
+      - run: PYTHONPATH=experiments/v2x python -m unittest discover -s experiments/v2x -p test_model_command_authority.py -v
+      - run: PYTHONPATH=experiments/v2x python experiments/v2x/model_command_authority.py
