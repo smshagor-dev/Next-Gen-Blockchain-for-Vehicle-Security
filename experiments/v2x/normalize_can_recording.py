@@ -55,7 +55,8 @@ def normalize(raw: bytes, *, expected_sha256: str, recording_id: str,
         if count >= frame_limit:
             raise ValueError("source exceeds maximum frame count")
         if None in row or set(row) != set(RAW_FIELDS) or any(
-                not isinstance(row[k], str) or not row[k] for k in RAW_FIELDS):
+                not isinstance(row[k], str) or (not row[k] and k != "data_hex")
+                for k in RAW_FIELDS):
             raise ValueError("malformed CAN frame row")
         timestamp, can_id, dlc, payload = (
             row["timestamp_us"], row["can_id"], row["dlc"], row["data_hex"])
