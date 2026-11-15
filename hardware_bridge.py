@@ -102,7 +102,7 @@ def _signed_observation_timestamp(value):
     # Require full date and time, explicit seconds, and disallow ISO shortcuts
     # (basic dates, comma fractions, etc.). Normalize only after validation.
     import re
-    if not re.fullmatch(r"\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|\\+00:00)", value):
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|\+00:00)", value):
         raise ValueError("timestamp: noncanonical observation timestamp")
     return parsed.astimezone(timezone.utc).isoformat()
 
