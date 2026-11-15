@@ -33,3 +33,14 @@ This matrix records engineering progress, **not scientific validation**. Exact M
 - **Synthetic test evidence:** `PYTHONPATH=experiments/v2x python -m unittest discover -s experiments/v2x -p 'test_attested_interval_join.py' -v` ran in isolated local Python with a locally reconstructed mirror of `join_world_incidents.py`: **15/15 passed**. Newly pushed GitHub file content hashes matched the locally tested files; the exact repository-wide test suite and CI have **not been executed**.
 - **Critical limitation:** No capture-interval attestation producer has been implemented or physically verified. A signed `capture_complete` flag is a hub's self-report, not proof of uninterrupted sensing, independently trusted annotators or a pre-registered experiment. No authentic incident-level efficacy evidence was generated; this test suite is NON-PUBLISHABLE as a main result.
 - **Next:** implement exporter-side canonical interval receipts, preserve an operator-pinned trial manifest before execution, validate producer/consumer interoperation and execute matched real incident trials under independent world truth; then independent cluster-aware comparisons.
+
+## 2026-11-15 — safety-isolated remote command reference model (draft PR)
+
+| Workstream | State | Verifiable evidence and limitations |
+| --- | --- | --- |
+| Remote command vs local safety separation | IMPLEMENTED, CI PENDING | `experiments/v2x/model_command_authority.py` enumerates 64 Boolean authority states and 256 remote requests; remote brake, steering and throttle are categorically denied. Only an authenticated, fresh, evidence-admitted network alert with network availability and no local emergency latch may relay. |
+| Local emergency dominance | IMPLEMENTED, CI PENDING | Local emergency sets a latch independently of network state; only a separately authorized **local** reset can clear it. Remote requests never mutate the latch. 15 deterministic tests include state enumeration, partition, replay and reset transitions. |
+| Formal safety interpretation | PARTIAL | Finite-state exhaustive reference model is an executable bounded invariant check, **not** a formal proof of production `hardware_bridge.py`, embedded firmware, CAN interlocks or external safety standards. Integration/refinement proof and hardware fault injection are missing. |
+| Genuine experimental results | BLOCKED | No physical local emergency circuit or independent network capture, original VeReMi/CAN dataset labels, independently replicated multi-seed effect estimates. No publication claims from model enumeration. |
+
+Next: wire the reference model's deny-by-default network-only authorization decision into a simulated adapter and verify no path to CAN/ECU actuation. Separately obtain hardware test access and independent data provenance before manuscript efficacy claims.
