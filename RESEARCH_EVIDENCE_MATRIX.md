@@ -60,3 +60,10 @@ Test command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experim
 | Matched experimental cohorts | Upcoming | Integrate with independent truth join in PR #117 after review; verify incident coverage and baseline/candidate symmetry before statistical analysis |
 
 **Next code task:** connect pinned trial verification to independent truth join and capture-interval receipt with consistent incident universes, then run verified publisher-sourced held-out multi-seed cohorts. No physical ECU tests or publishable efficacy claims are implied.
+
+## 2026-11-15 — policy replay cross-check (stacked draft)
+
+- **Implemented:** verifier recomputes every simulation-only verdict from the pinned replay input using `replay_isolated_commands.replay` and rejects fabricated/omitted decisions, inconsistent summaries and inflated evidence classification.
+- **Regression coverage authored:** three additional adversarial cases (forged verdict, omitted decision, falsified evidence class); original integrity fixtures updated to valid replay schema. GitHub CI and repository tests **not yet verified**.
+- **Limitation:** both verifier and replay share code, so this is an integrity consistency check, not an independent implementation, authentic observation, or real-world safety proof. A maliciously modified policy implementation could still produce consistent but incorrect decisions; policy executable hash must be externally trusted.
+- **Next:** join independent incident truth and capture-interval receipts to the verified replay, enforce complete incident universe, and run real matched cohorts with authentic provenance.
