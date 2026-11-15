@@ -23,6 +23,23 @@ class ClusterInfluenceTests(unittest.TestCase):
         self.assertTrue(result["sign_reversal_under_omission"])
         self.assertEqual(result["minimum_loo_pp"], -50)
 
+    def test_null_crossing_is_not_sign_reversal(self):
+        rows = [["a", "A", "1", "0", "1"],
+                ["b", "B", "1", "1", "1"],
+                ["c", "C", "1", "1", "1"]]
+        result = self.evaluate(rows)
+        self.assertFalse(result["sign_reversal_under_omission"])
+        self.assertTrue(result["reaches_null_under_omission"])
+
+    def test_negative_to_positive_is_strict_reversal(self):
+        rows = [["a1", "A", "1", "1", "0"],
+                ["a2", "A", "1", "1", "0"],
+                ["b", "B", "1", "0", "1"],
+                ["c", "C", "1", "1", "1"]]
+        result = self.evaluate(rows)
+        self.assertTrue(result["sign_reversal_under_omission"])
+        self.assertFalse(result["reaches_null_under_omission"])
+
     def test_uniform_improvement(self):
         result = self.evaluate([[str(i), str(i), "1", "0", "1"] for i in range(3)])
         self.assertEqual(result["minimum_loo_pp"], 100)
