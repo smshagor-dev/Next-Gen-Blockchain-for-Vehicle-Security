@@ -89,3 +89,10 @@ Test command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experim
 - **Command once checkout is available:** `python -m unittest tests.test_hardware_bridge_security -v` followed by `python -m unittest discover -s tests -p 'test_*.py'`.
 - **Limit:** no physical actuator, CAN, emergency circuit, authenticated runtime capture, or external dataset was tested. This is engineering regression coverage, **not publishable scientific evidence**.
 - **Next:** verify CI and full integration regression on PR #132, implement differential trace conformance against the abstract emergency-state model, and independently witness physical emergency precedence before any hardware authorization claim.
+
+## 2026-11-15 — stateful production dispatcher conformance (draft PR #132)
+
+- **Implemented on draft branch:** `tests/test_stateful_network_isolation_conformance.py` exercises 1,024 deterministic two-step combinations (2,048 transitions), including emergency state, sensor failure, safe-mode alarm, bench arming and simulated dispatcher restart. It asserts production `SafeModeActuatorDispatcher` never writes to Pi/Arduino sockets or delegates to the ECU gateway. An additional test checks eight legacy ECU mode/arming/internal-init combinations.
+- **Validation:** GitHub commit created; exact repository test execution and CI **not yet verified** because the execution container cannot resolve github.com. Run `python -m unittest tests.test_stateful_network_isolation_conformance -v` from the repository root (or `python -m unittest discover -s tests -p 'test_stateful_network_isolation_conformance.py' -v`).
+- **Evidence classification:** deterministic mocked software trace regression only; **not** an independent safety proof, physical interlock test, real network latency measurement, or publishable V2X efficacy result.
+- **Next:** validate the draft PR against current main, execute integration tests with real localhost authenticated ingress, then independent incident-ground-truth dataset trials and matched baseline comparisons. Keep draft until verified.
