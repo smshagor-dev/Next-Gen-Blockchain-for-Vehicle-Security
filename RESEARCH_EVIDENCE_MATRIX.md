@@ -67,3 +67,10 @@ Test command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experim
 - **Implemented:** replaced obsolete test with explicit regression checks that the ECU transport is never initialized, forced legacy gateway flags do not forward to CAN/serial output, and private output helpers fail closed.
 - **Validation:** original pinned replay workflow 43685231640 passed before this correction; changed Security Baseline regression is **not yet revalidated** as of this entry.
 - **Scientific limitation:** these are mocked software safety checks, not tests on a physical ECU, emergency control circuit, or independent safety certification.
+
+## 2026-11-15 — duplicate-member hardware transport ambiguity (draft PR)
+
+- **Implemented:** recursively reject repeated JSON object members in raw authenticated hardware envelopes before MAC verification, including repeated `mac`, `device_id` and nested telemetry measurements. This removes first/last-wins interpretation ambiguity between parser implementations without changing wire format or local emergency-stop control.
+- **Regression cases:** four new in-memory adversarial tests cover valid-MAC duplication, nested payload duplication, device-identity override and rejection without replay-nonce consumption. Test command: `python -m unittest tests.test_hardware_bridge_security -v` (repository CI pending).
+- **Evidence class:** protocol-parser hardening only. No independent live attack measurement, physical actuator tests, or publishable efficacy results. `AGENTS.md` not present at repository root.
+- **Next:** measure authenticated socket ingest under bounded malicious framing/reconnect traffic with separate CPU/RAM/latency counters and pinned experiment artifacts; validate producer/consumer interoperation on independent held-out V2X captures.
