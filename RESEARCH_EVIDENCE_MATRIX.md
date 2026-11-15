@@ -75,3 +75,14 @@ Test command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experim
 - **Validation:** repository checkout failed with `Could not resolve host: github.com`; exact tests and CI are **unverified**. Synthetic examples are **not publishable scientific observations**.
 - **Blocked:** genuine independent incident/recording clusters, publisher-verified dataset hashes and labels, matched held-out candidate/baseline predictions, physical interlocks.
 - **Next code task:** run `python -m unittest discover -s tests -p 'test_cluster_influence_analysis.py' -v` in the full checkout; link out-of-band pinned replay manifests to paired cluster IDs, fail closed on incomplete joins, then execute independent real cohorts.
+
+## 2026-11-15 — cluster influence semantics correction (draft #133)
+
+| Area | State | Evidence / next |
+| --- | --- | --- |
+| Leave-one-cluster-out direction | Implemented, exact CI pending | Strict sign reversal now requires opposite nonzero signs (`full * omitted < 0`); touching zero is separately reported as `reaches_null_under_omission` |
+| Regression | Authored, unverified | Two synthetic cases distinguish positive-to-zero from negative-to-positive; run `PYTHONPATH=. python -m unittest discover -s tests -p 'test_cluster_influence_analysis.py' -v` |
+| Authentic paired clusters | Blocked | No independently verified recording/scenario grouping, source truth or held-out candidate/baseline pairs; no publishable effect estimates |
+| Next | Upcoming | Bind external trial manifests and independent cluster IDs to complete incident joins, then validate matched cohorts and uncertainty estimates |
+
+This correction prevents reporting a loss of effect as a directional reversal. Neither outcome alone establishes statistical significance.
