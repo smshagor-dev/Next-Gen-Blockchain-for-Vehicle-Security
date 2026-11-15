@@ -24,7 +24,7 @@ from blockchain import SmartCarBlockchain, TelemetryData
 from bounded_tcp_admission import BoundedTCPAdmission
 from hardware_actuation_safety import BenchActuationGate
 from hardware_transport_deadlines import deadline_check, DeadlineExpired
-from hardware_observation_freshness import verify_observation_age
+from hardware_ingress_clock import verify_ingress_observation
 from hardware_transport_security import (
     AuthenticatedLineFramer,
     HardwareEnvelopeVerifier,
@@ -341,7 +341,9 @@ def run_arduino_mode(bc: SmartCarBlockchain):
             chunk = ser.read(1024)
             if not chunk:
                 continue
-            last_progress = time.monotonic()
+            ingress_monotonic = time.monotonic()
+            ingress_utc = datetime.now(timezone.utc)
+            last_progress = ingress_monotonic
             try:
                 verified = session.receive(chunk)
             except HardwareTransportError as exc:
@@ -353,9 +355,11 @@ def run_arduino_mode(bc: SmartCarBlockchain):
                 # admit later envelopes after the absolute session deadline.
                 if time.monotonic() >= deadline:
                     raise RuntimeError("Arduino serial session lifetime exceeded; port quarantined")
-                verify_observation_age(
+                verify_ingress_observation(
                     item.payload.get("timestamp"),
-                    received_utc=datetime.now(timezone.utc),
+                    received_utc=ingress_utc,
+                    received_monotonic=ingress_monotonic,
+                    commit_monotonic=time.monotonic(),
                     max_age_seconds=max(1, min(3600, get_int("SMARTCAR_HW_OBSERVATION_MAX_AGE_SEC", 15))),
                     max_future_skew_seconds=max(0, min(60, get_int("SMARTCAR_HW_OBSERVATION_FUTURE_SKEW_SEC", 2))),
                 )
@@ -444,6 +448,8 @@ def run_pi_mode(bc: SmartCarBlockchain):
                     data = conn.recv(4096)
                     if not data:
                         break
+                    ingress_monotonic = time.monotonic()
+                    ingress_utc = datetime.now(timezone.utc)
                     received_bytes += len(data)
                     if received_bytes > max_session_bytes:
                         raise HardwareTransportError("HW_SESSION_BYTE_BUDGET_EXCEEDED")
@@ -486,9 +492,11 @@ def run_pi_mode(bc: SmartCarBlockchain):
                         if not global_budget.claim():
                             raise HardwareTransportError("HW_GLOBAL_FRAME_BUDGET_EXCEEDED", authenticated=True)
                         accepted_frames += 1
-                        verify_observation_age(
+                        verify_ingress_observation(
                             item.payload.get("timestamp"),
-                            received_utc=datetime.now(timezone.utc),
+                            received_utc=ingress_utc,
+                            received_monotonic=ingress_monotonic,
+                            commit_monotonic=time.monotonic(),
                             max_age_seconds=max(1, min(3600, get_int("SMARTCAR_HW_OBSERVATION_MAX_AGE_SEC", 15))),
                             max_future_skew_seconds=max(0, min(60, get_int("SMARTCAR_HW_OBSERVATION_FUTURE_SKEW_SEC", 2))),
                         )
