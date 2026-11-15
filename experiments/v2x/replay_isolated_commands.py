@@ -16,6 +16,17 @@ COMMANDS = {"alert", "brake", "steer", "throttle", "reset_emergency"}
 MAX_BYTES = 16 * 1024 * 1024
 MAX_LINES = 100000
 
+def _strict_pairs(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON field: " + key)
+        result[key] = value
+    return result
+
+def _reject_constant(value):
+    raise ValueError("non-finite JSON constant: " + value)
+
 def evaluate(event):
     if type(event) is not dict or set(event) != FIELDS:
         raise ValueError("invalid event schema")
@@ -48,9 +59,9 @@ def replay(raw):
     output = []
     for line_no, line in enumerate(rows, 1):
         try:
-            event = json.loads(line)
+            # Do not silently accept duplicate security gates or non-standard\n            # JSON constants. Such ambiguities break independent replay audits.\n            event = json.loads(line, object_pairs_hook=_strict_pairs,\n                               parse_constant=_reject_constant)
             verdict = evaluate(event)
-        except (ValueError, TypeError, json.JSONDecodeError) as exc:
+        except (ValueError, TypeError, UnicodeDecodeError) as exc:
             raise ValueError("invalid input at line %d: %s" % (line_no, exc)) from exc
         identifier = event["incident_id"]
         if identifier in seen:

@@ -1,0 +1,17 @@
+name: V2X Replay Parser Regression
+on:
+  pull_request:
+    paths:
+      - 'experiments/v2x/replay_isolated_commands.py'
+      - 'experiments/v2x/test_replay_isolated_commands.py'
+      - '.github/workflows/v2x-replay-parser-regression.yml'
+  workflow_dispatch:
+jobs:
+  parser-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m unittest discover -s experiments/v2x -p 'test_replay_isolated_commands.py' -v

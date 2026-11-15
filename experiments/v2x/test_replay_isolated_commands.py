@@ -41,5 +41,32 @@ class IsolatedReplayTests(unittest.TestCase):
     def test_empty_is_not_effectiveness_evidence(self):
         self.assertEqual(replay(b"")["evidence_class"], "synthetic_or_unverified_simulation_only")
 
+    def test_duplicate_security_gate_rejected(self):
+        raw = json.dumps(event()).replace('"authenticated": true',
+            '"authenticated": false, "authenticated": true').encode() + b"\n"
+        with self.assertRaisesRegex(ValueError, "duplicate JSON field"):
+            replay(raw)
+
+    def test_duplicate_incident_identifier_key_rejected(self):
+        raw = json.dumps(event()).replace('"incident_id": "trial-1"',
+            '"incident_id": "forged", "incident_id": "trial-1"').encode() + b"\n"
+        with self.assertRaisesRegex(ValueError, "duplicate JSON field"):
+            replay(raw)
+
+    def test_nonfinite_json_constant_rejected(self):
+        raw = json.dumps(event()).replace('"authenticated": true',
+            '"authenticated": NaN').encode() + b"\n"
+        with self.assertRaisesRegex(ValueError, "non-finite"):
+            replay(raw)
+
+    def test_invalid_utf8_rejected(self):
+        with self.assertRaisesRegex(ValueError, "invalid input at line"):
+            replay(b"\\xff\\n")
+
+    def test_valid_input_still_admitted(self):
+        raw = (json.dumps(event()) + "\\n").encode()
+        result = replay(raw)
+        self.assertEqual(result["events"], [{"incident_id": "trial-1", "verdict": "simulated_alert"}])
+
 if __name__ == "__main__":
     unittest.main()
