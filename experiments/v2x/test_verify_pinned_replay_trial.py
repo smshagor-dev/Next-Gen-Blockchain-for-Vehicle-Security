@@ -16,7 +16,7 @@ class PinnedTrialTests(unittest.TestCase):
         self.truth = b'incident_id,cluster_id,should_alert\ni1,c1,1\n'
         self.capture = b'capture-data'
         self.policy = b'policy-v1'
-        self.output = encode({"input_sha256": sha(self.source), "events": [{"incident_id": "i1", "verdict": "simulated_alert"}], "count": 1, "simulated_alerts": 1})
+        self.output = encode({"input_sha256": sha(self.source), "events": [{"incident_id": "i1", "verdict": "simulated_alert"}], "count": 1, "simulated_alerts": 1, "evidence_class": "synthetic_or_unverified_simulation_only"})
         self.manifest = {"schema_version": 1, "experiment_id": "e1", "scenario_id": "s1",
                          "seed": "1", "split": "test", "input_sha256": sha(self.source),
                          "truth_sha256": sha(self.truth), "capture_sha256": sha(self.capture),
@@ -86,6 +86,28 @@ class PinnedTrialTests(unittest.TestCase):
     def test_duplicate_json_key(self):
         with self.assertRaises(ValueError):
             self.run_trial(output=b'{"input_sha256":"x","input_sha256":"y"}')
+
+
+    def test_forged_decision(self):
+        out = json.loads(self.output)
+        out["events"][0]["verdict"] = "blocked_evidence"
+        out["simulated_alerts"] = 0
+        with self.assertRaisesRegex(ValueError, "disagree"):
+            self.run_trial(output=encode(out))
+
+    def test_missing_decision(self):
+        out = json.loads(self.output)
+        out["events"] = []
+        out["count"] = 0
+        out["simulated_alerts"] = 0
+        with self.assertRaisesRegex(ValueError, "disagree"):
+            self.run_trial(output=encode(out))
+
+    def test_wrong_evidence_class(self):
+        out = json.loads(self.output)
+        out["evidence_class"] = "authentic_physical_evidence"
+        with self.assertRaisesRegex(ValueError, "classification"):
+            self.run_trial(output=encode(out))
 
 if __name__ == "__main__":
     unittest.main()
