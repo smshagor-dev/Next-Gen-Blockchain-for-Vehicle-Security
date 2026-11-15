@@ -67,3 +67,20 @@ Test command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experim
 - **Implemented:** replaced obsolete test with explicit regression checks that the ECU transport is never initialized, forced legacy gateway flags do not forward to CAN/serial output, and private output helpers fail closed.
 - **Validation:** original pinned replay workflow 43685231640 passed before this correction; changed Security Baseline regression is **not yet revalidated** as of this entry.
 - **Scientific limitation:** these are mocked software safety checks, not tests on a physical ECU, emergency control circuit, or independent safety certification.
+
+## 2026-11-15 — abstract safety-invariant exploration (issue #92)
+
+| Research dimension | Status | Evidence and limitation |
+| --- | --- | --- |
+| Evidence-gated remote alert admission | Implemented in **abstract** model | All authenticated, fresh, admitted-evidence gates and absence of local emergency are necessary for network alert relay |
+| Local emergency dominance | Abstract model checked | Simultaneous local emergency set dominates local clear; remote reset cannot clear the emergency latch |
+| Physical command isolation | Abstract model checked | Network brake, steer and throttle are blocked for every enumerated combination |
+| Exhaustive finite-state exploration | Locally executed | 640 one-step input/state combinations for each of two policies; candidate: 0 violations; deliberately unsafe authenticated-command baseline: 100 violating combinations. Eight local Python tests passed |
+| Production implementation refinement | Blocked | This abstract model is NOT linked to production code, does not prove temporal safety under concurrency or hardware/ECU isolation; physical emergency stop and watchdog are not independently measured |
+| Original research evidence | Partial | Provides falsifiable abstract safety properties and an unsafe reference counterexample, NOT novel cryptography or publishable effectiveness metrics |
+| Next | Upcoming | Extract a production adapter to the actual command-authorization decision path, check multi-step traces and crash/restart invariants, run physical interlock/HIL tests only when authorized lab access exists |
+
+Local verification (on reconstructed standalone source identical in logic to the pushed model):
+`python -m unittest -v test_check_command_authorization.py` (8/8 passed) and
+`python check_command_authorization.py` (candidate 0/640; unsafe baseline 100/640).
+Repository CI and production model conformance remain unverified. These are synthetic model results, NOT independent physical experiments.
