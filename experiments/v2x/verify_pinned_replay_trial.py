@@ -86,6 +86,16 @@ def verify(manifest_raw, replay_input_raw, replay_output_raw, truth_raw,
         seen.add(incident)
     if type(replay.get("simulated_alerts")) is not int or replay["simulated_alerts"] != sum(e["verdict"] == "simulated_alert" for e in events):
         raise ValueError("invalid alert count")
+    # A digest-pinned replay file may still contain fabricated decisions. Recompute
+    # every verdict from the exact pinned input using the reference policy.
+    from replay_isolated_commands import replay as replay_reference
+    expected = replay_reference(replay_input_raw)
+    if replay.get("events") != expected["events"]:
+        raise ValueError("replay decisions disagree with pinned policy input")
+    if replay["count"] != expected["count"] or replay["simulated_alerts"] != expected["simulated_alerts"]:
+        raise ValueError("replay summary disagrees with reference policy")
+    if replay.get("evidence_class") != expected["evidence_class"]:
+        raise ValueError("replay evidence classification mismatch")
     return {"manifest_sha256": expected_manifest_sha256, "replay_output_sha256": sha(replay_output_raw),
             "trial": {k: manifest[k] for k in GROUP}, "decision_count": len(events),
             "publication_ready": False,
