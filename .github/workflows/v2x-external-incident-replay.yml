@@ -1,0 +1,39 @@
+name: External V2X Incident Replay Research Protocol
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "experiments/v2x/replay_external_incidents.py"
+      - "experiments/v2x/test_replay_external_incidents.py"
+      - "experiments/v2x/join_world_incidents.py"
+      - "experiments/v2x/attested_interval_join.py"
+      - "v2x_evidence_admission.py"
+      - ".github/workflows/v2x-external-incident-replay.yml"
+  push:
+    branches: [main]
+    paths:
+      - "experiments/v2x/replay_external_incidents.py"
+      - "experiments/v2x/test_replay_external_incidents.py"
+      - ".github/workflows/v2x-external-incident-replay.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-gate-replay-contract:
+    name: Label-free trace / real evidence gate / Python 3.11
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile replay modules
+        run: python -m compileall -q experiments/v2x/replay_external_incidents.py experiments/v2x/test_replay_external_incidents.py
+      - name: Run 17 replay/DoS/collusion/partition contract scenarios
+        env:
+          PYTHONPATH: ".:experiments/v2x"
+        run: python -m unittest discover -s experiments/v2x -p "test_replay_external_incidents.py" -v
