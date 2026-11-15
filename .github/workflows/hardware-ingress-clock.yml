@@ -1,0 +1,22 @@
+name: Hardware receive clock validation
+on:
+  pull_request:
+    paths:
+      - hardware_ingress_clock.py
+      - hardware_bridge.py
+      - hardware_observation_freshness.py
+      - tests/test_hardware_ingress_clock.py
+      - .github/workflows/hardware-ingress-clock.yml
+  workflow_dispatch:
+jobs:
+  receive-clock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Validate receive clock and pre-commit freshness
+        run: PYTHONPATH=. python -m unittest discover -s tests -p 'test_hardware_ingress_clock.py' -v
+      - name: Compile affected source
+        run: python -m py_compile hardware_bridge.py hardware_ingress_clock.py hardware_observation_freshness.py
