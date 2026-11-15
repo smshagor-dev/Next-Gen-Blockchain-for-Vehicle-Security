@@ -80,3 +80,12 @@ Test command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experim
 | Scientific efficacy | Blocked | No authentic V2X/CAN held-out trials, independent attack truth, HIL or measured effect sizes added |
 
 **Next:** run exact CI and investigate any legacy tests that expect unsafe network stop delivery; verify signed telemetry ingestion remains unaffected. Then add differential production/model traces and externally witnessed power-loss emergency tests before considering physical command output. Never use these mocked regressions as main scientific results.
+
+
+## 2026-11-15 — fail-closed network actuator regression reconciliation (draft PR #132)
+
+- **Implemented:** replaced the stale armed-bench regression that expected signed Pi commands and ECU forwarding with a two-state (armed/unarmed) check asserting no Pi `sendall`, Arduino `write`, or ECU dispatch even with both legacy environment flags enabled. This tests the actual safety-isolated production dispatcher rather than treating a MAC as receiver-side interlock proof.
+- **Evidence:** updated test committed as `9cb99ae17a4ce6ee17a9aaeeeea695e2c59c5090`; source inspection confirmed the dispatcher returns false for both network send paths. Exact repository tests **not executed**: local `git ls-remote` failed DNS resolution for github.com. CI **not verified**.
+- **Command once checkout is available:** `python -m unittest tests.test_hardware_bridge_security -v` followed by `python -m unittest discover -s tests -p 'test_*.py'`.
+- **Limit:** no physical actuator, CAN, emergency circuit, authenticated runtime capture, or external dataset was tested. This is engineering regression coverage, **not publishable scientific evidence**.
+- **Next:** verify CI and full integration regression on PR #132, implement differential trace conformance against the abstract emergency-state model, and independently witness physical emergency precedence before any hardware authorization claim.
