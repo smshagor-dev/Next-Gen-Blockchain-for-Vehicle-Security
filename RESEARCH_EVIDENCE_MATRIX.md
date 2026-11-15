@@ -44,3 +44,10 @@ This matrix records engineering progress, **not scientific validation**. Exact M
 | Genuine experimental results | BLOCKED | No physical local emergency circuit or independent network capture, original VeReMi/CAN dataset labels, independently replicated multi-seed effect estimates. No publication claims from model enumeration. |
 
 Next: wire the reference model's deny-by-default network-only authorization decision into a simulated adapter and verify no path to CAN/ECU actuation. Separately obtain hardware test access and independent data provenance before manuscript efficacy claims.
+
+## 2026-11-15 — simulation-only command boundary (stacked draft)
+
+- Completed in draft: memory-only alert adapter, strict evidence context, bounded messages, independent local emergency/reset and synthetic exhaustive action/context checks. No CAN, serial or vehicle actuator interface.
+- Partial: four synthetic regression methods and dedicated CI workflow; CI and full repository regressions not yet verified. Depends on draft PR #113.
+- Blocked: physical ECU safety and interlocks, publisher-authenticated VeReMi/CAN data, independent trial provenance, matched multi-seed outcomes, ledger finality.
+- Upcoming: run CI, add network-free incident replay driver and authentic baseline experiments. Synthetic tests are NOT publishable efficacy evidence.
