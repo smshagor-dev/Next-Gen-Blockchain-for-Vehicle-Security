@@ -12,7 +12,7 @@ def sha(b):
 
 class PinnedTrialTests(unittest.TestCase):
     def setUp(self):
-        self.source = b'{"incident_id":"i1"}\n'
+        self.source = encode({"incident_id":"i1", "command":"alert", "authenticated":True, "fresh":True, "evidence_admitted":True, "local_emergency":False}) + b"\n"
         self.truth = b'incident_id,cluster_id,should_alert\ni1,c1,1\n'
         self.capture = b'capture-data'
         self.policy = b'policy-v1'
