@@ -1,0 +1,34 @@
+name: Independent V2X Trial Analysis
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "experiments/v2x/analyze_independent_trials.py"
+      - "experiments/v2x/test_analyze_independent_trials.py"
+      - ".github/workflows/v2x-independent-trial-analysis.yml"
+  push:
+    branches: [main]
+    paths:
+      - "experiments/v2x/analyze_independent_trials.py"
+      - "experiments/v2x/test_analyze_independent_trials.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analysis-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile statistical analysis
+        run: python -m compileall -q experiments/v2x/analyze_independent_trials.py experiments/v2x/test_analyze_independent_trials.py
+      - name: Run 17 independent-trial statistical contract tests
+        env:
+          PYTHONPATH: experiments/v2x
+        run: python -m unittest discover -s experiments/v2x -p "test_analyze_independent_trials.py" -v
