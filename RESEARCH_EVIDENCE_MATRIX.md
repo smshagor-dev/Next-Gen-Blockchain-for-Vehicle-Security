@@ -67,3 +67,15 @@ Test command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experim
 - **Implemented:** replaced obsolete test with explicit regression checks that the ECU transport is never initialized, forced legacy gateway flags do not forward to CAN/serial output, and private output helpers fail closed.
 - **Validation:** original pinned replay workflow 43685231640 passed before this correction; changed Security Baseline regression is **not yet revalidated** as of this entry.
 - **Scientific limitation:** these are mocked software safety checks, not tests on a physical ECU, emergency control circuit, or independent safety certification.
+
+## 2026-11-15 — authenticated telemetry observation-time integrity (draft)
+
+| Item | State | Evidence and limitation |
+| --- | --- | --- |
+| Observation timestamp admission | Implemented; CI pending | `hardware_bridge.to_telemetry` now requires an explicitly supplied canonical UTC ISO-8601 observation timestamp, rejecting absent, naive, non-UTC, malformed and oversized values instead of inventing current ingestion time |
+| Regressions | Authored; execution pending | `tests/test_hardware_observation_timestamp.py` covers Z/UTC normalization, missing timestamp, invalid offsets and malformed dates; command: `python -m unittest discover -s tests -p 'test_hardware_observation_timestamp.py' -v` |
+| Hardware safety | Unchanged, partial | No changes to independent physical emergency control or fail-closed CAN/serial gateway. Signed transport freshness is **not** sensor observation freshness |
+| Dataset evidence | Blocked | No authentic independently sourced VeReMi/CAN data or independent timestamp attestation; device can still lie about observation time |
+| Next code task | Upcoming | Enforce policy-defined maximum observation age relative to independently verified reception time, with bounded clock-skew tests and real TCP-loopback latency/DoS trials |
+
+This is a provenance-integrity engineering correction, not a new cryptographic primitive or publishable research efficacy result. No actual hardware experiment was performed.
