@@ -1,0 +1,31 @@
+name: Pinned Offline CAN Source Normalization
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "experiments/v2x/normalize_can_recording.py"
+      - "experiments/v2x/test_normalize_can_recording.py"
+      - ".github/workflows/can-source-normalization.yml"
+  push:
+    branches: [main]
+    paths:
+      - "experiments/v2x/normalize_can_recording.py"
+      - "experiments/v2x/test_normalize_can_recording.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  normalize-can:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile normalization adapter
+        run: python -m compileall -q experiments/v2x/normalize_can_recording.py
+      - name: Execute synthetic CAN source validation regressions
+        env:
+          PYTHONPATH: experiments/v2x
+        run: python -m unittest discover -s experiments/v2x -p 'test_normalize_can_recording.py' -v
