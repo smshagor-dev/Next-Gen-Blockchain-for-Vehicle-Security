@@ -48,11 +48,14 @@ def analyze(path):
         omissions.append({"omitted_cluster": cluster, "remaining_incidents": remaining,
                           "estimate_pp": effect, "change_from_full_pp": effect - estimate})
     effects = [v["estimate_pp"] for v in omissions]
+    # A zero effect is a null crossing, not a reversal of direction.
+    strict_reversal = any(estimate * value < 0 for value in effects)
+    reaches_null = any(value == 0 for value in effects)
     return {"incidents": total_n, "independent_clusters": len(clusters),
             "full_estimate_pp": estimate, "leave_one_cluster_out": omissions,
             "minimum_loo_pp": min(effects), "maximum_loo_pp": max(effects),
-            "sign_reversal_under_omission": any((v > 0) != (estimate > 0) for v in effects)
-                if estimate != 0 else any(v != 0 for v in effects),
+            "sign_reversal_under_omission": strict_reversal,
+            "reaches_null_under_omission": reaches_null,
             "publication_ready": False,
             "limitations": "Descriptive sensitivity, not a confidence interval or significance test. Cluster independence, source authenticity, and preregistered grouping require external verification."}
 
