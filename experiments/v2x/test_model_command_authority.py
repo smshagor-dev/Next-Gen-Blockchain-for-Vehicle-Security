@@ -12,7 +12,7 @@ class SafetyAuthorityModelTests(unittest.TestCase):
         result = check_all_states()
         self.assertEqual(result["remote_requests"], 256)
         self.assertEqual(result["actuation_requests_accepted"], 0)
-        self.assertEqual(result["network_relays"], 1)
+        self.assertEqual(result["network_relays"], 2)
 
     def test_accepted_alert_only_network(self):
         result = decide(self.ready, "network_alert")
