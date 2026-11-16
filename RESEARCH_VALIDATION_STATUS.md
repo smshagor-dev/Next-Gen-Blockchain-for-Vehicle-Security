@@ -165,3 +165,14 @@ Added `tests/test_production_pi_handler_loopback.py` (commit `f639b838`) to comp
 **Status:** complete-frame count preflight = implemented/unverified; production hardware ingress and independent emergency-stop = partial/unverified; general multi-frame transaction semantics = blocked pending design; authentic V2X/CAN dataset provenance, independent attack baselines, effect-size statistics = blocked; publishable research = not ready.
 
 **Next code task:** design explicit per-frame admission delivery or transactional replay-store batch API, and validate the production Pi handler using real authenticated loopback sessions with injected malformed second frames, replay races, slow clients and resource measurements. Keep PR draft; no hardware or scientific efficacy claim.
+
+
+## 2026-11-16 receiver fragmented-body preflight repair
+
+**Implemented (unverified):** Commit df9b3646 fixes the receiver's frame-count preflight to retain partial frame-body bytes across successive feed() calls. Previously, when expected was set, preflight discarded self.buffer, potentially parsing a legitimate continuation as an invalid frame and poisoning the session. Added two regressions: fragmented body plus next frame succeeds; fragmented body plus an over-budget second frame rejects before consuming the first replay sequence. This is a simulation-only correctness/security regression, not publishable experimental evidence.
+
+**Validation pending:** Execute `python -m unittest discover -s research_contracts -p 'test_receiver_fault_model.py' -v` and the full repository suite on a checkout. No passing tests or real hardware/network metrics are claimed in this run.
+
+**Matrix:** receiver fragmented-body preflight = implemented/unverified; general batch atomicity = partial; production hardware bridge and emergency control = unverified; ledger crash consistency = partial; authentic dataset experiments and independent statistical baselines = blocked; paper = not ready.
+
+**Next code task:** implement explicit per-frame delivery semantics or a transactional replay batch API; test malformed second-frame behavior and crash rollback with real loopback sockets before merge.
