@@ -74,7 +74,7 @@ class BoundedReceiver:
                 self.expected = None
                 try:
                     accepted.append(self._admit(payload))
-                except (FrameError, RecursionError) as exc:
+                except Exception as exc:  # Storage errors must also terminate this connection.
                     self.poisoned = True
                     raise FrameError("connection rejected after invalid frame") from exc
         return accepted
@@ -190,6 +190,26 @@ class ReceiverFaultTests(unittest.TestCase):
         with self.assertRaises(FrameError):
             self.receiver.feed(len(raw).to_bytes(4, "big") + raw)
         self.assertTrue(self.receiver.poisoned)
+
+    def test_durable_store_failure_poison_connection(self):
+        class FailedStore:
+            def admit_authenticated(self, node, seq, authenticated=False):
+                raise OSError("injected storage failure")
+        receiver = BoundedReceiver({"a": b"secret-a"}, replay_gate=FailedStore())
+        with self.assertRaises(FrameError):
+            receiver.feed(frame("a", 1, {}, b"secret-a"))
+        self.assertTrue(receiver.poisoned)
+        with self.assertRaises(FrameError):
+            receiver.feed(frame("a", 2, {}, b"secret-a"))
+
+    def test_durable_store_rejection_poison_connection(self):
+        class RejectedStore:
+            def admit_authenticated(self, node, seq, authenticated=False):
+                return False
+        receiver = BoundedReceiver({"a": b"secret-a"}, replay_gate=RejectedStore())
+        with self.assertRaises(FrameError):
+            receiver.feed(frame("a", 1, {}, b"secret-a"))
+        self.assertTrue(receiver.poisoned)
 
     def test_no_actuator_interface(self):
         self.assertFalse(hasattr(self.receiver, "actuate"))
