@@ -193,3 +193,15 @@ Local verification (on reconstructed standalone source identical in logic to the
 `python -m unittest -v test_check_command_authorization.py` (8/8 passed) and
 `python check_command_authorization.py` (candidate 0/640; unsafe baseline 100/640).
 Repository CI and production model conformance remain unverified. These are synthetic model results, NOT independent physical experiments.
+
+## 2026-11-15 — bounded multi-step emergency/restart model (draft)
+
+| Area | State | Evidence and next step |
+| --- | --- | --- |
+| Abstract emergency safety transitions | Implemented, repository CI pending | `experiments/v2x/check_emergency_state_machine.py` explores restart, sensor faults/recovery, physical emergency/reset, and gated remote commands through depth 7 |
+| Bounded model verification | Local contract test passed | Isolated local Python exploration found 28 reachable state/depth pairs, 360 transitions and 0 invariant violations; 10/10 local tests passed on equivalent source. GitHub CI is not yet verified |
+| Physical interlock and persistence | **Blocked** | The model **assumes** an external persistent emergency latch and trusted local reset; no physical ECU or process-crash test validates those assumptions |
+| Production conformance | **Upcoming** | Build stateful differential tests against actual command dispatch path and prove reset cannot originate from network inputs |
+| Scientific efficacy | **Blocked** | No independent incident dataset or matched multi-seed experiments; model checking is software specification evidence, not detection performance |
+
+No novelty claim for cryptography, consensus finality, or physical safety follows from this abstract model. The model uses a reduced state space and no asynchronous timing or actuator dynamics. Do not cite 360 transitions as independent empirical trials.
