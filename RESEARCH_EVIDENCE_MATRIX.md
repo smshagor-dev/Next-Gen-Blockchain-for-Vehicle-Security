@@ -92,3 +92,17 @@ This protocol never opens a CAN socket, sends physical actuator commands, or inf
 | Next | Upcoming | Execute tests in repository CI, add fixed-horizon benign traffic matched-load control, then run recording-disjoint independent trials and candidate/baseline comparisons |
 
 No accuracy, safety efficacy, statistical significance or publishable primary research result is claimed. Existing fixture CSVs, three-peer poisoning checks, five-iteration microbenchmarks and offline network formulas remain non-publishable primary evidence.
+
+
+## 2026-11-16 — equal-timestamp, equal-frame-count offline CAN sham (draft PR #136)
+
+| Area | State | Evidence / limitation |
+| --- | --- | --- |
+| Matched exposure control | Implemented; test execution pending | `generate_matched_can_sham_control.py` appends frames from a separately pinned donor at exactly the replay timestamps, preserving frame count and horizon, with independent source/donor recording IDs and byte digests |
+| Adversarial contracts | Authored; execution pending | `tests/test_matched_can_sham_control.py`: seven synthetic tests covering timestamp/count parity, determinism, tamper, donor identity, bounds and type validation |
+| Donor ground truth | Blocked | This tool **cannot verify** that the donor is benign; the operator must provide independently verified provenance and source-disjoint labels. A different recording ID and hash do not prove independent collection |
+| Scientific comparability | Partial | Timing and frame-count parity do **not** imply equal CAN ID distributions, payload distributions, ECU dynamics, capture quality or causal exchangeability. Donor frames are explicitly simulated, not physical CAN events |
+| Publishable evidence | Blocked | No real publisher-authenticated CAN source, independently annotated incidents, multi-seed matched baselines, physical safety witness or validated effect estimates |
+| Next code task | Upcoming | Run exact tests and CI; pin independently verified benign donor provenance; add matching/stratification for CAN ID and DLC distributions; execute disjoint-recording trials with incident-level truth and cluster-aware uncertainty |
+
+Test: `python -m unittest tests.test_matched_can_sham_control -v`. Existing fixture CSVs and short microbenchmarks remain NON-PUBLISHABLE main results.
