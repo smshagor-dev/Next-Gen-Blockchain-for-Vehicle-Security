@@ -151,3 +151,16 @@ This is a provenance-integrity engineering correction, not a new cryptographic p
 | Runtime scaling and manuscript | Upcoming | Next: real localhost TCP with authenticated multi-frame bursts, queue-delay histograms, CPU/RAM and bounded-DoS scenarios; then independently sourced matched baselines |
 
 **Limitations:** Host software receive UTC is not a trusted hardware timestamp; fragmented frames use the receive that completes the frame, and clock synchronization is not attested. The monotonic elapsed clock prevents *processing delays* from refreshing an old observation, but does not establish truth of a compromised device's signed clock. This is safety engineering evidence only, not publishable original efficacy research.
+
+## 2026-11-15 — real localhost TCP saturation protocol (draft, issue #92)
+
+| Area | State | Evidence / next action |
+| --- | --- | --- |
+| Bounded TCP admission | Implemented on main; real loopback experiment added in draft | `experiments/v2x/bench_tcp_loopback_admission.py` creates actual IPv4 localhost TCP connections, fills worker slots, rejects a bounded overload, waits for release and verifies admission recovery |
+| TCP runtime measurements | Code implemented; CI pending | Measures rejection round-trip median/p95, wall/process CPU seconds, Python-traced peak allocations, and overload attempts per elapsed second; raw per-repetition JSON preserved as a CI artifact |
+| Socket experiment regressions | Authored, execution pending | Three test methods cover one/four workers and invalid parameter limits; dedicated workflow runs actual TCP sockets on GitHub runners |
+| Local execution | Blocked transiently | Exact GitHub checkout failed in local container: `Could not resolve host: github.com`. Do not claim local pass or numerical measurements |
+| Authentic V2X/CAN and HIL safety | Blocked | TCP admission alone does not test MAC/replay validation, end-to-end authenticated telemetry, physical emergency interlock, publisher data or vehicle network behavior |
+| Research inference | Blocked | Repeated microbenchmarks on one host are engineering diagnostics, NOT independent incident-level research trials or publishable V2X efficacy |
+
+**Next:** integrate authenticated telemetry TCP loopback from reviewed PR #125–#127 once validated; record actual end-to-end reception-to-ledger timing, malformed/replay rejection and process RSS under matched attack loads, then independent publisher-verified incident experiments. Existing PR #124 measures socketpair admission and is not duplicated here: this run uses actual TCP connections and includes recovery.
