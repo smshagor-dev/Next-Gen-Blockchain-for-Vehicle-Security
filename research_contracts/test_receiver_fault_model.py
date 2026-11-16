@@ -17,7 +17,7 @@ class BoundedReceiver:
 
     Replay state is intentionally volatile: reboot durability is NOT claimed.
     """
-    def __init__(self, keys, limit=MAX_FRAME):
+    def __init__(self, keys, limit=MAX_FRAME, replay_gate=None):
         if not 1 <= limit <= MAX_FRAME:
             raise ValueError("invalid limit")
         self.keys = dict(keys)
@@ -25,6 +25,7 @@ class BoundedReceiver:
         self.buffer = bytearray()
         self.expected = None
         self.seen = {}
+        self.replay_gate = replay_gate
 
     def feed(self, chunk):
         if not isinstance(chunk, bytes):
@@ -71,9 +72,17 @@ class BoundedReceiver:
             expected = hmac.new(self.keys[node], canonical, hashlib.sha256).hexdigest()
             if not hmac.compare_digest(expected, mac):
                 raise ValueError("invalid authentication")
-            if seq <= self.seen.get(node, -1):
-                raise ValueError("replay")
-            self.seen[node] = seq
+            if seq > 9223372036854775807:
+                raise ValueError("sequence exceeds durable store range")
+            if self.replay_gate is not None:
+                # Commit authenticated high-water mark before exposing admission.
+                # Storage failures propagate: no event is returned to the caller.
+                if not self.replay_gate.admit_authenticated(node, seq, authenticated=True):
+                    raise ValueError("replay or durable gate rejection")
+            else:
+                if seq <= self.seen.get(node, -1):
+                    raise ValueError("replay")
+                self.seen[node] = seq
             return {"node": node, "seq": seq, "event": event}
         except (ValueError, TypeError, KeyError, UnicodeError) as exc:
             raise FrameError("admission rejected") from exc
