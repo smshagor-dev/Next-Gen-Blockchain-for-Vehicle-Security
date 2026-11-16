@@ -176,3 +176,20 @@ This is a provenance-integrity engineering correction, not a new cryptographic p
 | Next code task | Upcoming | Validate CI, integrate pending ingress freshness PRs and measure authenticated TCP loopback rejection latency, CPU/RAM, reconnect load and safe emergency isolation |
 
 This is security engineering evidence, not publishable incident-level detection effectiveness. An enrolled malicious node can still send a syntactically valid but false reading; independently sourced truth and matched baselines are required.
+
+## 2026-11-15 — abstract safety-invariant exploration (issue #92)
+
+| Research dimension | Status | Evidence and limitation |
+| --- | --- | --- |
+| Evidence-gated remote alert admission | Implemented in **abstract** model | All authenticated, fresh, admitted-evidence gates and absence of local emergency are necessary for network alert relay |
+| Local emergency dominance | Abstract model checked | Simultaneous local emergency set dominates local clear; remote reset cannot clear the emergency latch |
+| Physical command isolation | Abstract model checked | Network brake, steer and throttle are blocked for every enumerated combination |
+| Exhaustive finite-state exploration | Locally executed | 640 one-step input/state combinations for each of two policies; candidate: 0 violations; deliberately unsafe authenticated-command baseline: 100 violating combinations. Eight local Python tests passed |
+| Production implementation refinement | Blocked | This abstract model is NOT linked to production code, does not prove temporal safety under concurrency or hardware/ECU isolation; physical emergency stop and watchdog are not independently measured |
+| Original research evidence | Partial | Provides falsifiable abstract safety properties and an unsafe reference counterexample, NOT novel cryptography or publishable effectiveness metrics |
+| Next | Upcoming | Extract a production adapter to the actual command-authorization decision path, check multi-step traces and crash/restart invariants, run physical interlock/HIL tests only when authorized lab access exists |
+
+Local verification (on reconstructed standalone source identical in logic to the pushed model):
+`python -m unittest -v test_check_command_authorization.py` (8/8 passed) and
+`python check_command_authorization.py` (candidate 0/640; unsafe baseline 100/640).
+Repository CI and production model conformance remain unverified. These are synthetic model results, NOT independent physical experiments.
