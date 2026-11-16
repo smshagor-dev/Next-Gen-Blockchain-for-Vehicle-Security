@@ -134,3 +134,13 @@ Added `tests/test_production_pi_handler_loopback.py` (commit `f639b838`) to comp
 - **Scope:** isolated model only. Production `hardware_bridge` transport teardown, persistent replay storage, local emergency control, and power-loss behavior remain unverified. This does not establish DoS resistance or hardware safety.
 - **Validation:** GitHub connector commit succeeded, but checkout/testing unavailable because `git ls-remote` failed with `Could not resolve host: github.com`. No test pass is claimed. Run `python -m unittest discover -s research_contracts -p 'test_receiver_fault_model.py' -v` and `python -m unittest discover -s research_contracts -p 'test_*.py' -v` before review.
 - **Next:** enforce production socket teardown on rejected frames and run live loopback fragmentation/slow-peer/concurrent-client fault injection, preserving local emergency-stop precedence. Keep draft and do not merge without tests.
+
+## 2026-11-16 durable replay storage fault session teardown
+
+**Implemented, unverified (commit e7dd0836):** The isolated bounded receiver now poisons its transport session on unexpected exceptions from the durable replay gate, including injected OSError during SQLite/storage admission. Previously such exceptions escaped without setting `poisoned`, allowing a subsequent frame on the same session. Added two regression cases for storage exceptions and explicit durable-gate rejection. This is simulation-only and does not prove production receiver behavior or disk durability.
+
+**Test commands (not executed in full checkout):** `python -m unittest discover -s research_contracts -p 'test_receiver_fault_model.py' -v` and `python -m unittest discover -s research_contracts -p 'test_*.py' -v`.
+
+**Matrix:** Receiver storage-fault fail-closed = implemented/unverified; production bridge teardown = partial; physical emergency independence = unverified; ledger crash/power-loss = partial/blocked; authentic independent incident truth = blocked; multi-seed matched experiments and paper = blocked. Existing fixture CSVs, 3-peer sanity check, five-iteration microbenchmarks and communication formulas remain non-publishable primary evidence.
+
+**Next code task:** Integrate equivalent storage-error teardown in production Pi ingress, exercise actual loopback sockets under concurrent replay and slow-peer faults, and record measured latency/CPU/RAM under identical baselines. Keep draft PR pending executable validation.
