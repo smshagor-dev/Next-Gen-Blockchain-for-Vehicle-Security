@@ -191,66 +191,38 @@ class AuthenticatedPiTelemetrySession:
 
 
 class SafeModeActuatorDispatcher:
-    """Dispatch hardware stop commands when blockchain safe mode is activated."""
+    """Fail-closed network command boundary.
+
+    A ledger safe-mode event is evidence for a local alert, not authorization
+    to send an actuator command to a remote Arduino/Pi. In particular, a
+    sender-side MAC and a bench arming flag cannot establish receiver-side
+    authorization, freshness, physical interlock state, or local emergency
+    precedence. Physical emergency stop remains an independent local circuit.
+    """
 
     def __init__(self, gate: Optional[BenchActuationGate] = None):
         self.gate = gate if gate is not None else BenchActuationGate()
-        # Opt in explicitly; never energize an actuator just by starting bridge.
-        self.enabled = get_bool("SMARTCAR_HARD_STOP_ENABLED", False)
-        self._last_sent_at = None
-        self._cooldown_sec = 0.8
+        self.enabled = False
         self.ecu_gateway = ECUCommandGateway(gate=self.gate)
 
     def _should_send(self, bc: SmartCarBlockchain, block) -> bool:
-        if not self.enabled or not self.gate.is_armed():
-            return False
-        now = time.monotonic()
-        if self._last_sent_at is not None and now - self._last_sent_at < self._cooldown_sec:
-            return False
-        return bool(getattr(bc, "safe_mode_active", False) or getattr(block, "safe_mode_activated", False))
+        # Intentionally non-configurable until independently validated receiver
+        # authorization and physical interlocks are implemented.
+        return False
 
     def maybe_send_arduino(
         self, ser, bc: SmartCarBlockchain, block, *,
         device_id: str, device_secret: str,
     ):
-        if not self._should_send(bc, block):
-            return
-        try:
-            payload = build_safe_stop_payload(block_index=getattr(block, "index", -1))
-            envelope = build_authenticated_envelope(
-                device_id, device_secret, "COMMAND", payload
-            )
-            ser.write(encode_authenticated_envelope(envelope))
-            self._last_sent_at = time.monotonic()
-            print("[ACTUATOR] Signed SAFE_MODE_STOP sent to Arduino bench node")
-        except (OSError, HardwareTransportError) as e:
-            print(f"[ACTUATOR] Arduino command rejected: {e}")
-            return
-        self.ecu_gateway.send_safe_mode_stop(block_index=getattr(block, "index", -1))
+        """Never send a network-originated stop command to an actuator."""
+        return False
 
     def maybe_send_pi(
-        self,
-        conn,
-        bc: SmartCarBlockchain,
-        block,
-        *,
-        device_id: str,
-        device_secret: str,
+        self, conn, bc: SmartCarBlockchain, block, *,
+        device_id: str, device_secret: str,
     ):
-        if not self._should_send(bc, block):
-            return
-        try:
-            payload = build_safe_stop_payload(block_index=getattr(block, "index", -1))
-            envelope = build_authenticated_envelope(
-                device_id, device_secret, "COMMAND", payload
-            )
-            conn.sendall(encode_authenticated_envelope(envelope))
-            self._last_sent_at = time.monotonic()
-            print("[ACTUATOR] Signed SAFE_MODE_STOP sent to Pi bench node")
-        except (OSError, HardwareTransportError) as e:
-            print(f"[ACTUATOR] Pi command rejected: {e}")
-            return
-        self.ecu_gateway.send_safe_mode_stop(block_index=getattr(block, "index", -1))
+        """Never send a network-originated stop command to an actuator."""
+        return False
 
 
 class ECUCommandGateway:

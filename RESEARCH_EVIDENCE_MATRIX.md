@@ -205,3 +205,32 @@ Repository CI and production model conformance remain unverified. These are synt
 | Scientific efficacy | **Blocked** | No independent incident dataset or matched multi-seed experiments; model checking is software specification evidence, not detection performance |
 
 No novelty claim for cryptography, consensus finality, or physical safety follows from this abstract model. The model uses a reduced state space and no asynchronous timing or actuator dynamics. Do not cite 360 transitions as independent empirical trials.
+
+## 2026-11-15 — remote safe-stop command isolation (draft)
+
+| Workstream | State | Evidence / limitation |
+| --- | --- | --- |
+| Remote actuator authorization | Implemented on draft; verification pending | `SafeModeActuatorDispatcher` no longer transmits signed `COMMAND` envelopes to Arduino/Pi merely because ledger safe mode is active and bench gate is armed. This closes the sender-only authorization gap; remote actuator transport is deliberately disabled |
+| ECU output | Existing fail-closed boundary retained | `ECUCommandGateway` still refuses CAN/serial output |
+| Regression coverage | Authored, unverified | Five mocked tests cover serial, TCP, environment opt-in, ECU direct helpers and emergency/sensor combinations. Run `PYTHONPATH=. python -m unittest discover -s tests -p 'test_network_actuation_isolation.py' -v` and full security suite before merge |
+| Local physical emergency stop | Not verified | Software code does not test physical emergency circuit, persistence across power loss or actuator isolation |
+| Formal-model conformance | Partial | Draft #130/#131 assume no network actuation; this change aligns production command *output* boundary, but does not prove full temporal conformance or independent receiver-side authorization |
+| Scientific efficacy | Blocked | No authentic V2X/CAN held-out trials, independent attack truth, HIL or measured effect sizes added |
+
+**Next:** run exact CI and investigate any legacy tests that expect unsafe network stop delivery; verify signed telemetry ingestion remains unaffected. Then add differential production/model traces and externally witnessed power-loss emergency tests before considering physical command output. Never use these mocked regressions as main scientific results.
+
+
+## 2026-11-15 — fail-closed network actuator regression reconciliation (draft PR #132)
+
+- **Implemented:** replaced the stale armed-bench regression that expected signed Pi commands and ECU forwarding with a two-state (armed/unarmed) check asserting no Pi `sendall`, Arduino `write`, or ECU dispatch even with both legacy environment flags enabled. This tests the actual safety-isolated production dispatcher rather than treating a MAC as receiver-side interlock proof.
+- **Evidence:** updated test committed as `9cb99ae17a4ce6ee17a9aaeeeea695e2c59c5090`; source inspection confirmed the dispatcher returns false for both network send paths. Exact repository tests **not executed**: local `git ls-remote` failed DNS resolution for github.com. CI **not verified**.
+- **Command once checkout is available:** `python -m unittest tests.test_hardware_bridge_security -v` followed by `python -m unittest discover -s tests -p 'test_*.py'`.
+- **Limit:** no physical actuator, CAN, emergency circuit, authenticated runtime capture, or external dataset was tested. This is engineering regression coverage, **not publishable scientific evidence**.
+- **Next:** verify CI and full integration regression on PR #132, implement differential trace conformance against the abstract emergency-state model, and independently witness physical emergency precedence before any hardware authorization claim.
+
+## 2026-11-15 — stateful production dispatcher conformance (draft PR #132)
+
+- **Implemented on draft branch:** `tests/test_stateful_network_isolation_conformance.py` exercises 1,024 deterministic two-step combinations (2,048 transitions), including emergency state, sensor failure, safe-mode alarm, bench arming and simulated dispatcher restart. It asserts production `SafeModeActuatorDispatcher` never writes to Pi/Arduino sockets or delegates to the ECU gateway. An additional test checks eight legacy ECU mode/arming/internal-init combinations.
+- **Validation:** GitHub commit created; exact repository test execution and CI **not yet verified** because the execution container cannot resolve github.com. Run `python -m unittest tests.test_stateful_network_isolation_conformance -v` from the repository root (or `python -m unittest discover -s tests -p 'test_stateful_network_isolation_conformance.py' -v`).
+- **Evidence classification:** deterministic mocked software trace regression only; **not** an independent safety proof, physical interlock test, real network latency measurement, or publishable V2X efficacy result.
+- **Next:** validate the draft PR against current main, execute integration tests with real localhost authenticated ingress, then independent incident-ground-truth dataset trials and matched baseline comparisons. Keep draft until verified.
