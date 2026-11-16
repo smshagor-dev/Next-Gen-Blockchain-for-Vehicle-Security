@@ -144,3 +144,13 @@ Added `tests/test_production_pi_handler_loopback.py` (commit `f639b838`) to comp
 **Matrix:** Receiver storage-fault fail-closed = implemented/unverified; production bridge teardown = partial; physical emergency independence = unverified; ledger crash/power-loss = partial/blocked; authentic independent incident truth = blocked; multi-seed matched experiments and paper = blocked. Existing fixture CSVs, 3-peer sanity check, five-iteration microbenchmarks and communication formulas remain non-publishable primary evidence.
 
 **Next code task:** Integrate equivalent storage-error teardown in production Pi ingress, exercise actual loopback sockets under concurrent replay and slow-peer faults, and record measured latency/CPU/RAM under identical baselines. Keep draft PR pending executable validation.
+
+## 2026-11-16 cumulative receiver byte-budget checkpoint
+
+**Implemented, execution unverified:** Isolated authenticated receiver now charges all input bytes across repeated `feed()` calls, including incomplete frames, before parsing or MAC verification. A per-connection default 262144-byte ceiling (configurable between 4096 and 262144 bytes) poisons the session and clears partial framing on exceed. Three regression cases cover one-byte fragmented authenticated frames, valid traffic consuming the budget, and invalid budget configuration. Commits `8429892c`, `bd499990`; existing Draft PR #141. This is a bounded-resource *simulation*, not evidence of production DoS resistance.
+
+**Validation:** GitHub connector writes succeeded; local `git ls-remote` failed DNS resolution of github.com. Committed suite not executed. Run `python -m unittest discover -s research_contracts -p 'test_receiver_fault_model.py' -v` and full tests. Existing production Pi bridge has separate byte-budget logic but has not been jointly exercised with this model.
+
+**Matrix:** Cumulative simulation ingress budget = implemented/unverified; production socket fault experiments = partial/unverified; local emergency hardware control = unverified; ledger finality = blocked; authentic incident ground truth = blocked; matched multi-seed independent experiments = upcoming; manuscript = blocked. Fixture CSVs, 3-peer poisoning sanity, 5-iteration microbenchmarks and offline formulas remain non-publishable primary evidence.
+
+**Next code task:** Run real loopback socket fault-injection on production Pi handler with fragmented signed frames and stalled peers, measure rejection latency, CPU, RAM, and honest-client throughput against a matched baseline. Audit storage crash/restart replay persistence before any merge.
