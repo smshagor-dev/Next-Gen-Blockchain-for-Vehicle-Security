@@ -1,0 +1,18 @@
+name: Matched V2X capture trial integrity
+on:
+  pull_request:
+    paths:
+      - 'experiments/v2x/compare_matched_capture_trials.py'
+      - 'experiments/v2x/test_compare_matched_capture_trials.py'
+      - '.github/workflows/matched-v2x-capture-trials.yml'
+  workflow_dispatch:
+jobs:
+  matched-trial-regressions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify deterministic matched capture trial contracts
+        run: PYTHONPATH=experiments/v2x python -m unittest discover -s experiments/v2x -p 'test_compare_matched_capture_trials.py' -v
