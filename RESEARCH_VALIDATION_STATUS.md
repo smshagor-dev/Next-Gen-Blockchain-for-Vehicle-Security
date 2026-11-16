@@ -154,3 +154,14 @@ Added `tests/test_production_pi_handler_loopback.py` (commit `f639b838`) to comp
 **Matrix:** Cumulative simulation ingress budget = implemented/unverified; production socket fault experiments = partial/unverified; local emergency hardware control = unverified; ledger finality = blocked; authentic incident ground truth = blocked; matched multi-seed independent experiments = upcoming; manuscript = blocked. Fixture CSVs, 3-peer poisoning sanity, 5-iteration microbenchmarks and offline formulas remain non-publishable primary evidence.
 
 **Next code task:** Run real loopback socket fault-injection on production Pi handler with fragmented signed frames and stalled peers, measure rejection latency, CPU, RAM, and honest-client throughput against a matched baseline. Audit storage crash/restart replay persistence before any merge.
+
+
+## 2026-11-16 receiver frame-budget preflight checkpoint
+
+**Implemented, execution unverified:** Commit `b065f9d` preflights the number of complete length-prefixed frames in each input chunk before mutating the durable replay gate. A fully present over-budget batch now fails closed without consuming its first replay sequence. Updated prior regression expectations and added a recording durable-gate regression. This closes only the *known frame-count overflow partial-commit case*; malformed or rejected later frames can still leave earlier authenticated commits, and neither general batch atomicity nor crash consistency is established.
+
+**Validation command:** `python -m unittest discover -s research_contracts -p 'test_receiver_fault_model.py' -v`. Not executed against the committed branch; no pass claim. The parser preflight copies bounded chunk data and should be benchmarked against trickle/fragmented input before production use.
+
+**Status:** complete-frame count preflight = implemented/unverified; production hardware ingress and independent emergency-stop = partial/unverified; general multi-frame transaction semantics = blocked pending design; authentic V2X/CAN dataset provenance, independent attack baselines, effect-size statistics = blocked; publishable research = not ready.
+
+**Next code task:** design explicit per-frame admission delivery or transactional replay-store batch API, and validate the production Pi handler using real authenticated loopback sessions with injected malformed second frames, replay races, slow clients and resource measurements. Keep PR draft; no hardware or scientific efficacy claim.
