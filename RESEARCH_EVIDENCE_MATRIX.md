@@ -164,3 +164,15 @@ This is a provenance-integrity engineering correction, not a new cryptographic p
 | Research inference | Blocked | Repeated microbenchmarks on one host are engineering diagnostics, NOT independent incident-level research trials or publishable V2X efficacy |
 
 **Next:** integrate authenticated telemetry TCP loopback from reviewed PR #125–#127 once validated; record actual end-to-end reception-to-ledger timing, malformed/replay rejection and process RSS under matched attack loads, then independent publisher-verified incident experiments. Existing PR #124 measures socketpair admission and is not duplicated here: this run uses actual TCP connections and includes recovery.
+
+## 2026-11-15 — numeric overflow and signed metadata boundary (draft)
+
+| Area | Status | Evidence and next step |
+| --- | --- | --- |
+| Authenticated telemetry parser fail-closed behavior | Implemented in draft; CI pending | `hardware_transport_security.py` catches huge JSON integer-to-float overflow as `HardwareTransportError`, and rejects non-string event, source and observation timestamp rather than stringifying them |
+| Synthetic adversarial regression | Authored, execution unverified | Seven tests in `tests/test_hardware_numeric_metadata_boundary.py`, including a valid authenticated envelope roundtrip. Dedicated CI workflow added. Exact local checkout blocked by GitHub DNS failure; do not claim test pass |
+| Hardware control | Unchanged | No ECU/CAN actuation path enabled. Local emergency stop remains independent |
+| Authentic experiments and scientific efficacy | Blocked | No genuine external VeReMi NextGen/CAN trial, physical interlock measurement, or independently validated attack outcomes generated |
+| Next code task | Upcoming | Validate CI, integrate pending ingress freshness PRs and measure authenticated TCP loopback rejection latency, CPU/RAM, reconnect load and safe emergency isolation |
+
+This is security engineering evidence, not publishable incident-level detection effectiveness. An enrolled malicious node can still send a syntactically valid but false reading; independently sourced truth and matched baselines are required.

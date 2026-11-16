@@ -184,7 +184,13 @@ def _is_real_number(value: object) -> bool:
 def _validated_number(name: str, value: object) -> float:
     if not _is_real_number(value):
         raise HardwareTransportError(f"HW_TELEMETRY_TYPE_INVALID_{name.upper()}")
-    number = float(value)
+    # Python accepts arbitrarily large JSON integers. Converting one to
+    # float can raise OverflowError, which must not escape the transport
+    # error boundary or terminate an ingress worker.
+    try:
+        number = float(value)
+    except (OverflowError, ValueError, TypeError) as exc:
+        raise HardwareTransportError(f"HW_TELEMETRY_RANGE_INVALID_{name.upper()}") from exc
     if not math.isfinite(number):
         raise HardwareTransportError(f"HW_TELEMETRY_NONFINITE_{name.upper()}")
     minimum, maximum = _NUMERIC_RANGES[name]
@@ -216,12 +222,16 @@ def validate_telemetry_payload(
             raise HardwareTransportError(f"HW_TELEMETRY_TYPE_INVALID_{name.upper()}")
 
     if "timestamp" in payload:
-        timestamp = str(payload.get("timestamp", ""))
+        if type(payload["timestamp"]) is not str:
+            raise HardwareTransportError("HW_TELEMETRY_TIMESTAMP_INVALID")
+        timestamp = payload["timestamp"]
         if _parse_utc(timestamp) is None:
             raise HardwareTransportError("HW_TELEMETRY_TIMESTAMP_INVALID")
         result["timestamp"] = timestamp
 
-    event = str(payload.get("event", ""))
+    if "event" in payload and type(payload["event"]) is not str:
+        raise HardwareTransportError("HW_TELEMETRY_EVENT_INVALID")
+    event = payload.get("event", "")
     if "event" in payload:
         if not event or len(event.encode("utf-8")) > MAX_EVENT_BYTES:
             raise HardwareTransportError("HW_TELEMETRY_EVENT_INVALID")
@@ -230,7 +240,9 @@ def validate_telemetry_payload(
         result["event"] = event
 
     if "source" in payload:
-        source = str(payload.get("source", ""))
+        if type(payload["source"]) is not str:
+            raise HardwareTransportError("HW_TELEMETRY_SOURCE_INVALID")
+        source = payload["source"]
         if len(source) > 96 or any(ord(ch) < 32 for ch in source):
             raise HardwareTransportError("HW_TELEMETRY_SOURCE_INVALID")
         result["source"] = source
