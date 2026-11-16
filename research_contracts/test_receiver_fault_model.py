@@ -64,6 +64,41 @@ class BoundedReceiver:
             self.expected = None
             raise FrameError("session byte budget exhausted")
         self.received_bytes += len(chunk)
+        # Preflight fully buffered frame count before any replay-store mutation.
+        # This prevents a known over-budget batch from consuming a durable nonce
+        # and then returning no events. Invalid later frames can still leave
+        # earlier commits; this is NOT general batch atomicity.
+        probe = bytes(self.buffer) if self.expected is None else b""
+        probe_expected = self.expected
+        cursor = 0
+        complete = 0
+        while cursor < len(chunk):
+            if probe_expected is None:
+                needed = 4 - len(probe)
+                probe += chunk[cursor:cursor + needed]
+                cursor += min(needed, len(chunk) - cursor)
+                if len(probe) < 4:
+                    break
+                probe_expected = int.from_bytes(probe, "big")
+                probe = b""
+                if not 1 <= probe_expected <= self.limit:
+                    self.poisoned = True
+                    self.buffer.clear()
+                    self.expected = None
+                    raise FrameError("frame size rejected")
+            needed = probe_expected - len(probe)
+            take = min(needed, len(chunk) - cursor)
+            probe += chunk[cursor:cursor + take]
+            cursor += take
+            if len(probe) == probe_expected:
+                complete += 1
+                probe = b""
+                probe_expected = None
+        if complete > self.session_frame_limit - self.accepted_frames:
+            self.poisoned = True
+            self.buffer.clear()
+            self.expected = None
+            raise FrameError("session frame budget exhausted before admission")
         accepted = []
         offset = 0
         while offset < len(chunk):
@@ -278,10 +313,23 @@ class ReceiverFaultTests(unittest.TestCase):
         with self.assertRaises(FrameError):
             receiver.feed(frame("a", 1, {}, b"secret-a") + frame("a", 2, {}, b"secret-a"))
         self.assertTrue(receiver.poisoned)
-        self.assertEqual(receiver.accepted_frames, 1)
-        # First event was admitted to replay state but no batch is returned.
-        # A batch is NOT an atomic transaction; this is not a ledger guarantee.
-        self.assertEqual(receiver.seen["a"], 1)
+        self.assertEqual(receiver.accepted_frames, 0)
+        self.assertNotIn("a", receiver.seen)
+        # The rejected batch did not consume a replay sequence.
+
+    def test_over_budget_batch_does_not_call_durable_store(self):
+        class RecordingGate:
+            def __init__(self):
+                self.calls = []
+            def admit_authenticated(self, node, seq, authenticated=False):
+                self.calls.append((node, seq))
+                return True
+        gate = RecordingGate()
+        receiver = BoundedReceiver({"a": b"secret-a"}, replay_gate=gate, session_frame_limit=1)
+        with self.assertRaises(FrameError):
+            receiver.feed(frame("a", 1, {}, b"secret-a") + frame("a", 2, {}, b"secret-a"))
+        self.assertEqual(gate.calls, [])
+        self.assertTrue(receiver.poisoned)
 
     def test_invalid_frame_count_configuration(self):
         for limit in (0, -1, True, MAX_SESSION_FRAMES + 1):
