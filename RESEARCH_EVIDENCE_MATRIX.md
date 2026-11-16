@@ -67,3 +67,16 @@ Test command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experim
 - **Implemented:** replaced obsolete test with explicit regression checks that the ECU transport is never initialized, forced legacy gateway flags do not forward to CAN/serial output, and private output helpers fail closed.
 - **Validation:** original pinned replay workflow 43685231640 passed before this correction; changed Security Baseline regression is **not yet revalidated** as of this entry.
 - **Scientific limitation:** these are mocked software safety checks, not tests on a physical ECU, emergency control circuit, or independent safety certification.
+
+
+## 2026-11-16 — offline CAN replay intervention protocol (draft)
+
+| Workstream | Status | Evidence / limitations |
+| --- | --- | --- |
+| Deterministic CAN replay intervention | Implemented in draft; validation pending | `experiments/v2x/generate_can_replay_scenario.py` takes pinned normalized CAN frames, replays a selected contiguous window after the original recording, and writes byte-hashed scenario output and provenance manifest |
+| Synthetic protocol contracts | Authored, not executed | `tests/test_can_replay_scenario.py` checks determinism, tamper, out-of-range windows, nonpositive offset, malformed indices, mixed recording identities and ragged CSV |
+| Repository execution | Blocked transiently | Fresh GitHub clone failed with DNS `Could not resolve host: github.com`; no claim that tests or CI passed |
+| Scientific inference | Blocked | Injected replay flags are **simulation interventions**, not independently annotated attack truth. No authentic publisher archive, physical CAN device, or comparative efficacy evidence is claimed |
+| Next code task | Upcoming | Execute exact regression tests and cross-check with existing CAN normalization, then add matched no-attack controls and randomized multi-seed replay positions on publisher-verified recording-disjoint data |
+
+This protocol never opens a CAN socket, sends physical actuator commands, or infers ground-truth labels. Existing fixture/microbenchmark observations remain NON-PUBLISHABLE main results.
