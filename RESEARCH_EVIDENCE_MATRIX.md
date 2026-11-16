@@ -80,3 +80,15 @@ Test command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experim
 | Next code task | Upcoming | Execute exact regression tests and cross-check with existing CAN normalization, then add matched no-attack controls and randomized multi-seed replay positions on publisher-verified recording-disjoint data |
 
 This protocol never opens a CAN socket, sends physical actuator commands, or infers ground-truth labels. Existing fixture/microbenchmark observations remain NON-PUBLISHABLE main results.
+
+## 2026-11-16 — paired offline CAN replay control (draft PR #136)
+
+| Workstream | Status | Evidence / limitation |
+| --- | --- | --- |
+| Matched recording input | Implemented, unverified | `generate_paired_can_replay_control.py` derives injected and no-injection control traces from the exact same SHA-256-pinned normalized source, recording ID and scenario parameters; hashes both outputs |
+| Synthetic regression contracts | Authored, not executed | Five tests in `tests/test_paired_can_replay_control.py` cover counts, deterministic output, tampering, invalid windows and scenario IDs. Command: `PYTHONPATH=experiments/v2x python -m unittest tests.test_paired_can_replay_control -v` |
+| Scientific comparability | Partial | No-injection control has fewer frames and lacks post-recording exposure. It is NOT an equal-load/equal-duration matched control; no valid latency/throughput causal comparison until explicit horizon and matched benign traffic are added |
+| Authentic datasets and physical safety | Blocked | No publisher-authenticated CAN recording, independent annotation, hardware loopback or physical emergency witness in this change |
+| Next | Upcoming | Execute tests in repository CI, add fixed-horizon benign traffic matched-load control, then run recording-disjoint independent trials and candidate/baseline comparisons |
+
+No accuracy, safety efficacy, statistical significance or publishable primary research result is claimed. Existing fixture CSVs, three-peer poisoning checks, five-iteration microbenchmarks and offline network formulas remain non-publishable primary evidence.
