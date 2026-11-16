@@ -142,7 +142,7 @@ class ReceiverFaultTests(unittest.TestCase):
 
     def test_zero_length(self):
         with self.assertRaises(FrameError):
-            self.receiver.feed(b"\\x00\\x00\\x00\\x00")
+            self.receiver.feed(bytes(4))
 
     def test_transport_chunk_budget(self):
         with self.assertRaises(FrameError):
