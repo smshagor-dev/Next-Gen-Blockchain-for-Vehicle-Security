@@ -176,3 +176,16 @@ Added `tests/test_production_pi_handler_loopback.py` (commit `f639b838`) to comp
 **Matrix:** receiver fragmented-body preflight = implemented/unverified; general batch atomicity = partial; production hardware bridge and emergency control = unverified; ledger crash consistency = partial; authentic dataset experiments and independent statistical baselines = blocked; paper = not ready.
 
 **Next code task:** implement explicit per-frame delivery semantics or a transactional replay batch API; test malformed second-frame behavior and crash rollback with real loopback sockets before merge.
+
+
+## 2026-11-17 malformed-later-frame preflight checkpoint
+
+**Implemented, execution unverified:** Receiver fault model now parses JSON syntax (including nested duplicate-key rejection and non-finite constants) for every complete frame in a feed batch before any durable replay admission. This prevents a syntactically malformed second frame from silently consuming the first valid frame's nonce when no events are returned. Two executable regression cases cover malformed trailing JSON and duplicate keys in the second frame. Commit `82eb47d7`.
+
+**Limitations:** This is isolated simulation, not production Pi integration. It is NOT general batch atomicity: a later frame with valid JSON but invalid MAC, replay sequence or failed storage can still follow an earlier durable commit. A true transactional batch gate or explicit per-frame delivery contract remains necessary. Local emergency controls were not modified. No physical safety or scientific performance result claimed.
+
+**Validation:** `git ls-remote https://github.com/smshagor-dev/Next-Gen-Blockchain-for-Vehicle-Security.git HEAD` failed with `Could not resolve host: github.com` on 2026-11-17. Connector commit succeeded, but checked-in tests could not run in the local container. Execute `python -m unittest discover -s research_contracts -p 'test_receiver_fault_model.py' -v` and full suite before merging.
+
+**Matrix:** complete-frame JSON syntax preflight = implemented/unverified; general replay batch atomicity = partial; production ingress = partial; emergency-stop physical independence = unverified; ledger crash consistency = partial; real dataset provenance and independent adversarial comparisons = blocked; publication-ready evidence = blocked.
+
+**Next code task:** Add a transactional multi-frame durable replay admission API or explicit one-frame-at-a-time delivery, then real production loopback socket fault injection with measured matched-baseline resource costs.
