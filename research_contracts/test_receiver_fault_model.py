@@ -8,9 +8,20 @@ import json
 import unittest
 
 MAX_FRAME = 4096
+MAX_CHUNK = 16384  # Bound work per feed call; transport must split larger reads.
 
 class FrameError(ValueError):
     pass
+
+def _unique_object(pairs):
+    """Reject duplicate keys at every nesting depth before authentication."""
+    obj = {}
+    for key, value in pairs:
+        if key in obj:
+            raise ValueError("duplicate JSON key")
+        obj[key] = value
+    return obj
+
 
 class BoundedReceiver:
     """Length-prefixed frames; authenticate before admitting an event.
@@ -30,6 +41,8 @@ class BoundedReceiver:
     def feed(self, chunk):
         if not isinstance(chunk, bytes):
             raise TypeError("bytes required")
+        if len(chunk) > MAX_CHUNK:
+            raise FrameError("oversized transport chunk")
         accepted = []
         offset = 0
         while offset < len(chunk):
@@ -59,7 +72,7 @@ class BoundedReceiver:
 
     def _admit(self, payload):
         try:
-            envelope = json.loads(payload)
+            envelope = json.loads(payload, object_pairs_hook=_unique_object)
             if not isinstance(envelope, dict) or set(envelope) != {"node", "seq", "event", "mac"}:
                 raise ValueError("unexpected fields")
             node, seq, event, mac = (envelope[k] for k in ("node", "seq", "event", "mac"))
@@ -130,6 +143,22 @@ class ReceiverFaultTests(unittest.TestCase):
     def test_zero_length(self):
         with self.assertRaises(FrameError):
             self.receiver.feed(b"\\x00\\x00\\x00\\x00")
+
+    def test_transport_chunk_budget(self):
+        with self.assertRaises(FrameError):
+            self.receiver.feed(b"x" * (MAX_CHUNK + 1))
+        self.assertEqual(self.receiver.buffer, bytearray())
+        self.assertEqual(self.receiver.feed(frame("a", 1, {}, b"secret-a"))[0]["seq"], 1)
+
+    def test_duplicate_top_level_key_rejected(self):
+        raw = b'{"node":"a","node":"a","seq":1,"event":{},"mac":"bad"}'
+        with self.assertRaises(FrameError):
+            self.receiver.feed(len(raw).to_bytes(4, "big") + raw)
+
+    def test_duplicate_nested_event_key_rejected(self):
+        raw = b'{"node":"a","seq":1,"event":{"hazard":false,"hazard":true},"mac":"bad"}'
+        with self.assertRaises(FrameError):
+            self.receiver.feed(len(raw).to_bytes(4, "big") + raw)
 
     def test_no_actuator_interface(self):
         self.assertFalse(hasattr(self.receiver, "actuate"))
