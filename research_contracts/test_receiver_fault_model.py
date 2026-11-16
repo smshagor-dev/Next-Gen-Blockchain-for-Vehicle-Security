@@ -9,6 +9,7 @@ import unittest
 
 MAX_FRAME = 4096
 MAX_CHUNK = 16384  # Bound work per feed call; transport must split larger reads.
+MAX_SESSION_BYTES = 262144  # Bound cumulative connection work, including incomplete bytes.
 
 class FrameError(ValueError):
     pass
@@ -28,9 +29,13 @@ class BoundedReceiver:
 
     Replay state is intentionally volatile: reboot durability is NOT claimed.
     """
-    def __init__(self, keys, limit=MAX_FRAME, replay_gate=None):
+    def __init__(self, keys, limit=MAX_FRAME, replay_gate=None, session_byte_limit=MAX_SESSION_BYTES):
         if not 1 <= limit <= MAX_FRAME:
             raise ValueError("invalid limit")
+        if type(session_byte_limit) is not int or not MAX_FRAME <= session_byte_limit <= MAX_SESSION_BYTES:
+            raise ValueError("invalid session byte limit")
+        self.session_byte_limit = session_byte_limit
+        self.received_bytes = 0
         self.keys = dict(keys)
         self.limit = limit
         self.buffer = bytearray()
@@ -47,6 +52,13 @@ class BoundedReceiver:
         if len(chunk) > MAX_CHUNK:
             self.poisoned = True
             raise FrameError("oversized transport chunk")
+        # Charge bytes before parsing: tiny fragments cannot evade the budget.
+        if len(chunk) > self.session_byte_limit - self.received_bytes:
+            self.poisoned = True
+            self.buffer.clear()
+            self.expected = None
+            raise FrameError("session byte budget exhausted")
+        self.received_bytes += len(chunk)
         accepted = []
         offset = 0
         while offset < len(chunk):
@@ -210,6 +222,28 @@ class ReceiverFaultTests(unittest.TestCase):
         with self.assertRaises(FrameError):
             receiver.feed(frame("a", 1, {}, b"secret-a"))
         self.assertTrue(receiver.poisoned)
+
+    def test_fragmented_trickle_cannot_bypass_cumulative_budget(self):
+        receiver = BoundedReceiver({"a": b"secret-a"}, session_byte_limit=MAX_FRAME)
+        for _ in range(MAX_FRAME):
+            receiver.feed(b"\\x00")
+        with self.assertRaises(FrameError):
+            receiver.feed(b"\\x00")
+        self.assertTrue(receiver.poisoned)
+        self.assertEqual(receiver.received_bytes, MAX_FRAME)
+
+    def test_valid_frames_also_consume_session_budget(self):
+        receiver = BoundedReceiver({"a": b"secret-a"}, session_byte_limit=MAX_FRAME)
+        for seq in range(1, 5):
+            receiver.feed(frame("a", seq, {}, b"secret-a"))
+        with self.assertRaises(FrameError):
+            receiver.feed(b"x" * MAX_FRAME)
+        self.assertTrue(receiver.poisoned)
+
+    def test_session_limit_configuration_fails_closed(self):
+        for limit in (0, -1, True, MAX_FRAME - 1, MAX_SESSION_BYTES + 1):
+            with self.subTest(limit=limit), self.assertRaises(ValueError):
+                BoundedReceiver({"a": b"secret-a"}, session_byte_limit=limit)
 
     def test_no_actuator_interface(self):
         self.assertFalse(hasattr(self.receiver, "actuate"))
