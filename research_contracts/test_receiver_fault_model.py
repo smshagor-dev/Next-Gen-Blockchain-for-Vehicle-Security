@@ -10,6 +10,7 @@ import unittest
 MAX_FRAME = 4096
 MAX_CHUNK = 16384  # Bound work per feed call; transport must split larger reads.
 MAX_SESSION_BYTES = 262144  # Bound cumulative connection work, including incomplete bytes.
+MAX_SESSION_FRAMES = 256  # Bound authenticated event and durable-storage work per session.
 
 class FrameError(ValueError):
     pass
@@ -29,11 +30,15 @@ class BoundedReceiver:
 
     Replay state is intentionally volatile: reboot durability is NOT claimed.
     """
-    def __init__(self, keys, limit=MAX_FRAME, replay_gate=None, session_byte_limit=MAX_SESSION_BYTES):
+    def __init__(self, keys, limit=MAX_FRAME, replay_gate=None, session_byte_limit=MAX_SESSION_BYTES, session_frame_limit=MAX_SESSION_FRAMES):
         if not 1 <= limit <= MAX_FRAME:
             raise ValueError("invalid limit")
         if type(session_byte_limit) is not int or not MAX_FRAME <= session_byte_limit <= MAX_SESSION_BYTES:
             raise ValueError("invalid session byte limit")
+        if type(session_frame_limit) is not int or not 1 <= session_frame_limit <= MAX_SESSION_FRAMES:
+            raise ValueError("invalid session frame limit")
+        self.session_frame_limit = session_frame_limit
+        self.accepted_frames = 0
         self.session_byte_limit = session_byte_limit
         self.received_bytes = 0
         self.keys = dict(keys)
@@ -85,7 +90,13 @@ class BoundedReceiver:
                 self.buffer.clear()
                 self.expected = None
                 try:
-                    accepted.append(self._admit(payload))
+                    # Bound expensive MAC verification and durable replay commits,
+                    # independently of the cumulative byte budget.
+                    if self.accepted_frames >= self.session_frame_limit:
+                        raise FrameError("session frame budget exhausted")
+                    item = self._admit(payload)
+                    self.accepted_frames += 1
+                    accepted.append(item)
                 except Exception as exc:  # Storage errors must also terminate this connection.
                     self.poisoned = True
                     raise FrameError("connection rejected after invalid frame") from exc
@@ -253,6 +264,29 @@ class ReceiverFaultTests(unittest.TestCase):
         for limit in (0, -1, True, MAX_FRAME - 1, MAX_SESSION_BYTES + 1):
             with self.subTest(limit=limit), self.assertRaises(ValueError):
                 BoundedReceiver({"a": b"secret-a"}, session_byte_limit=limit)
+
+    def test_authenticated_frame_count_budget(self):
+        receiver = BoundedReceiver({"a": b"secret-a"}, session_frame_limit=2)
+        self.assertEqual([x["seq"] for x in receiver.feed(frame("a", 1, {}, b"secret-a") + frame("a", 2, {}, b"secret-a"))], [1, 2])
+        with self.assertRaises(FrameError):
+            receiver.feed(frame("a", 3, {}, b"secret-a"))
+        self.assertTrue(receiver.poisoned)
+        self.assertEqual(receiver.accepted_frames, 2)
+
+    def test_batch_cannot_bypass_frame_count_budget(self):
+        receiver = BoundedReceiver({"a": b"secret-a"}, session_frame_limit=1)
+        with self.assertRaises(FrameError):
+            receiver.feed(frame("a", 1, {}, b"secret-a") + frame("a", 2, {}, b"secret-a"))
+        self.assertTrue(receiver.poisoned)
+        self.assertEqual(receiver.accepted_frames, 1)
+        # First event was admitted to replay state but no batch is returned.
+        # A batch is NOT an atomic transaction; this is not a ledger guarantee.
+        self.assertEqual(receiver.seen["a"], 1)
+
+    def test_invalid_frame_count_configuration(self):
+        for limit in (0, -1, True, MAX_SESSION_FRAMES + 1):
+            with self.subTest(limit=limit), self.assertRaises(ValueError):
+                BoundedReceiver({"a": b"secret-a"}, session_frame_limit=limit)
 
     def test_no_actuator_interface(self):
         self.assertFalse(hasattr(self.receiver, "actuate"))
