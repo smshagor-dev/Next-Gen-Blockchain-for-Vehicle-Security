@@ -67,3 +67,16 @@ Test command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experim
 - **Implemented:** replaced obsolete test with explicit regression checks that the ECU transport is never initialized, forced legacy gateway flags do not forward to CAN/serial output, and private output helpers fail closed.
 - **Validation:** original pinned replay workflow 43685231640 passed before this correction; changed Security Baseline regression is **not yet revalidated** as of this entry.
 - **Scientific limitation:** these are mocked software safety checks, not tests on a physical ECU, emergency control circuit, or independent safety certification.
+
+
+## 2026-11-16 — recording/source-disjoint cohort audit (draft)
+
+| Area | State | Evidence and next step |
+| --- | --- | --- |
+| Held-out recording leakage | Implemented, tests pending | `experiments/v2x/audit_recording_split_leakage.py` fails closed on recording-group and source-digest overlap across train/validation/test, malformed schema, duplicate incident/trial IDs, duplicate JSON keys and incorrect external manifest SHA-256 |
+| Synthetic contracts | Authored, not yet executed | 10 adversarial unit tests in `tests/test_recording_split_leakage.py`; run `python -m unittest tests.test_recording_split_leakage -v` |
+| Publisher dataset provenance | Blocked | A SHA-256 supplied by an operator establishes byte identity only, not publisher authenticity, annotation reliability or license |
+| Attack efficacy and independent cluster statistics | Blocked | No authentic held-out observations, independent labels, strong-baseline comparisons or physical interlock evidence from this work |
+| Next | Upcoming | Execute exact tests/CI, verify publisher-sourced recording manifests, preregister disjoint cohorts, then run identical candidate/baseline trials with independent cluster-level uncertainty |
+
+This is a methodological guardrail, **not a scientific detection result**. Group IDs are operator-supplied and must be independently validated; conservative source-level disjointness may exclude legitimate splits within one archive. Existing fixture CSVs, microbenchmarks and offline formulas remain non-publishable main evidence.
