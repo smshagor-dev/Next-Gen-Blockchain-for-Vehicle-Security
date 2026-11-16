@@ -1,0 +1,26 @@
+name: Real TCP loopback admission experiment
+on:
+  pull_request:
+    paths:
+      - 'bounded_tcp_admission.py'
+      - 'experiments/v2x/bench_tcp_loopback_admission.py'
+      - 'experiments/v2x/test_bench_tcp_loopback_admission.py'
+      - '.github/workflows/tcp-loopback-admission.yml'
+  workflow_dispatch:
+jobs:
+  loopback:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run real localhost TCP saturation tests
+        run: PYTHONPATH=.:experiments/v2x python -m unittest discover -s experiments/v2x -p 'test_bench_tcp_loopback_admission.py' -v
+      - name: Run bounded repeated loopback measurements
+        run: PYTHONPATH=.:experiments/v2x python experiments/v2x/bench_tcp_loopback_admission.py --clients 4 --overload 100 --repetitions 5 --output tcp_loopback_measurements.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tcp-loopback-measurements
+          path: tcp_loopback_measurements.json
+          retention-days: 14
