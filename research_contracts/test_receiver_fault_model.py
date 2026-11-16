@@ -37,11 +37,15 @@ class BoundedReceiver:
         self.expected = None
         self.seen = {}
         self.replay_gate = replay_gate
+        self.poisoned = False  # A rejected frame terminates this simulated connection.
 
     def feed(self, chunk):
+        if self.poisoned:
+            raise FrameError("connection rejected; create a new receiver")
         if not isinstance(chunk, bytes):
             raise TypeError("bytes required")
         if len(chunk) > MAX_CHUNK:
+            self.poisoned = True
             raise FrameError("oversized transport chunk")
         accepted = []
         offset = 0
@@ -58,6 +62,7 @@ class BoundedReceiver:
                 if self.expected < 1 or self.expected > self.limit:
                     self.buffer.clear()
                     self.expected = None
+                    self.poisoned = True
                     raise FrameError("frame size rejected")
             need = self.expected - len(self.buffer)
             take = min(need, len(chunk) - offset)
@@ -67,7 +72,11 @@ class BoundedReceiver:
                 payload = bytes(self.buffer)
                 self.buffer.clear()
                 self.expected = None
-                accepted.append(self._admit(payload))
+                try:
+                    accepted.append(self._admit(payload))
+                except (FrameError, RecursionError) as exc:
+                    self.poisoned = True
+                    raise FrameError("connection rejected after invalid frame") from exc
         return accepted
 
     def _admit(self, payload):
@@ -148,7 +157,9 @@ class ReceiverFaultTests(unittest.TestCase):
         with self.assertRaises(FrameError):
             self.receiver.feed(b"x" * (MAX_CHUNK + 1))
         self.assertEqual(self.receiver.buffer, bytearray())
-        self.assertEqual(self.receiver.feed(frame("a", 1, {}, b"secret-a"))[0]["seq"], 1)
+        with self.assertRaises(FrameError):
+            self.receiver.feed(frame("a", 1, {}, b"secret-a"))
+        self.assertEqual(BoundedReceiver({"a": b"secret-a"}).feed(frame("a", 1, {}, b"secret-a"))[0]["seq"], 1)
 
     def test_duplicate_top_level_key_rejected(self):
         raw = b'{"node":"a","node":"a","seq":1,"event":{},"mac":"bad"}'
@@ -159,6 +170,26 @@ class ReceiverFaultTests(unittest.TestCase):
         raw = b'{"node":"a","seq":1,"event":{"hazard":false,"hazard":true},"mac":"bad"}'
         with self.assertRaises(FrameError):
             self.receiver.feed(len(raw).to_bytes(4, "big") + raw)
+
+    def test_tamper_poison_prevents_reuse_of_same_connection(self):
+        with self.assertRaises(FrameError):
+            self.receiver.feed(frame("a", 1, {}, b"wrong"))
+        with self.assertRaises(FrameError):
+            self.receiver.feed(frame("a", 2, {}, b"secret-a"))
+        self.assertTrue(self.receiver.poisoned)
+
+    def test_invalid_header_poison_prevents_reuse(self):
+        with self.assertRaises(FrameError):
+            self.receiver.feed((MAX_FRAME + 1).to_bytes(4, "big"))
+        with self.assertRaises(FrameError):
+            self.receiver.feed(frame("a", 1, {}, b"secret-a"))
+
+    def test_nested_json_depth_fails_closed(self):
+        nested = '[' * 1200 + '0' + ']' * 1200
+        raw = ('{"node":"a","seq":1,"event":{"nested":' + nested + '},"mac":"bad"}').encode()
+        with self.assertRaises(FrameError):
+            self.receiver.feed(len(raw).to_bytes(4, "big") + raw)
+        self.assertTrue(self.receiver.poisoned)
 
     def test_no_actuator_interface(self):
         self.assertFalse(hasattr(self.receiver, "actuate"))
