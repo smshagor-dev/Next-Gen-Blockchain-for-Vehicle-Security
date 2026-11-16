@@ -306,3 +306,42 @@ This is a **measurement integrity guard**, not proof of preregistration or publi
 | Next | Upcoming | Execute exact tests/CI, verify publisher-sourced recording manifests, preregister disjoint cohorts, then run identical candidate/baseline trials with independent cluster-level uncertainty |
 
 This is a methodological guardrail, **not a scientific detection result**. Group IDs are operator-supplied and must be independently validated; conservative source-level disjointness may exclude legitimate splits within one archive. Existing fixture CSVs, microbenchmarks and offline formulas remain non-publishable main evidence.
+
+
+## 2026-11-16 — offline CAN replay intervention protocol (draft)
+
+| Workstream | Status | Evidence / limitations |
+| --- | --- | --- |
+| Deterministic CAN replay intervention | Implemented in draft; validation pending | `experiments/v2x/generate_can_replay_scenario.py` takes pinned normalized CAN frames, replays a selected contiguous window after the original recording, and writes byte-hashed scenario output and provenance manifest |
+| Synthetic protocol contracts | Authored, not executed | `tests/test_can_replay_scenario.py` checks determinism, tamper, out-of-range windows, nonpositive offset, malformed indices, mixed recording identities and ragged CSV |
+| Repository execution | Blocked transiently | Fresh GitHub clone failed with DNS `Could not resolve host: github.com`; no claim that tests or CI passed |
+| Scientific inference | Blocked | Injected replay flags are **simulation interventions**, not independently annotated attack truth. No authentic publisher archive, physical CAN device, or comparative efficacy evidence is claimed |
+| Next code task | Upcoming | Execute exact regression tests and cross-check with existing CAN normalization, then add matched no-attack controls and randomized multi-seed replay positions on publisher-verified recording-disjoint data |
+
+This protocol never opens a CAN socket, sends physical actuator commands, or infers ground-truth labels. Existing fixture/microbenchmark observations remain NON-PUBLISHABLE main results.
+
+## 2026-11-16 — paired offline CAN replay control (draft PR #136)
+
+| Workstream | Status | Evidence / limitation |
+| --- | --- | --- |
+| Matched recording input | Implemented, unverified | `generate_paired_can_replay_control.py` derives injected and no-injection control traces from the exact same SHA-256-pinned normalized source, recording ID and scenario parameters; hashes both outputs |
+| Synthetic regression contracts | Authored, not executed | Five tests in `tests/test_paired_can_replay_control.py` cover counts, deterministic output, tampering, invalid windows and scenario IDs. Command: `PYTHONPATH=experiments/v2x python -m unittest tests.test_paired_can_replay_control -v` |
+| Scientific comparability | Partial | No-injection control has fewer frames and lacks post-recording exposure. It is NOT an equal-load/equal-duration matched control; no valid latency/throughput causal comparison until explicit horizon and matched benign traffic are added |
+| Authentic datasets and physical safety | Blocked | No publisher-authenticated CAN recording, independent annotation, hardware loopback or physical emergency witness in this change |
+| Next | Upcoming | Execute tests in repository CI, add fixed-horizon benign traffic matched-load control, then run recording-disjoint independent trials and candidate/baseline comparisons |
+
+No accuracy, safety efficacy, statistical significance or publishable primary research result is claimed. Existing fixture CSVs, three-peer poisoning checks, five-iteration microbenchmarks and offline network formulas remain non-publishable primary evidence.
+
+
+## 2026-11-16 — equal-timestamp, equal-frame-count offline CAN sham (draft PR #136)
+
+| Area | State | Evidence / limitation |
+| --- | --- | --- |
+| Matched exposure control | Implemented; test execution pending | `generate_matched_can_sham_control.py` appends frames from a separately pinned donor at exactly the replay timestamps, preserving frame count and horizon, with independent source/donor recording IDs and byte digests |
+| Adversarial contracts | Authored; execution pending | `tests/test_matched_can_sham_control.py`: seven synthetic tests covering timestamp/count parity, determinism, tamper, donor identity, bounds and type validation |
+| Donor ground truth | Blocked | This tool **cannot verify** that the donor is benign; the operator must provide independently verified provenance and source-disjoint labels. A different recording ID and hash do not prove independent collection |
+| Scientific comparability | Partial | Timing and frame-count parity do **not** imply equal CAN ID distributions, payload distributions, ECU dynamics, capture quality or causal exchangeability. Donor frames are explicitly simulated, not physical CAN events |
+| Publishable evidence | Blocked | No real publisher-authenticated CAN source, independently annotated incidents, multi-seed matched baselines, physical safety witness or validated effect estimates |
+| Next code task | Upcoming | Run exact tests and CI; pin independently verified benign donor provenance; add matching/stratification for CAN ID and DLC distributions; execute disjoint-recording trials with incident-level truth and cluster-aware uncertainty |
+
+Test: `python -m unittest tests.test_matched_can_sham_control -v`. Existing fixture CSVs and short microbenchmarks remain NON-PUBLISHABLE main results.
