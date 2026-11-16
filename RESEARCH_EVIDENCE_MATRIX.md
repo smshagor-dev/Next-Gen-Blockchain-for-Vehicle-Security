@@ -67,3 +67,18 @@ Test command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experim
 - **Implemented:** replaced obsolete test with explicit regression checks that the ECU transport is never initialized, forced legacy gateway flags do not forward to CAN/serial output, and private output helpers fail closed.
 - **Validation:** original pinned replay workflow 43685231640 passed before this correction; changed Security Baseline regression is **not yet revalidated** as of this entry.
 - **Scientific limitation:** these are mocked software safety checks, not tests on a physical ECU, emergency control circuit, or independent safety certification.
+
+
+## 2026-11-15 — matched, signed held-out capture comparisons (draft PR; issue #92)
+
+| Research item | Status | Evidence / limitation |
+| --- | --- | --- |
+| Baseline/candidate capture matching | Implemented, GitHub CI pending | \`compare_matched_capture_trials.py\` calls existing \`attested_interval_join.evaluate_interval\` for BOTH methods using the same independent-world incident universe and operator-pinned held-out test interval |
+| Source integrity and receipt checking | Implemented | Requires four exact SHA-256 pins (world, both raw hub captures, expected window), two export HMAC receipts, two interval HMAC receipts, and claim of complete capture for the exact test window; never filters a method's missing incidents |
+| Paired outcomes | Implemented | Produces deterministic \`paired_incidents.csv\` in \`incident_id,cluster_id,truth,baseline,candidate\` schema, TP/TN/FP/FN, unreceived incident counts and candidate-minus-baseline accuracy difference in percentage points |
+| Cluster validity | Partial | One scenario/seed is **one cluster**, not an independent observation per incident. Estimating uncertainty needs multiple genuinely independent, source-verified clusters |
+| Synthetic adversarial validation | Local contract checks complete; repository CI pending | 18/18 local Python tests passed with reconstructed upstream dependencies; pushed new source and test Git blob hashes match locally tested files. Validates empty-but-signed capture, missing positives, false positives, duplicate rows, nonce replay, forged HMAC, incomplete receipts, wrong trial/window, out-of-window timestamps, unverified relay, malformed truth and pins |
+| Authentic VeReMi NextGen/CAN efficacy | Blocked | No independently publisher-verified raw archives, trusted annotation producer, physical capture proof or real multiple-cohort experiment in this PR |
+| Statistical inference and manuscript claims | Blocked | Per-trial descriptive results are not a population estimate or significance test; fixture results are NON-PUBLISHABLE main research evidence |
+
+**Next code task:** integrate reviewed per-trial paired exports across independently recorded scenario/seed cohorts, require external publisher source pins and group-disjoint split manifests, and only then run cluster-aware bootstrap/permutation sensitivity and measured runtime network/CPU/RAM. Do not infer physical safety, capture continuity, preregistration or finality from HMACs or SHA-256 alone.
