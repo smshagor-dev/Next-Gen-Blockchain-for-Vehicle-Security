@@ -80,3 +80,16 @@ Test command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experim
 | Next | Upcoming | Integrate pinned trial receipt and complete capture interval; fail on source identity mismatch, then execute matched multi-seed trials and cluster-level uncertainty |
 
 These synthetic checks are not publication-ready attack detection results. Missing prediction means no alert only when the world-universe manifest and trial capture interval are independently complete; otherwise no scientific inference is warranted.
+
+
+## 2026-11-16 — paired full-universe diagnostic extension (draft PR #134)
+
+| Workstream | State | Evidence / limitation |
+| --- | --- | --- |
+| Full-universe paired correctness | Implemented, repository CI unverified | Audit v2 adds both-correct, candidate-only-correct, baseline-only-correct, and both-wrong counts on every world incident, treating absent predictions as no-alert |
+| Asymmetric observation audit | Implemented, repository CI unverified | Separately counts both-observed, candidate-only-observed, baseline-only-observed and neither-observed to expose differential capture without conditioning paired comparisons on observed rows |
+| Synthetic validation | Partial | Two equivalent isolated Python regression cases executed locally and passed; committed repository tests and complete CI not executed |
+| Scientific efficacy | Blocked | No independent capture-completeness witness, source-authenticated incident universe, matched publisher dataset, physical ECU test or independently clustered multi-seed trials |
+| Next engineering task | Upcoming | Bind both prediction streams to pinned capture receipts and preregistered incident/cluster manifests, then reject mismatched trial identity before computing effect sizes |
+
+Do not interpret missing prediction as proof of no physical observation: it is a prespecified **no-alert scoring convention**, and incomplete capture remains a separately reported threat to validity. No p-value or publishable attack detection claim is derived from these synthetic tests.
