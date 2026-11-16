@@ -68,7 +68,7 @@ class BoundedReceiver:
         # This prevents a known over-budget batch from consuming a durable nonce
         # and then returning no events. Invalid later frames can still leave
         # earlier commits; this is NOT general batch atomicity.
-        probe = bytes(self.buffer) if self.expected is None else b""
+        probe = bytes(self.buffer)  # Preserve partial header OR body across feed calls.
         probe_expected = self.expected
         cursor = 0
         complete = 0
@@ -183,6 +183,26 @@ class ReceiverFaultTests(unittest.TestCase):
         self.assertEqual(self.receiver.feed(f[:2]), [])
         self.assertEqual(self.receiver.feed(f[2:9]), [])
         self.assertEqual(len(self.receiver.feed(f[9:])), 1)
+
+    def test_fragmented_body_followed_by_next_frame(self):
+        # A partial body followed by a second complete frame must not cause
+        # the preflight scanner to misinterpret body bytes as a new header.
+        first = frame("a", 1, {"hazard": True}, b"secret-a")
+        second = frame("a", 2, {}, b"secret-a")
+        cut = 12
+        self.assertEqual(self.receiver.feed(first[:cut]), [])
+        self.assertEqual([item["seq"] for item in self.receiver.feed(first[cut:] + second)], [1, 2])
+
+    def test_fragmented_body_budget_preflight_no_partial_commit(self):
+        first = frame("a", 1, {"hazard": True}, b"secret-a")
+        second = frame("a", 2, {}, b"secret-a")
+        receiver = BoundedReceiver({"a": b"secret-a"}, session_frame_limit=1)
+        self.assertEqual(receiver.feed(first[:12]), [])
+        with self.assertRaises(FrameError):
+            receiver.feed(first[12:] + second)
+        self.assertEqual(receiver.accepted_frames, 0)
+        self.assertEqual(receiver.seen, {})
+        self.assertTrue(receiver.poisoned)
 
     def test_multiple_frames(self):
         f = frame("a", 1, {}, b"secret-a") + frame("a", 2, {}, b"secret-a")
