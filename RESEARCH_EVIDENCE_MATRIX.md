@@ -93,3 +93,17 @@ These synthetic checks are not publication-ready attack detection results. Missi
 | Next engineering task | Upcoming | Bind both prediction streams to pinned capture receipts and preregistered incident/cluster manifests, then reject mismatched trial identity before computing effect sizes |
 
 Do not interpret missing prediction as proof of no physical observation: it is a prespecified **no-alert scoring convention**, and incomplete capture remains a separately reported threat to validity. No p-value or publishable attack detection claim is derived from these synthetic tests.
+
+
+## 2026-11-16 — paired-world trial input pinning (draft PR #134)
+
+| Workstream | State | Evidence / limitation |
+| --- | --- | --- |
+| Input integrity | Implemented, tests pending | `experiments/v2x/verify_pinned_coverage.py` requires an out-of-band SHA-256 pin for a strict held-out trial manifest, and checks exact SHA-256 of world/candidate/baseline input bytes before scoring; rechecks digests after scoring |
+| Trial identity and split | Implemented, tests pending | Rejects absent/extra manifest fields, duplicate JSON keys, non-held-out split, invalid seed, nonfinite constants and wrong protocol |
+| Regression verification | Authored, unverified | Six synthetic tests in `tests/test_verify_pinned_coverage.py`; run `PYTHONPATH=. python -m unittest tests.test_verify_pinned_coverage -v` |
+| Independent source authenticity | Blocked | Manifest and pins can be operator generated; no trusted external timestamp, independent ground truth or publisher archive authentication |
+| Experimental evidence | Blocked | No authentic multi-seed paired V2X/CAN trial, independent capture uptime proof or physical hardware validation |
+| Next | Upcoming | Run exact tests/CI; connect pinned capture receipts and externally verified world annotations; execute independent held-out attack trials |
+
+This is a **measurement integrity guard**, not proof of preregistration or publishable efficacy. Local checkout remains blocked by GitHub DNS; no test pass is claimed.
