@@ -95,3 +95,10 @@ Test command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experim
 | Upcoming | Next code task | Wire reviewed PR #121's paired capture outputs into cohort manifest creation; add independent publisher source checks, controlled attack cohorts and runtime measurements |
 
 This is research infrastructure, **not a publishable efficacy result**. The percentile interval can under-cover with few independent clusters and cannot establish a causal effect. Source-group disjointness is checked only against declared identifiers.
+
+## 2026-11-15 — duplicate-member hardware transport ambiguity (draft PR)
+
+- **Implemented:** recursively reject repeated JSON object members in raw authenticated hardware envelopes before MAC verification, including repeated `mac`, `device_id` and nested telemetry measurements. This removes first/last-wins interpretation ambiguity between parser implementations without changing wire format or local emergency-stop control.
+- **Regression cases:** four new in-memory adversarial tests cover valid-MAC duplication, nested payload duplication, device-identity override and rejection without replay-nonce consumption. Test command: `python -m unittest tests.test_hardware_bridge_security -v` (repository CI pending).
+- **Evidence class:** protocol-parser hardening only. No independent live attack measurement, physical actuator tests, or publishable efficacy results. `AGENTS.md` not present at repository root.
+- **Next:** measure authenticated socket ingest under bounded malicious framing/reconnect traffic with separate CPU/RAM/latency counters and pinned experiment artifacts; validate producer/consumer interoperation on independent held-out V2X captures.
