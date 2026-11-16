@@ -225,12 +225,21 @@ class ReceiverFaultTests(unittest.TestCase):
 
     def test_fragmented_trickle_cannot_bypass_cumulative_budget(self):
         receiver = BoundedReceiver({"a": b"secret-a"}, session_byte_limit=MAX_FRAME)
-        for _ in range(MAX_FRAME):
-            receiver.feed(b"\\x00")
-        with self.assertRaises(FrameError):
-            receiver.feed(b"\\x00")
-        self.assertTrue(receiver.poisoned)
+        seq = 1
+        while True:
+            payload = frame("a", seq, {}, b"secret-a")
+            if receiver.received_bytes + len(payload) > MAX_FRAME:
+                break
+            for byte in payload:
+                receiver.feed(bytes([byte]))
+            seq += 1
+        remaining = MAX_FRAME - receiver.received_bytes
+        for byte in payload[:remaining]:
+            receiver.feed(bytes([byte]))
         self.assertEqual(receiver.received_bytes, MAX_FRAME)
+        with self.assertRaises(FrameError):
+            receiver.feed(bytes([payload[remaining]]))
+        self.assertTrue(receiver.poisoned)
 
     def test_valid_frames_also_consume_session_budget(self):
         receiver = BoundedReceiver({"a": b"secret-a"}, session_byte_limit=MAX_FRAME)
