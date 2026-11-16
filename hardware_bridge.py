@@ -24,6 +24,7 @@ from blockchain import SmartCarBlockchain, TelemetryData
 from bounded_tcp_admission import BoundedTCPAdmission
 from hardware_actuation_safety import BenchActuationGate
 from hardware_transport_deadlines import deadline_check, DeadlineExpired
+from hardware_observation_freshness import verify_observation_age
 from hardware_transport_security import (
     AuthenticatedLineFramer,
     HardwareEnvelopeVerifier,
@@ -352,6 +353,12 @@ def run_arduino_mode(bc: SmartCarBlockchain):
                 # admit later envelopes after the absolute session deadline.
                 if time.monotonic() >= deadline:
                     raise RuntimeError("Arduino serial session lifetime exceeded; port quarantined")
+                verify_observation_age(
+                    item.payload.get("timestamp"),
+                    received_utc=datetime.now(timezone.utc),
+                    max_age_seconds=max(1, min(3600, get_int("SMARTCAR_HW_OBSERVATION_MAX_AGE_SEC", 15))),
+                    max_future_skew_seconds=max(0, min(60, get_int("SMARTCAR_HW_OBSERVATION_FUTURE_SKEW_SEC", 2))),
+                )
                 tel = to_telemetry(item.payload)
                 event = str(item.payload["event"])
                 block = bc.push_telemetry(tel, event)
@@ -479,6 +486,12 @@ def run_pi_mode(bc: SmartCarBlockchain):
                         if not global_budget.claim():
                             raise HardwareTransportError("HW_GLOBAL_FRAME_BUDGET_EXCEEDED", authenticated=True)
                         accepted_frames += 1
+                        verify_observation_age(
+                            item.payload.get("timestamp"),
+                            received_utc=datetime.now(timezone.utc),
+                            max_age_seconds=max(1, min(3600, get_int("SMARTCAR_HW_OBSERVATION_MAX_AGE_SEC", 15))),
+                            max_future_skew_seconds=max(0, min(60, get_int("SMARTCAR_HW_OBSERVATION_FUTURE_SKEW_SEC", 2))),
+                        )
                         tel = to_telemetry(item.payload)
                         event = str(item.payload["event"])
                         with ledger_lock:
