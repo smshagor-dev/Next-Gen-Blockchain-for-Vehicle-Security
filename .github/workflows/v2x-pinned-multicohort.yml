@@ -1,0 +1,18 @@
+name: V2X pinned multi-cohort analysis
+on:
+  pull_request:
+    paths:
+      - 'experiments/v2x/aggregate_pinned_cohorts.py'
+      - 'experiments/v2x/test_aggregate_pinned_cohorts.py'
+      - '.github/workflows/v2x-pinned-multicohort.yml'
+  workflow_dispatch:
+jobs:
+  paired-cluster-integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run synthetic adversarial cohort contracts
+        run: PYTHONPATH=experiments/v2x python -m unittest discover -s experiments/v2x -p 'test_aggregate_pinned_cohorts.py' -v

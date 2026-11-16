@@ -99,8 +99,21 @@ def _raise_constant(value: str):
 
 
 def _strict_json_loads(raw: str):
+    # JSON permits repeated object members syntactically, but different
+    # implementations can choose first/last value. Never authenticate one
+    # interpretation and let another consumer act on another interpretation.
+    # This hook is applied recursively to envelope AND nested payload objects.
+    def unique_members(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise HardwareTransportError("HW_JSON_DUPLICATE_KEY")
+            result[key] = value
+        return result
+
     try:
-        return json.loads(raw, parse_constant=_raise_constant)
+        return json.loads(raw, parse_constant=_raise_constant,
+                          object_pairs_hook=unique_members)
     except HardwareTransportError:
         raise
     except (json.JSONDecodeError, UnicodeDecodeError, TypeError, ValueError) as exc:
