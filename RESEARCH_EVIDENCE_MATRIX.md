@@ -115,3 +115,15 @@ This is research infrastructure, **not a publishable efficacy result**. The perc
 | Independent vehicle hardware safety | Blocked | No vehicle, CAN interface, physical emergency stop, hardware-in-the-loop, or independent laboratory access. Results are **NON-PUBLISHABLE main evidence** |
 
 **Next implementation:** run end-to-end loopback TCP with authenticated and invalid hardware envelopes, verify global budgets and absolute deadlines, then perform isolated process CPU/RAM/latency measurements with several independent seeds and explicit threat scenarios. Never infer publication-level significance from n >= 30.
+
+## 2026-11-15 — authenticated telemetry observation-time integrity (draft)
+
+| Item | State | Evidence and limitation |
+| --- | --- | --- |
+| Observation timestamp admission | Implemented; CI pending | `hardware_bridge.to_telemetry` now requires an explicitly supplied canonical UTC ISO-8601 observation timestamp, rejecting absent, naive, non-UTC, malformed and oversized values instead of inventing current ingestion time |
+| Regressions | Authored; execution pending | `tests/test_hardware_observation_timestamp.py` covers Z/UTC normalization, missing timestamp, invalid offsets and malformed dates; command: `python -m unittest discover -s tests -p 'test_hardware_observation_timestamp.py' -v` |
+| Hardware safety | Unchanged, partial | No changes to independent physical emergency control or fail-closed CAN/serial gateway. Signed transport freshness is **not** sensor observation freshness |
+| Dataset evidence | Blocked | No authentic independently sourced VeReMi/CAN data or independent timestamp attestation; device can still lie about observation time |
+| Next code task | Upcoming | Enforce policy-defined maximum observation age relative to independently verified reception time, with bounded clock-skew tests and real TCP-loopback latency/DoS trials |
+
+This is a provenance-integrity engineering correction, not a new cryptographic primitive or publishable research efficacy result. No actual hardware experiment was performed.

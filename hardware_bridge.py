@@ -74,6 +74,40 @@ def _strict_telemetry_bool(value, field):
     return value
 
 
+
+def _signed_observation_timestamp(value):
+    """Require an explicit UTC observation time; never substitute ingestion time.
+
+    Envelope MAC/freshness authenticates the transport message, not the
+    observation's age. A device could sign old measurements with a fresh nonce.
+    Keeping a strict observation timestamp allows downstream research to
+    evaluate that age without silently inventing a current measurement.
+    """
+    if type(value) is not str or not 20 <= len(value) <= 40:
+        raise ValueError("timestamp: explicit bounded UTC ISO-8601 string required")
+    # Only canonical Z or explicit +00:00 are accepted. Offset conversion,
+    # naive local clocks and arbitrary text cannot silently change semantics.
+    if value.endswith("Z"):
+        value_to_parse = value[:-1] + "+00:00"
+    elif value.endswith("+00:00"):
+        value_to_parse = value
+    else:
+        raise ValueError("timestamp: UTC timezone required")
+    try:
+        parsed = datetime.fromisoformat(value_to_parse)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("timestamp: invalid ISO-8601 UTC value") from exc
+    if parsed.utcoffset() is None or parsed.utcoffset().total_seconds() != 0:
+        raise ValueError("timestamp: UTC timezone required")
+    # Require full date and time, explicit seconds, and disallow ISO shortcuts
+    # (basic dates, comma fractions, etc.). Normalize only after validation.
+    import re
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|\+00:00)", value):
+        raise ValueError("timestamp: noncanonical observation timestamp")
+    return parsed.astimezone(timezone.utc).isoformat()
+
+
+
 def to_telemetry(pkt: dict) -> TelemetryData:
     # Safety-critical booleans must be explicitly supplied by an authenticated
     # sender. Missing fields must not silently become a safe/healthy reading.
@@ -100,7 +134,7 @@ def to_telemetry(pkt: dict) -> TelemetryData:
         driver_heart_rate_bpm=_finite_telemetry_number(pkt.get("driver_heart_rate_bpm", 72.0), "driver_heart_rate_bpm"),
         driver_drowsiness_score=_finite_telemetry_number(pkt.get("driver_drowsiness_score", 0.0), "driver_drowsiness_score"),
         driver_unwell=_strict_telemetry_bool(pkt.get("driver_unwell", False), "driver_unwell"),
-        timestamp=str(pkt.get("timestamp", _now())),
+        timestamp=_signed_observation_timestamp(pkt.get("timestamp")),
     )
 
 
