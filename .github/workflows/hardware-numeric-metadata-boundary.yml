@@ -1,0 +1,18 @@
+name: Hardware numeric metadata boundary
+on:
+  pull_request:
+    paths:
+      - hardware_transport_security.py
+      - tests/test_hardware_numeric_metadata_boundary.py
+      - .github/workflows/hardware-numeric-metadata-boundary.yml
+  workflow_dispatch:
+jobs:
+  numeric-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run strict signed telemetry boundary regressions
+        run: PYTHONPATH=. python -m unittest discover -s tests -p 'test_hardware_numeric_metadata_boundary.py' -v

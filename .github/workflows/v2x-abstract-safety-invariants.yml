@@ -1,0 +1,20 @@
+name: V2X abstract safety invariants
+on:
+  pull_request:
+    paths:
+      - 'experiments/v2x/check_command_authorization.py'
+      - 'experiments/v2x/test_check_command_authorization.py'
+      - '.github/workflows/v2x-abstract-safety-invariants.yml'
+  workflow_dispatch:
+jobs:
+  safety-invariants:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run abstract command safety tests
+        run: PYTHONPATH=experiments/v2x python -m unittest discover -s experiments/v2x -p 'test_check_command_authorization.py' -v
+      - name: Exhaustive one-step model check
+        run: python experiments/v2x/check_command_authorization.py
