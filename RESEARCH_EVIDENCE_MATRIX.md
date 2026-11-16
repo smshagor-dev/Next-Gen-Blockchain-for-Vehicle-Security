@@ -139,3 +139,15 @@ This is a provenance-integrity engineering correction, not a new cryptographic p
 | Independent V2X/CAN efficacy | Blocked | No authentic publisher-verified incident dataset, multi-seed attack efficacy or matched-baseline observation in this change |
 
 **Next code task:** capture host ingress UTC once at first complete signed-frame receipt and bind it to the exact verified envelope, rather than sampling the clock immediately before each ledger mutation; then execute real TCP loopback under delayed ledger operations, replay/future skew and wall-clock adjustments, and independently measure rejection rates/CPU/RAM/latency. This policy is a software safety guard, not publishable scientific efficacy evidence.
+
+## 2026-11-15 — host ingress clock binding (stacked draft, issue #92)
+
+| Research area | Status | Evidence / next step |
+| --- | --- | --- |
+| Authenticated telemetry freshness at receive boundary | Implemented, CI pending | New `hardware_ingress_clock.py` samples host UTC and monotonic time immediately after bounded TCP recv / Arduino read, before MAC verification; signed observation age checked at ingress and again before ledger mutation using monotonic elapsed time |
+| Delayed queued frames / clock rollback | Synthetic regression authored, CI pending | 14 tests cover delayed processing, stale/future observations, invalid monotonic values, boundary conditions, and bounded policy. No vehicle or network timing result claimed |
+| Physical interlocks and local emergency | Blocked physical validation | No ECU actuation change; fail-closed ECU output remains. Local hardwired emergency control has not been independently witnessed |
+| Authentic independent V2X/CAN evidence | Blocked | No verified raw dataset, independent annotation, or matched multi-seed effectiveness result in this change |
+| Runtime scaling and manuscript | Upcoming | Next: real localhost TCP with authenticated multi-frame bursts, queue-delay histograms, CPU/RAM and bounded-DoS scenarios; then independently sourced matched baselines |
+
+**Limitations:** Host software receive UTC is not a trusted hardware timestamp; fragmented frames use the receive that completes the frame, and clock synchronization is not attested. The monotonic elapsed clock prevents *processing delays* from refreshing an old observation, but does not establish truth of a compromised device's signed clock. This is safety engineering evidence only, not publishable original efficacy research.
