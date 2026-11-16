@@ -70,6 +70,38 @@ class BridgeSecurityTests(unittest.TestCase):
         with self.assertRaisesRegex(hws.HardwareTransportError, "HW_ENVELOPE_FIELDS_INVALID"):
             session.receive(b'{"speed":35.0,"event":"HW:PI:TELEMETRY"}\n')
 
+    def test_duplicate_top_level_mac_rejected_before_authentication(self):
+        envelope = hws.build_authenticated_envelope(DEVICE_ID, DEVICE_KEY, "TELEMETRY", sample())
+        raw = json.dumps(envelope, separators=(",", ":")).encode("utf-8")
+        # Duplicate a *valid* MAC; last-wins parsers would accept the frame.
+        raw = raw[:-1] + b',"mac":"' + envelope["mac"].encode("ascii") + b'"}\n'
+        with self.assertRaisesRegex(hws.HardwareTransportError, "HW_JSON_DUPLICATE_KEY"):
+            bridge.AuthenticatedPiTelemetrySession(self.new_verifier()).receive(raw)
+
+    def test_duplicate_nested_payload_field_rejected(self):
+        envelope = hws.build_authenticated_envelope(DEVICE_ID, DEVICE_KEY, "TELEMETRY", sample())
+        raw = json.dumps(envelope, separators=(",", ":"))
+        raw = raw.replace('"speed":35.0', '"speed":35.0,"speed":35.0', 1).encode("utf-8") + b"\n"
+        with self.assertRaisesRegex(hws.HardwareTransportError, "HW_JSON_DUPLICATE_KEY"):
+            bridge.AuthenticatedPiTelemetrySession(self.new_verifier()).receive(raw)
+
+    def test_duplicate_device_id_cannot_override_enrolled_identity(self):
+        envelope = hws.build_authenticated_envelope(DEVICE_ID, DEVICE_KEY, "TELEMETRY", sample())
+        raw = json.dumps(envelope, separators=(",", ":")).encode("utf-8")
+        raw = raw[:-1] + b',"device_id":"' + SECOND_ID.encode("ascii") + b'"}\n'
+        with self.assertRaisesRegex(hws.HardwareTransportError, "HW_JSON_DUPLICATE_KEY"):
+            bridge.AuthenticatedPiTelemetrySession(self.new_verifier()).receive(raw)
+
+    def test_duplicate_json_key_rejection_does_not_claim_replay_nonce(self):
+        envelope = hws.build_authenticated_envelope(DEVICE_ID, DEVICE_KEY, "TELEMETRY", sample())
+        raw = json.dumps(envelope, separators=(",", ":")).encode("utf-8")
+        ambiguous = raw[:-1] + b',"mac":"' + envelope["mac"].encode("ascii") + b'"}\n'
+        verifier = self.new_verifier()
+        with self.assertRaisesRegex(hws.HardwareTransportError, "HW_JSON_DUPLICATE_KEY"):
+            bridge.AuthenticatedPiTelemetrySession(verifier).receive(ambiguous)
+        # A rejected ambiguous encoding must not poison a later valid frame.
+        self.assertEqual(len(bridge.AuthenticatedPiTelemetrySession(verifier).receive(raw + b"\n")), 1)
+
     def test_corrupted_mac_rejected(self):
         envelope = hws.build_authenticated_envelope(DEVICE_ID, DEVICE_KEY, "TELEMETRY", sample())
         envelope["payload"]["speed"] = 42.0
@@ -122,27 +154,29 @@ class BridgeSecurityTests(unittest.TestCase):
         conn.sendall.assert_not_called()
         gateway.return_value.send_safe_mode_stop.assert_not_called()
 
-    def test_bench_armed_command_is_signed_and_direction_bound(self):
-        gate = FakeGate(True)
-        with mock.patch.dict(os.environ, {
-            "SMARTCAR_HARD_STOP_ENABLED": "1",
-            "SMARTCAR_ECU_CONTROL_ENABLED": "0",
-        }), mock.patch.object(bridge, "ECUCommandGateway") as gateway:
-            dispatcher = bridge.SafeModeActuatorDispatcher(gate=gate)
-            conn = mock.Mock()
-            bc = SimpleNamespace(safe_mode_active=True)
-            block = SimpleNamespace(index=7, safe_mode_activated=True)
-            dispatcher.maybe_send_pi(
-                conn, bc, block, device_id=DEVICE_ID, device_secret=DEVICE_KEY
-            )
-        conn.sendall.assert_called_once()
-        signed = conn.sendall.call_args.args[0]
-        verified = hws.HardwareEnvelopeVerifier({DEVICE_ID: DEVICE_KEY}).verify(
-            signed, expected_kind="COMMAND", expected_device_id=DEVICE_ID
-        )
-        self.assertEqual(verified.payload["cmd"], "SAFE_MODE_STOP")
-        self.assertEqual(verified.payload["block_index"], 7)
-        gateway.return_value.send_safe_mode_stop.assert_called_once_with(block_index=7)
+    def test_bench_armed_network_stop_never_reaches_pi_or_ecu(self):
+        # A sender-side MAC and bench arming cannot prove receiver interlocks.
+        for armed in (True, False):
+            gate = FakeGate(armed)
+            with mock.patch.dict(os.environ, {
+                "SMARTCAR_HARD_STOP_ENABLED": "1",
+                "SMARTCAR_ECU_CONTROL_ENABLED": "1",
+            }), mock.patch.object(bridge, "ECUCommandGateway") as gateway:
+                dispatcher = bridge.SafeModeActuatorDispatcher(gate=gate)
+                conn = mock.Mock()
+                ser = mock.Mock()
+                bc = SimpleNamespace(safe_mode_active=True)
+                block = SimpleNamespace(index=7, safe_mode_activated=True)
+                self.assertFalse(dispatcher._should_send(bc, block))
+                self.assertFalse(dispatcher.maybe_send_pi(
+                    conn, bc, block, device_id=DEVICE_ID, device_secret=DEVICE_KEY
+                ))
+                self.assertFalse(dispatcher.maybe_send_arduino(
+                    ser, bc, block, device_id=DEVICE_ID, device_secret=DEVICE_KEY
+                ))
+                conn.sendall.assert_not_called()
+                ser.write.assert_not_called()
+                gateway.return_value.send_safe_mode_stop.assert_not_called()
 
     def test_ecu_transport_is_never_initialized_even_when_bench_armed(self):
         # The unauthenticated CAN/serial ECU path was intentionally disabled.

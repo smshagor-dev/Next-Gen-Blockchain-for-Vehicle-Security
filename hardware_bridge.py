@@ -24,6 +24,7 @@ from blockchain import SmartCarBlockchain, TelemetryData
 from bounded_tcp_admission import BoundedTCPAdmission
 from hardware_actuation_safety import BenchActuationGate
 from hardware_transport_deadlines import deadline_check, DeadlineExpired
+from hardware_ingress_clock import verify_ingress_observation
 from hardware_transport_security import (
     AuthenticatedLineFramer,
     HardwareEnvelopeVerifier,
@@ -74,6 +75,40 @@ def _strict_telemetry_bool(value, field):
     return value
 
 
+
+def _signed_observation_timestamp(value):
+    """Require an explicit UTC observation time; never substitute ingestion time.
+
+    Envelope MAC/freshness authenticates the transport message, not the
+    observation's age. A device could sign old measurements with a fresh nonce.
+    Keeping a strict observation timestamp allows downstream research to
+    evaluate that age without silently inventing a current measurement.
+    """
+    if type(value) is not str or not 20 <= len(value) <= 40:
+        raise ValueError("timestamp: explicit bounded UTC ISO-8601 string required")
+    # Only canonical Z or explicit +00:00 are accepted. Offset conversion,
+    # naive local clocks and arbitrary text cannot silently change semantics.
+    if value.endswith("Z"):
+        value_to_parse = value[:-1] + "+00:00"
+    elif value.endswith("+00:00"):
+        value_to_parse = value
+    else:
+        raise ValueError("timestamp: UTC timezone required")
+    try:
+        parsed = datetime.fromisoformat(value_to_parse)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("timestamp: invalid ISO-8601 UTC value") from exc
+    if parsed.utcoffset() is None or parsed.utcoffset().total_seconds() != 0:
+        raise ValueError("timestamp: UTC timezone required")
+    # Require full date and time, explicit seconds, and disallow ISO shortcuts
+    # (basic dates, comma fractions, etc.). Normalize only after validation.
+    import re
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|\+00:00)", value):
+        raise ValueError("timestamp: noncanonical observation timestamp")
+    return parsed.astimezone(timezone.utc).isoformat()
+
+
+
 def to_telemetry(pkt: dict) -> TelemetryData:
     # Safety-critical booleans must be explicitly supplied by an authenticated
     # sender. Missing fields must not silently become a safe/healthy reading.
@@ -100,7 +135,7 @@ def to_telemetry(pkt: dict) -> TelemetryData:
         driver_heart_rate_bpm=_finite_telemetry_number(pkt.get("driver_heart_rate_bpm", 72.0), "driver_heart_rate_bpm"),
         driver_drowsiness_score=_finite_telemetry_number(pkt.get("driver_drowsiness_score", 0.0), "driver_drowsiness_score"),
         driver_unwell=_strict_telemetry_bool(pkt.get("driver_unwell", False), "driver_unwell"),
-        timestamp=str(pkt.get("timestamp", _now())),
+        timestamp=_signed_observation_timestamp(pkt.get("timestamp")),
     )
 
 
@@ -156,66 +191,38 @@ class AuthenticatedPiTelemetrySession:
 
 
 class SafeModeActuatorDispatcher:
-    """Dispatch hardware stop commands when blockchain safe mode is activated."""
+    """Fail-closed network command boundary.
+
+    A ledger safe-mode event is evidence for a local alert, not authorization
+    to send an actuator command to a remote Arduino/Pi. In particular, a
+    sender-side MAC and a bench arming flag cannot establish receiver-side
+    authorization, freshness, physical interlock state, or local emergency
+    precedence. Physical emergency stop remains an independent local circuit.
+    """
 
     def __init__(self, gate: Optional[BenchActuationGate] = None):
         self.gate = gate if gate is not None else BenchActuationGate()
-        # Opt in explicitly; never energize an actuator just by starting bridge.
-        self.enabled = get_bool("SMARTCAR_HARD_STOP_ENABLED", False)
-        self._last_sent_at = None
-        self._cooldown_sec = 0.8
+        self.enabled = False
         self.ecu_gateway = ECUCommandGateway(gate=self.gate)
 
     def _should_send(self, bc: SmartCarBlockchain, block) -> bool:
-        if not self.enabled or not self.gate.is_armed():
-            return False
-        now = time.monotonic()
-        if self._last_sent_at is not None and now - self._last_sent_at < self._cooldown_sec:
-            return False
-        return bool(getattr(bc, "safe_mode_active", False) or getattr(block, "safe_mode_activated", False))
+        # Intentionally non-configurable until independently validated receiver
+        # authorization and physical interlocks are implemented.
+        return False
 
     def maybe_send_arduino(
         self, ser, bc: SmartCarBlockchain, block, *,
         device_id: str, device_secret: str,
     ):
-        if not self._should_send(bc, block):
-            return
-        try:
-            payload = build_safe_stop_payload(block_index=getattr(block, "index", -1))
-            envelope = build_authenticated_envelope(
-                device_id, device_secret, "COMMAND", payload
-            )
-            ser.write(encode_authenticated_envelope(envelope))
-            self._last_sent_at = time.monotonic()
-            print("[ACTUATOR] Signed SAFE_MODE_STOP sent to Arduino bench node")
-        except (OSError, HardwareTransportError) as e:
-            print(f"[ACTUATOR] Arduino command rejected: {e}")
-            return
-        self.ecu_gateway.send_safe_mode_stop(block_index=getattr(block, "index", -1))
+        """Never send a network-originated stop command to an actuator."""
+        return False
 
     def maybe_send_pi(
-        self,
-        conn,
-        bc: SmartCarBlockchain,
-        block,
-        *,
-        device_id: str,
-        device_secret: str,
+        self, conn, bc: SmartCarBlockchain, block, *,
+        device_id: str, device_secret: str,
     ):
-        if not self._should_send(bc, block):
-            return
-        try:
-            payload = build_safe_stop_payload(block_index=getattr(block, "index", -1))
-            envelope = build_authenticated_envelope(
-                device_id, device_secret, "COMMAND", payload
-            )
-            conn.sendall(encode_authenticated_envelope(envelope))
-            self._last_sent_at = time.monotonic()
-            print("[ACTUATOR] Signed SAFE_MODE_STOP sent to Pi bench node")
-        except (OSError, HardwareTransportError) as e:
-            print(f"[ACTUATOR] Pi command rejected: {e}")
-            return
-        self.ecu_gateway.send_safe_mode_stop(block_index=getattr(block, "index", -1))
+        """Never send a network-originated stop command to an actuator."""
+        return False
 
 
 class ECUCommandGateway:
@@ -306,7 +313,9 @@ def run_arduino_mode(bc: SmartCarBlockchain):
             chunk = ser.read(1024)
             if not chunk:
                 continue
-            last_progress = time.monotonic()
+            ingress_monotonic = time.monotonic()
+            ingress_utc = datetime.now(timezone.utc)
+            last_progress = ingress_monotonic
             try:
                 verified = session.receive(chunk)
             except HardwareTransportError as exc:
@@ -318,6 +327,14 @@ def run_arduino_mode(bc: SmartCarBlockchain):
                 # admit later envelopes after the absolute session deadline.
                 if time.monotonic() >= deadline:
                     raise RuntimeError("Arduino serial session lifetime exceeded; port quarantined")
+                verify_ingress_observation(
+                    item.payload.get("timestamp"),
+                    received_utc=ingress_utc,
+                    received_monotonic=ingress_monotonic,
+                    commit_monotonic=time.monotonic(),
+                    max_age_seconds=max(1, min(3600, get_int("SMARTCAR_HW_OBSERVATION_MAX_AGE_SEC", 15))),
+                    max_future_skew_seconds=max(0, min(60, get_int("SMARTCAR_HW_OBSERVATION_FUTURE_SKEW_SEC", 2))),
+                )
                 tel = to_telemetry(item.payload)
                 event = str(item.payload["event"])
                 block = bc.push_telemetry(tel, event)
@@ -403,6 +420,8 @@ def run_pi_mode(bc: SmartCarBlockchain):
                     data = conn.recv(4096)
                     if not data:
                         break
+                    ingress_monotonic = time.monotonic()
+                    ingress_utc = datetime.now(timezone.utc)
                     received_bytes += len(data)
                     if received_bytes > max_session_bytes:
                         raise HardwareTransportError("HW_SESSION_BYTE_BUDGET_EXCEEDED")
@@ -445,6 +464,14 @@ def run_pi_mode(bc: SmartCarBlockchain):
                         if not global_budget.claim():
                             raise HardwareTransportError("HW_GLOBAL_FRAME_BUDGET_EXCEEDED", authenticated=True)
                         accepted_frames += 1
+                        verify_ingress_observation(
+                            item.payload.get("timestamp"),
+                            received_utc=ingress_utc,
+                            received_monotonic=ingress_monotonic,
+                            commit_monotonic=time.monotonic(),
+                            max_age_seconds=max(1, min(3600, get_int("SMARTCAR_HW_OBSERVATION_MAX_AGE_SEC", 15))),
+                            max_future_skew_seconds=max(0, min(60, get_int("SMARTCAR_HW_OBSERVATION_FUTURE_SKEW_SEC", 2))),
+                        )
                         tel = to_telemetry(item.payload)
                         event = str(item.payload["event"])
                         with ledger_lock:
