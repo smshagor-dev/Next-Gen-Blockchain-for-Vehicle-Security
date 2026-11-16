@@ -68,6 +68,54 @@ Test command: `PYTHONPATH=experiments/v2x python -m unittest discover -s experim
 - **Validation:** original pinned replay workflow 43685231640 passed before this correction; changed Security Baseline regression is **not yet revalidated** as of this entry.
 - **Scientific limitation:** these are mocked software safety checks, not tests on a physical ECU, emergency control circuit, or independent safety certification.
 
+
+## 2026-11-15 — matched, signed held-out capture comparisons (draft PR; issue #92)
+
+| Research item | Status | Evidence / limitation |
+| --- | --- | --- |
+| Baseline/candidate capture matching | Implemented, GitHub CI pending | \`compare_matched_capture_trials.py\` calls existing \`attested_interval_join.evaluate_interval\` for BOTH methods using the same independent-world incident universe and operator-pinned held-out test interval |
+| Source integrity and receipt checking | Implemented | Requires four exact SHA-256 pins (world, both raw hub captures, expected window), two export HMAC receipts, two interval HMAC receipts, and claim of complete capture for the exact test window; never filters a method's missing incidents |
+| Paired outcomes | Implemented | Produces deterministic \`paired_incidents.csv\` in \`incident_id,cluster_id,truth,baseline,candidate\` schema, TP/TN/FP/FN, unreceived incident counts and candidate-minus-baseline accuracy difference in percentage points |
+| Cluster validity | Partial | One scenario/seed is **one cluster**, not an independent observation per incident. Estimating uncertainty needs multiple genuinely independent, source-verified clusters |
+| Synthetic adversarial validation | Local contract checks complete; repository CI pending | 18/18 local Python tests passed with reconstructed upstream dependencies; pushed new source and test Git blob hashes match locally tested files. Validates empty-but-signed capture, missing positives, false positives, duplicate rows, nonce replay, forged HMAC, incomplete receipts, wrong trial/window, out-of-window timestamps, unverified relay, malformed truth and pins |
+| Authentic VeReMi NextGen/CAN efficacy | Blocked | No independently publisher-verified raw archives, trusted annotation producer, physical capture proof or real multiple-cohort experiment in this PR |
+| Statistical inference and manuscript claims | Blocked | Per-trial descriptive results are not a population estimate or significance test; fixture results are NON-PUBLISHABLE main research evidence |
+
+**Next code task:** integrate reviewed per-trial paired exports across independently recorded scenario/seed cohorts, require external publisher source pins and group-disjoint split manifests, and only then run cluster-aware bootstrap/permutation sensitivity and measured runtime network/CPU/RAM. Do not infer physical safety, capture continuity, preregistration or finality from HMACs or SHA-256 alone.
+
+## 2026-11-15 — independent V2X trial-cluster aggregation (draft)
+
+| Item | State | Evidence / limitation |
+| --- | --- | --- |
+| Pinned multi-cohort comparison | Implemented, review pending | New `experiments/v2x/aggregate_pinned_cohorts.py` checks externally pinned manifest SHA-256 and every paired CSV digest; refuses duplicate trial IDs, reused cluster IDs or declared source groups |
+| Descriptive effect and uncertainty | Implemented, synthetic only | Reconstructs paired confusion counts and candidate-minus-baseline accuracy, cluster-resampled 95% percentile interval with deterministic seed; never interprets n>=30 as significance |
+| Tests | Local checks passed; GitHub CI pending | 12/12 synthetic contract tests passed in isolated Python, including tamper, duplicate source group, duplicate incident, nonbinary truth, missing trial and one-cluster rejection. Exact pushed repository suite not yet verified |
+| Scientific provenance | Blocked | A source-group string and operator SHA-256 pin are assertions, not publisher authentication, independent ground truth or proof of preregistration |
+| Independent efficacy trials | Blocked | No authentic VeReMi NextGen/CAN observations, independent multi-seed experiments, vehicle hardware or external lab evidence in this change |
+| Upcoming | Next code task | Wire reviewed PR #121's paired capture outputs into cohort manifest creation; add independent publisher source checks, controlled attack cohorts and runtime measurements |
+
+This is research infrastructure, **not a publishable efficacy result**. The percentile interval can under-cover with few independent clusters and cannot establish a causal effect. Source-group disjointness is checked only against declared identifiers.
+
+## 2026-11-15 — duplicate-member hardware transport ambiguity (draft PR)
+
+- **Implemented:** recursively reject repeated JSON object members in raw authenticated hardware envelopes before MAC verification, including repeated `mac`, `device_id` and nested telemetry measurements. This removes first/last-wins interpretation ambiguity between parser implementations without changing wire format or local emergency-stop control.
+- **Regression cases:** four new in-memory adversarial tests cover valid-MAC duplication, nested payload duplication, device-identity override and rejection without replay-nonce consumption. Test command: `python -m unittest tests.test_hardware_bridge_security -v` (repository CI pending).
+- **Evidence class:** protocol-parser hardening only. No independent live attack measurement, physical actuator tests, or publishable efficacy results. `AGENTS.md` not present at repository root.
+- **Next:** measure authenticated socket ingest under bounded malicious framing/reconnect traffic with separate CPU/RAM/latency counters and pinned experiment artifacts; validate producer/consumer interoperation on independent held-out V2X captures.
+
+## 2026-11-15 — real local socket admission saturation (draft, not scientific main results)
+
+| Item | State | Evidence / limitation |
+| --- | --- | --- |
+| Saturated admission boundedness | Locally measured | `tests/test_admission_runtime.py` uses actual OS socket pairs, two occupied worker slots and 100 overload attempts; confirms 100 rejects, peak active 2, slot recovery after release |
+| Worker exception recovery | Locally tested | Synthetic worker fault raises in daemon thread; admission slot is released, although Python emits an uncaught thread exception |
+| Five-replicate runtime measurement | Locally measured | `experiments/v2x/bench_local_admission_saturation.py` with 4 blocked workers, 1,000 rejected socketpair attempts per replicate, 5 replicates. Median per-rejection dispatch times (microseconds): 1.498, 1.421, 1.416, 1.399, 1.392; per-replicate p99: 7.577, 4.062, 6.117, 11.472, 32.423. CPU process time per batch (ms): 9.924, 7.372, 8.020, 12.552, 16.386. Raw observation: `experiments/v2x/observations/local_socketpair_admission_2026-11-15.json` |
+| Exact repository CI | Pending | New `bounded-hardware-ingress-runtime.yml` exercises the repository test against actual mainline module. Local tests used a reconstructed copy of the mainline module and passed 2/2; no CI pass claimed |
+| Full network ingress / MAC / ledger / DoS | Upcoming | This benchmark measures only admission dispatcher under sequential overload, not real TCP, concurrent attacker connections, authentication, ledger throughput or end-to-end latency |
+| Independent vehicle hardware safety | Blocked | No vehicle, CAN interface, physical emergency stop, hardware-in-the-loop, or independent laboratory access. Results are **NON-PUBLISHABLE main evidence** |
+
+**Next implementation:** run end-to-end loopback TCP with authenticated and invalid hardware envelopes, verify global budgets and absolute deadlines, then perform isolated process CPU/RAM/latency measurements with several independent seeds and explicit threat scenarios. Never infer publication-level significance from n >= 30.
+
 ## 2026-11-15 — authenticated telemetry observation-time integrity (draft)
 
 | Item | State | Evidence and limitation |
