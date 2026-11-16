@@ -72,6 +72,7 @@ class BoundedReceiver:
         probe_expected = self.expected
         cursor = 0
         complete = 0
+        completed_payloads = []
         while cursor < len(chunk):
             if probe_expected is None:
                 needed = 4 - len(probe)
@@ -91,6 +92,7 @@ class BoundedReceiver:
             probe += chunk[cursor:cursor + take]
             cursor += take
             if len(probe) == probe_expected:
+                completed_payloads.append(probe)
                 complete += 1
                 probe = b""
                 probe_expected = None
@@ -99,6 +101,18 @@ class BoundedReceiver:
             self.buffer.clear()
             self.expected = None
             raise FrameError("session frame budget exhausted before admission")
+        # Preflight syntax for every complete frame before committing any replay
+        # sequence. This is deliberately NOT a transaction across valid frames:
+        # a later authenticated replay/storage failure may still follow a commit.
+        try:
+            for candidate in completed_payloads:
+                json.loads(candidate, object_pairs_hook=_unique_object,
+                           parse_constant=lambda value: (_ for _ in ()).throw(ValueError("nonfinite JSON constant")))
+        except (ValueError, TypeError, UnicodeError, RecursionError) as exc:
+            self.poisoned = True
+            self.buffer.clear()
+            self.expected = None
+            raise FrameError("batch syntax preflight rejected") from exc
         accepted = []
         offset = 0
         while offset < len(chunk):
@@ -203,6 +217,28 @@ class ReceiverFaultTests(unittest.TestCase):
         self.assertEqual(receiver.accepted_frames, 0)
         self.assertEqual(receiver.seen, {})
         self.assertTrue(receiver.poisoned)
+
+    def test_malformed_second_frame_does_not_consume_first_nonce(self):
+        class RecordingGate:
+            def __init__(self):
+                self.calls = []
+            def admit_authenticated(self, node, seq, authenticated=False):
+                self.calls.append((node, seq))
+                return True
+        gate = RecordingGate()
+        receiver = BoundedReceiver({"a": b"secret-a"}, replay_gate=gate)
+        malformed = b'{"node":'
+        with self.assertRaises(FrameError):
+            receiver.feed(frame("a", 1, {}, b"secret-a") + len(malformed).to_bytes(4, "big") + malformed)
+        self.assertEqual(gate.calls, [])
+        self.assertTrue(receiver.poisoned)
+
+    def test_duplicate_key_in_second_frame_does_not_consume_first_nonce(self):
+        receiver = BoundedReceiver({"a": b"secret-a"})
+        malformed = b'{"node":"a","node":"a"}'
+        with self.assertRaises(FrameError):
+            receiver.feed(frame("a", 1, {}, b"secret-a") + len(malformed).to_bytes(4, "big") + malformed)
+        self.assertEqual(receiver.seen, {})
 
     def test_multiple_frames(self):
         f = frame("a", 1, {}, b"secret-a") + frame("a", 2, {}, b"secret-a")
