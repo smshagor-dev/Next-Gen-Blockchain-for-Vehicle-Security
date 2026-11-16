@@ -70,6 +70,38 @@ class BridgeSecurityTests(unittest.TestCase):
         with self.assertRaisesRegex(hws.HardwareTransportError, "HW_ENVELOPE_FIELDS_INVALID"):
             session.receive(b'{"speed":35.0,"event":"HW:PI:TELEMETRY"}\n')
 
+    def test_duplicate_top_level_mac_rejected_before_authentication(self):
+        envelope = hws.build_authenticated_envelope(DEVICE_ID, DEVICE_KEY, "TELEMETRY", sample())
+        raw = json.dumps(envelope, separators=(",", ":")).encode("utf-8")
+        # Duplicate a *valid* MAC; last-wins parsers would accept the frame.
+        raw = raw[:-1] + b',"mac":"' + envelope["mac"].encode("ascii") + b'"}\n'
+        with self.assertRaisesRegex(hws.HardwareTransportError, "HW_JSON_DUPLICATE_KEY"):
+            bridge.AuthenticatedPiTelemetrySession(self.new_verifier()).receive(raw)
+
+    def test_duplicate_nested_payload_field_rejected(self):
+        envelope = hws.build_authenticated_envelope(DEVICE_ID, DEVICE_KEY, "TELEMETRY", sample())
+        raw = json.dumps(envelope, separators=(",", ":"))
+        raw = raw.replace('"speed":35.0', '"speed":35.0,"speed":35.0', 1).encode("utf-8") + b"\n"
+        with self.assertRaisesRegex(hws.HardwareTransportError, "HW_JSON_DUPLICATE_KEY"):
+            bridge.AuthenticatedPiTelemetrySession(self.new_verifier()).receive(raw)
+
+    def test_duplicate_device_id_cannot_override_enrolled_identity(self):
+        envelope = hws.build_authenticated_envelope(DEVICE_ID, DEVICE_KEY, "TELEMETRY", sample())
+        raw = json.dumps(envelope, separators=(",", ":")).encode("utf-8")
+        raw = raw[:-1] + b',"device_id":"' + SECOND_ID.encode("ascii") + b'"}\n'
+        with self.assertRaisesRegex(hws.HardwareTransportError, "HW_JSON_DUPLICATE_KEY"):
+            bridge.AuthenticatedPiTelemetrySession(self.new_verifier()).receive(raw)
+
+    def test_duplicate_json_key_rejection_does_not_claim_replay_nonce(self):
+        envelope = hws.build_authenticated_envelope(DEVICE_ID, DEVICE_KEY, "TELEMETRY", sample())
+        raw = json.dumps(envelope, separators=(",", ":")).encode("utf-8")
+        ambiguous = raw[:-1] + b',"mac":"' + envelope["mac"].encode("ascii") + b'"}\n'
+        verifier = self.new_verifier()
+        with self.assertRaisesRegex(hws.HardwareTransportError, "HW_JSON_DUPLICATE_KEY"):
+            bridge.AuthenticatedPiTelemetrySession(verifier).receive(ambiguous)
+        # A rejected ambiguous encoding must not poison a later valid frame.
+        self.assertEqual(len(bridge.AuthenticatedPiTelemetrySession(verifier).receive(raw + b"\n")), 1)
+
     def test_corrupted_mac_rejected(self):
         envelope = hws.build_authenticated_envelope(DEVICE_ID, DEVICE_KEY, "TELEMETRY", sample())
         envelope["payload"]["speed"] = 42.0

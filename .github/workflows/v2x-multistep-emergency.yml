@@ -1,0 +1,20 @@
+name: V2X multi-step emergency model
+on:
+  pull_request:
+    paths:
+      - 'experiments/v2x/check_emergency_state_machine.py'
+      - 'experiments/v2x/test_check_emergency_state_machine.py'
+      - '.github/workflows/v2x-multistep-emergency.yml'
+  workflow_dispatch:
+jobs:
+  bounded-state-exploration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Execute model contract tests
+        run: PYTHONPATH=experiments/v2x python -m unittest discover -s experiments/v2x -p 'test_check_emergency_state_machine.py' -v
+      - name: Explore bounded multi-step safety transitions
+        run: python experiments/v2x/check_emergency_state_machine.py --depth 7
