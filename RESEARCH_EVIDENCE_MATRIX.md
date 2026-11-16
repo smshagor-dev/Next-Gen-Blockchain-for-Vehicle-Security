@@ -253,3 +253,43 @@ No novelty claim for cryptography, consensus finality, or physical safety follow
 | Next | Upcoming | Bind external trial manifests and independent cluster IDs to complete incident joins, then validate matched cohorts and uncertainty estimates |
 
 This correction prevents reporting a loss of effect as a directional reversal. Neither outcome alone establishes statistical significance.
+
+## 2026-11-16 — Paired incident universe coverage (draft)
+
+| Workstream | Status | Evidence / limitation |
+| --- | --- | --- |
+| World-universe denominator | Implemented, synthetic contract only | `experiments/v2x/audit_trial_coverage.py` uses every independently supplied world incident; missing method predictions are scored as no-alert, including positive false negatives |
+| Candidate/baseline symmetry | Implemented | Both methods use exactly the same world IDs; reject unknown IDs, duplicate IDs, invalid binary labels, ragged CSV and unexpected columns |
+| Reproducibility | Partial | SHA-256 of three source CSV files, explicit incident/cluster counts, confusion counts; no external source authenticity attested |
+| Regression evidence | Locally verified equivalent isolated script: 7/7 synthetic tests; repository CI pending | Run `python -m unittest tests.test_audit_trial_coverage -v` from repo root; GitHub checkout DNS unavailable locally |
+| Authentic incident efficacy | Blocked | No independent incident truth provenance, source capture completeness proof, or authentic held-out candidate/baseline predictions |
+| Next | Upcoming | Integrate pinned trial receipt and complete capture interval; fail on source identity mismatch, then execute matched multi-seed trials and cluster-level uncertainty |
+
+These synthetic checks are not publication-ready attack detection results. Missing prediction means no alert only when the world-universe manifest and trial capture interval are independently complete; otherwise no scientific inference is warranted.
+
+
+## 2026-11-16 — paired full-universe diagnostic extension (draft PR #134)
+
+| Workstream | State | Evidence / limitation |
+| --- | --- | --- |
+| Full-universe paired correctness | Implemented, repository CI unverified | Audit v2 adds both-correct, candidate-only-correct, baseline-only-correct, and both-wrong counts on every world incident, treating absent predictions as no-alert |
+| Asymmetric observation audit | Implemented, repository CI unverified | Separately counts both-observed, candidate-only-observed, baseline-only-observed and neither-observed to expose differential capture without conditioning paired comparisons on observed rows |
+| Synthetic validation | Partial | Two equivalent isolated Python regression cases executed locally and passed; committed repository tests and complete CI not executed |
+| Scientific efficacy | Blocked | No independent capture-completeness witness, source-authenticated incident universe, matched publisher dataset, physical ECU test or independently clustered multi-seed trials |
+| Next engineering task | Upcoming | Bind both prediction streams to pinned capture receipts and preregistered incident/cluster manifests, then reject mismatched trial identity before computing effect sizes |
+
+Do not interpret missing prediction as proof of no physical observation: it is a prespecified **no-alert scoring convention**, and incomplete capture remains a separately reported threat to validity. No p-value or publishable attack detection claim is derived from these synthetic tests.
+
+
+## 2026-11-16 — paired-world trial input pinning (draft PR #134)
+
+| Workstream | State | Evidence / limitation |
+| --- | --- | --- |
+| Input integrity | Implemented, tests pending | `experiments/v2x/verify_pinned_coverage.py` requires an out-of-band SHA-256 pin for a strict held-out trial manifest, and checks exact SHA-256 of world/candidate/baseline input bytes before scoring; rechecks digests after scoring |
+| Trial identity and split | Implemented, tests pending | Rejects absent/extra manifest fields, duplicate JSON keys, non-held-out split, invalid seed, nonfinite constants and wrong protocol |
+| Regression verification | Authored, unverified | Six synthetic tests in `tests/test_verify_pinned_coverage.py`; run `PYTHONPATH=. python -m unittest tests.test_verify_pinned_coverage -v` |
+| Independent source authenticity | Blocked | Manifest and pins can be operator generated; no trusted external timestamp, independent ground truth or publisher archive authentication |
+| Experimental evidence | Blocked | No authentic multi-seed paired V2X/CAN trial, independent capture uptime proof or physical hardware validation |
+| Next | Upcoming | Run exact tests/CI; connect pinned capture receipts and externally verified world annotations; execute independent held-out attack trials |
+
+This is a **measurement integrity guard**, not proof of preregistration or publishable efficacy. Local checkout remains blocked by GitHub DNS; no test pass is claimed.
