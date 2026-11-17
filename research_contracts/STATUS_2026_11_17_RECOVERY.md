@@ -33,3 +33,13 @@ python -m unittest discover -s research_contracts -p 'test_*.py' -v
 The recovery flag is **opt-in**, not wired to production startup. A stat-before-connect path check is susceptible to concurrent filesystem replacement and is not a defense against a privileged adversary; further work should use securely owned storage, explicit provisioning markers, schema/integrity validation, and a verified production recovery path. Never enable network-controlled physical actuation without independent local interlocks.
 
 Next: audit production `hardware_bridge` replay-store startup and implement fail-closed recovery (separate explicit provisioning) with authenticated loopback fault injection and measured honest-client throughput/rejection latency. Review PR #140/#141 dependencies before merge.
+
+## 2026-11-17 storage rollback counterexample
+
+- Implemented `experiment_replay_storage_rollback.py` (commit `fab47c29`) to capture an online SQLite backup at high-water 10, advance to 11, then restore the older committed backup and attempt sequence 11 again.
+- **Observed in a separate local SQLite probe:** WAL mode enabled; high-water before restore 11; after restoring an older consistent backup 10. This establishes a storage rollback counterexample for unanchored SQLite persistence, not execution of the committed experiment script or a production receiver test.
+- A legitimate MAC plus durable replay database does not prevent re-admission after privileged snapshot rollback. The experiment intentionally asserts the vulnerability to prevent falsely claiming anti-rollback protection.
+- Research implication: require a separately protected monotonic anchor / attested secure counter or clearly exclude privileged rollback from the threat model. A mere `require_existing=True` existence check does not detect a valid older snapshot.
+- Run: `python research_contracts/experiment_replay_storage_rollback.py --trials 3 --output /tmp/replay_storage_rollback.csv`. The committed script has **not** been executed in a complete repository checkout due to GitHub DNS failure.
+- Matrix: SQLite snapshot rollback resistance = **blocked / demonstrated design limitation**; production durable replay integration = **upcoming**; physical emergency control = **unverified**; authentic dataset and multi-seed V2X results = **blocked**. This CSV is not publishable primary attack-detection evidence.
+- Next code task: implement explicit recovery integrity/anti-rollback policy and production fail-closed replay-store wiring, then run real authenticated loopback replay and slow-peer experiments.
