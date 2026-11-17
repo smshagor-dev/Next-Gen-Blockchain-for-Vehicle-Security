@@ -7,6 +7,7 @@ import sqlite3
 import threading
 import math
 import itertools
+import unicodedata
 
 MAX_BATCH_ENTRIES = 4096
 MAX_NODE_ID_BYTES = 128
@@ -52,8 +53,21 @@ class SQLiteAtomicReplayGate:
         entries = list(itertools.islice(iter(entries), MAX_BATCH_ENTRIES + 1))
         if len(entries) > MAX_BATCH_ENTRIES:
             raise ValueError("replay batch exceeds maximum entries")
-        for node, seq in entries:
-            if (not isinstance(node, str) or not node or len(node.encode("utf-8")) > MAX_NODE_ID_BYTES
+        for entry in entries:
+            if not isinstance(entry, (tuple, list)) or len(entry) != 2:
+                raise ValueError("invalid replay entry shape")
+            node, seq = entry
+            if not isinstance(node, str) or not node:
+                raise ValueError("invalid replay identity or sequence")
+            try:
+                encoded_node = node.encode("utf-8", errors="strict")
+            except UnicodeError as exc:
+                raise ValueError("invalid replay identity encoding") from exc
+            # Canonicalize at enrollment, not here: silently rewriting signed
+            # identities would change the authenticated principal. Reject
+            # noncanonical aliases before opening the replay transaction.
+            if (len(encoded_node) > MAX_NODE_ID_BYTES
+                    or unicodedata.normalize("NFC", node) != node
                     or any(ord(ch) < 32 or ord(ch) == 127 for ch in node)
                     or type(seq) is not int or not 0 <= seq <= 9223372036854775807):
                 raise ValueError("invalid replay identity or sequence")
