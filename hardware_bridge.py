@@ -139,6 +139,15 @@ def to_telemetry(pkt: dict) -> TelemetryData:
     )
 
 
+def _signed_event_label(value):
+    """Reject ambiguous or resource-heavy signed event labels before ledger mutation."""
+    if type(value) is not str or not 1 <= len(value) <= 128:
+        raise ValueError("event: nonempty bounded string required")
+    if any(ord(char) < 32 or ord(char) == 127 for char in value):
+        raise ValueError("event: control characters forbidden")
+    return value
+
+
 class GlobalTelemetryBudget:
     """Bound aggregate authenticated ledger mutations across TCP sessions.
 
@@ -336,7 +345,7 @@ def run_arduino_mode(bc: SmartCarBlockchain):
                     max_future_skew_seconds=max(0, min(60, get_int("SMARTCAR_HW_OBSERVATION_FUTURE_SKEW_SEC", 2))),
                 )
                 tel = to_telemetry(item.payload)
-                event = str(item.payload["event"])
+                event = _signed_event_label(item.payload.get("event"))
                 block = bc.push_telemetry(tel, event)
                 print(f"[CHAIN] block={block.index} event={event}")
                 actuator.maybe_send_arduino(
@@ -473,7 +482,7 @@ def run_pi_mode(bc: SmartCarBlockchain):
                             max_future_skew_seconds=max(0, min(60, get_int("SMARTCAR_HW_OBSERVATION_FUTURE_SKEW_SEC", 2))),
                         )
                         tel = to_telemetry(item.payload)
-                        event = str(item.payload["event"])
+                        event = _signed_event_label(item.payload.get("event"))
                         with ledger_lock:
                             block = bc.push_telemetry(tel, event)
                         # Network sendall may block for the peer's socket timeout.
