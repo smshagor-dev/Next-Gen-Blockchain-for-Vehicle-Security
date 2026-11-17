@@ -6,6 +6,9 @@ Each batch is a single SQLite transaction. One writer is serialized by SQLite.
 import sqlite3
 import threading
 import math
+import itertools
+
+MAX_BATCH_ENTRIES = 4096
 
 
 class ReplayStoreError(RuntimeError):
@@ -42,7 +45,12 @@ class SQLiteAtomicReplayGate:
         """
         if authenticated is not True:
             raise ValueError("authentication required")
-        entries = list(entries)
+        # Bound generator consumption before opening a transaction. A malicious
+        # authenticated peer must not force unbounded replay batch allocation.
+        # The extra element distinguishes exactly-at-limit from over-limit.
+        entries = list(itertools.islice(iter(entries), MAX_BATCH_ENTRIES + 1))
+        if len(entries) > MAX_BATCH_ENTRIES:
+            raise ValueError("replay batch exceeds maximum entries")
         for node, seq in entries:
             if not isinstance(node, str) or not node or type(seq) is not int or not 0 <= seq <= 9223372036854775807:
                 raise ValueError("invalid replay identity or sequence")
