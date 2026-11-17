@@ -80,3 +80,13 @@ Commands:
 `python -m unittest discover -s tests -p 'test_authenticated_durable_replay.py' -v`
 
 Next: run full repository tests, add reproducible authenticated multi-client socket attack harness with matched honest and malicious workloads, record raw latency/resource outcomes and independent trial seeds. Preserve default-deny remote actuation.
+
+## Concurrent nonce contention checkpoint
+
+Implemented `research_contracts/bench_concurrent_nonce.py` (commit 4e048fe) and `tests/test_concurrent_nonce_experiment.py` (commit 6da8f31). Real SQLite shared-store transactions are exercised by concurrent threads, with paired fresh/replay nonces, per-attempt monotonic latency, explicit outcomes and seed-tagged raw CSV. The assertion prevents accepting the same nonce twice regardless of scheduling order. Capacity saturation is tested independently.
+
+Run:
+`python -m unittest discover -s tests -p 'test_concurrent_nonce_experiment.py' -v`
+`python research_contracts/bench_concurrent_nonce.py --seed 20261117 --workers 8 --attempts 400 --capacity 200 --output results/concurrent_nonce_seed_20261117.csv`
+
+Status: IMPLEMENTED / UNEXECUTED. This is a **component-level concurrency benchmark**, not TCP ingress, malicious enrolled-node, CAN dataset or physical safety evidence. No raw results or statistical conclusions yet. Next code task: authenticated multi-client loopback harness against production Pi TCP and independent repeated-seed experiments with raw results; do not merge draft without verified tests.
