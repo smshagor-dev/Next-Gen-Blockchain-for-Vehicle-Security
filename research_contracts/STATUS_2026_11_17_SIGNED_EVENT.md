@@ -63,3 +63,20 @@ Execute:
 `python research_contracts/bench_nonce_capacity.py --capacity 200 --samples 300 --output results/nonce_capacity_raw.csv`
 
 **Not yet run against repository checkout:** git remote DNS lookup failed in execution environment. No measured runtime or significance claim. This is a capacity/fault microbenchmark, NOT publication-quality independent attack evidence. Next: run on checkout, independently validate raw CSV against actual SQLite records, then add matched concurrent honest/adversarial ingress experiments and independent incident-level dataset ground truth. Keep PR draft.
+
+## 2026-11-17 reprovisioning and authenticated fault tests
+
+| Workstream | Status | Evidence / limitation |
+| --- | --- | --- |
+| Crash/recovery provisioning | Implemented, tests pending | fcb62dd: explicit provisioning refuses any existing path, preventing silent loss of replay history |
+| Recovery regression | Committed, not executed | b82783e: existing nonce and unrelated database preservation |
+| Real signed-envelope adversarial tests | Committed, not executed | 6c38351: production envelope builder/verifier with SQLite, replay after restart, payload tamper, capacity fail closed |
+| Hardware ingress / emergency control | Partial / blocked | no physical device or independent interlock verification |
+| Research evidence | Not publishable | tests are deterministic safety checks, not independent multi-seed comparative experiments |
+| Main merge | Blocked | repository checkout unavailable; run full CI and inspect main drift before merge |
+
+Commands:
+`python -m unittest discover -s tests -p 'test_hardware_nonce_store.py' -v`
+`python -m unittest discover -s tests -p 'test_authenticated_durable_replay.py' -v`
+
+Next: run full repository tests, add reproducible authenticated multi-client socket attack harness with matched honest and malicious workloads, record raw latency/resource outcomes and independent trial seeds. Preserve default-deny remote actuation.
