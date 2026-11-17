@@ -50,6 +50,30 @@ class DurableNonceTests(unittest.TestCase):
             self.assertFalse(recovered.claim("node", "b" * 32, ttl_seconds=1))
             recovered.close()
 
+    def test_provisioning_existing_database_denied_without_reset(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "nonce.db")
+            original = SQLiteNonceStore(path, provision=True)
+            self.assertTrue(original.claim("node", "a" * 32, ttl_seconds=30))
+            original.close()
+            with self.assertRaisesRegex(NonceStoreError, "already exists"):
+                SQLiteNonceStore(path, provision=True)
+            recovered = SQLiteNonceStore(path)
+            self.assertFalse(recovered.claim("node", "a" * 32, ttl_seconds=30))
+            recovered.close()
+
+    def test_provisioning_existing_unrelated_database_denied(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "unrelated.db")
+            with sqlite3.connect(path) as db:
+                db.execute("CREATE TABLE unrelated(x INTEGER)")
+            with self.assertRaisesRegex(NonceStoreError, "already exists"):
+                SQLiteNonceStore(path, provision=True)
+            with sqlite3.connect(path) as db:
+                self.assertIsNone(db.execute(
+                    "SELECT name FROM sqlite_master WHERE name='nonce_claims'"
+                ).fetchone())
+
     def test_invalid_clock_fails_closed(self):
         with tempfile.TemporaryDirectory() as d:
             store = SQLiteNonceStore(os.path.join(d, "nonce.db"),
