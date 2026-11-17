@@ -113,6 +113,30 @@ class BoundedReceiver:
             self.buffer.clear()
             self.expected = None
             raise FrameError("batch syntax preflight rejected") from exc
+        # Authentication preflight prevents a later bad-MAC frame from consuming
+        # an earlier frame's durable replay sequence in the same transport batch.
+        # Storage rejection after preflight remains non-atomic; see status matrix.
+        try:
+            for candidate in completed_payloads:
+                envelope = json.loads(candidate, object_pairs_hook=_unique_object,
+                    parse_constant=lambda value: (_ for _ in ()).throw(ValueError("nonfinite JSON constant")))
+                if not isinstance(envelope, dict) or set(envelope) != {"node", "seq", "event", "mac"}:
+                    raise ValueError("unexpected envelope fields")
+                node, seq, event, mac = (envelope[k] for k in ("node", "seq", "event", "mac"))
+                if (not isinstance(node, str) or node not in self.keys or
+                    type(seq) is not int or not 0 <= seq <= 9223372036854775807 or
+                    not isinstance(event, dict) or not isinstance(mac, str)):
+                    raise ValueError("invalid authenticated envelope")
+                canonical = json.dumps({"node": node, "seq": seq, "event": event},
+                    sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+                expected_mac = hmac.new(self.keys[node], canonical, hashlib.sha256).hexdigest()
+                if not hmac.compare_digest(expected_mac, mac):
+                    raise ValueError("invalid MAC")
+        except (ValueError, TypeError, KeyError, UnicodeError, RecursionError) as exc:
+            self.poisoned = True
+            self.buffer.clear()
+            self.expected = None
+            raise FrameError("batch authentication preflight rejected") from exc
         accepted = []
         offset = 0
         while offset < len(chunk):
@@ -215,6 +239,32 @@ class ReceiverFaultTests(unittest.TestCase):
         with self.assertRaises(FrameError):
             receiver.feed(first[12:] + second)
         self.assertEqual(receiver.accepted_frames, 0)
+        self.assertEqual(receiver.seen, {})
+        self.assertTrue(receiver.poisoned)
+
+    def test_bad_mac_second_frame_does_not_consume_first_nonce(self):
+        class RecordingGate:
+            def __init__(self):
+                self.calls = []
+            def admit_authenticated(self, node, seq, authenticated=False):
+                self.calls.append((node, seq))
+                return True
+        gate = RecordingGate()
+        receiver = BoundedReceiver({"a": b"secret-a"}, replay_gate=gate)
+        valid = frame("a", 1, {}, b"secret-a")
+        bad_mac = frame("a", 2, {}, b"wrong-key")
+        with self.assertRaises(FrameError):
+            receiver.feed(valid + bad_mac)
+        self.assertEqual(gate.calls, [])
+        self.assertEqual(receiver.accepted_frames, 0)
+        self.assertTrue(receiver.poisoned)
+
+    def test_bad_mac_second_frame_after_fragmented_first(self):
+        receiver = BoundedReceiver({"a": b"secret-a"})
+        first = frame("a", 1, {"hazard": True}, b"secret-a")
+        self.assertEqual(receiver.feed(first[:13]), [])
+        with self.assertRaises(FrameError):
+            receiver.feed(first[13:] + frame("a", 2, {}, b"wrong-key"))
         self.assertEqual(receiver.seen, {})
         self.assertTrue(receiver.poisoned)
 
