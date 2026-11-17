@@ -43,3 +43,10 @@ Next: audit production `hardware_bridge` replay-store startup and implement fail
 - Run: `python research_contracts/experiment_replay_storage_rollback.py --trials 3 --output /tmp/replay_storage_rollback.csv`. The committed script has **not** been executed in a complete repository checkout due to GitHub DNS failure.
 - Matrix: SQLite snapshot rollback resistance = **blocked / demonstrated design limitation**; production durable replay integration = **upcoming**; physical emergency control = **unverified**; authentic dataset and multi-seed V2X results = **blocked**. This CSV is not publishable primary attack-detection evidence.
 - Next code task: implement explicit recovery integrity/anti-rollback policy and production fail-closed replay-store wiring, then run real authenticated loopback replay and slow-peer experiments.
+
+## 2026-11-17 schema recovery hardening
+
+- **Implemented (not executed):** Recovery now checks SQLite integrity, requires the replay_highwater table to exist, validates expected node/seq column types and primary key, and rejects negative/null persisted high-water. It no longer creates the replay table when require_existing=True. Commit `1152f7f`.
+- **Regression suite added:** `test_replay_recovery_schema.py` covers unrelated SQLite files, incompatible schemas, valid persisted replay rejection, and corrupt nonempty files. Commit `f774140`.
+- **Validation:** No checked-in tests executed this run. Execute `python -m unittest discover -s research_contracts -p 'test_replay_recovery_schema.py' -v` and the full replay suite before merge. No claim of production safety or empirical effectiveness.
+- **Remaining gap:** Schema checking does not detect a valid older snapshot, malicious database replacement, or guarantee startup integration in hardware_bridge. Next code task: explicit provision/recovery integration and authenticated loopback fault experiments, with emergency control isolated from network authorization.
