@@ -8,7 +8,10 @@ import argparse
 import csv
 import os
 from pathlib import Path
-import resource
+try:
+    import resource
+except ImportError:
+    resource = None  # Windows: RSS unavailable without optional dependencies
 import statistics
 import sys
 import tempfile
@@ -41,7 +44,8 @@ def run(output, capacity, samples):
                     "latency_ns": elapsed,
                     "database_bytes": os.path.getsize(db_path),
                     "wal_bytes": os.path.getsize(db_path + "-wal") if os.path.exists(db_path + "-wal") else 0,
-                    "maxrss_platform_units": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
+                    "maxrss_platform_units": (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+                                              if resource is not None else ''),
                 })
         finally:
             store.close()
