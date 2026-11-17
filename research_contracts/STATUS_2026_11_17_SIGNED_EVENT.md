@@ -54,3 +54,12 @@ Next code task: bound persistent nonce table safely (without reopening expired r
 
 Validation command: `python -m unittest discover -s tests -p 'test_hardware_nonce_store.py' -v`
 Next: test committed code on full checkout, measure capacity and disk-growth behavior, design epoch-bound replay expiration with authenticated time and rollback resistance before enabling eviction. Do not merge this draft.
+
+## 2026-11-17 nonce capacity experiment harness
+
+Implemented `research_contracts/bench_nonce_capacity.py` (commits d345a64, 12d6d3a). The harness creates a real temporary SQLite database, performs measured admission attempts, records per-attempt monotonic latency, SQLite main/WAL bytes and platform-dependent process max RSS, and asserts replay rejection after reopening. It exports raw CSV and prints descriptive summary; no results are precomputed or claimed. Windows RSS is omitted rather than fabricated.
+
+Execute:
+`python research_contracts/bench_nonce_capacity.py --capacity 200 --samples 300 --output results/nonce_capacity_raw.csv`
+
+**Not yet run against repository checkout:** git remote DNS lookup failed in execution environment. No measured runtime or significance claim. This is a capacity/fault microbenchmark, NOT publication-quality independent attack evidence. Next: run on checkout, independently validate raw CSV against actual SQLite records, then add matched concurrent honest/adversarial ingress experiments and independent incident-level dataset ground truth. Keep PR draft.
