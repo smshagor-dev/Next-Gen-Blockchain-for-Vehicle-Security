@@ -36,6 +36,28 @@ class DurableNonceTests(unittest.TestCase):
                     "SELECT name FROM sqlite_master WHERE name='nonce_claims'"
                 ).fetchone())
 
+    def test_capacity_exhaustion_denies_without_eviction(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "nonce.db")
+            store = SQLiteNonceStore(path, provision=True, max_claims=2)
+            self.assertTrue(store.claim("node", "a" * 32, ttl_seconds=1))
+            self.assertTrue(store.claim("node", "b" * 32, ttl_seconds=1))
+            with self.assertRaisesRegex(NonceStoreError, "capacity exhausted"):
+                store.claim("node", "c" * 32, ttl_seconds=1)
+            self.assertFalse(store.claim("node", "a" * 32, ttl_seconds=1))
+            store.close()
+            recovered = SQLiteNonceStore(path, max_claims=2)
+            self.assertFalse(recovered.claim("node", "b" * 32, ttl_seconds=1))
+            recovered.close()
+
+    def test_invalid_clock_fails_closed(self):
+        with tempfile.TemporaryDirectory() as d:
+            store = SQLiteNonceStore(os.path.join(d, "nonce.db"),
+                                     provision=True, clock=lambda: float("nan"))
+            with self.assertRaisesRegex(NonceStoreError, "clock"):
+                store.claim("node", "a" * 32, ttl_seconds=30)
+            store.close()
+
     def test_claims_not_erased_by_clock_rollback(self):
         with tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, "nonce.db")
