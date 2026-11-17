@@ -8,6 +8,7 @@ import threading
 import math
 import itertools
 import unicodedata
+import os
 
 MAX_BATCH_ENTRIES = 4096
 MAX_NODE_ID_BYTES = 128
@@ -18,11 +19,27 @@ class ReplayStoreError(RuntimeError):
 
 
 class SQLiteAtomicReplayGate:
-    def __init__(self, path, timeout=5.0):
+    def __init__(self, path, timeout=5.0, require_existing=False):
         if not isinstance(timeout, (int, float)) or isinstance(timeout, bool) or not math.isfinite(timeout) or not 0 < timeout <= 60:
             raise ValueError("timeout must be within (0, 60] seconds")
+        if type(require_existing) is not bool:
+            raise ValueError("require_existing must be bool")
+        # A missing replay database must never silently reset sequence history
+        # during recovery. Initial provisioning is an explicit separate mode.
+        if require_existing:
+            if not isinstance(path, (str, bytes, os.PathLike)):
+                raise ValueError("persistent replay path required")
+            try:
+                stat = os.stat(path)
+            except FileNotFoundError as exc:
+                raise ReplayStoreError("replay database missing; recovery denied") from exc
+            if not os.path.isfile(path) or stat.st_size == 0:
+                raise ReplayStoreError("replay database is not a provisioned file")
         self._lock = threading.RLock()
-        self.connection = sqlite3.connect(path, timeout=timeout, isolation_level=None, check_same_thread=False)
+        self.connection = sqlite3.connect(
+            path, timeout=timeout, isolation_level=None, check_same_thread=False,
+            uri=False,
+        )
         try:
             self.connection.execute("PRAGMA busy_timeout = %d" % int(timeout * 1000))
             if self.connection.execute("PRAGMA journal_mode=WAL").fetchone()[0].lower() != "wal":
