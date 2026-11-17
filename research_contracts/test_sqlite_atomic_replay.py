@@ -49,5 +49,35 @@ class SQLiteReplayAtomicityTests(unittest.TestCase):
         self.assertTrue(self.gate.admit_authenticated("a", 1, authenticated=True))
 
 
+    def test_sqlite_abort_on_second_write_rolls_back_entire_batch(self):
+        """An actual SQLite trigger abort must not consume the first nonce."""
+        self.gate.connection.execute("""
+            CREATE TRIGGER fail_second_node BEFORE INSERT ON replay_highwater
+            WHEN NEW.node = 'fault'
+            BEGIN SELECT RAISE(ABORT, 'injected storage failure'); END
+        """)
+        with self.assertRaises(__import__("sqlite3").DatabaseError):
+            self.gate.admit_authenticated_batch(
+                [("honest", 7), ("fault", 2)], authenticated=True)
+        self.assertFalse(self.gate.connection.in_transaction)
+        self.assertIsNone(self.gate.connection.execute(
+            "SELECT seq FROM replay_highwater WHERE node='honest'").fetchone())
+        self.assertTrue(self.gate.admit_authenticated("honest", 7, authenticated=True))
+
+    def test_failed_batch_does_not_advance_existing_highwater(self):
+        self.assertTrue(self.gate.admit_authenticated("honest", 4, authenticated=True))
+        self.gate.connection.execute("""
+            CREATE TRIGGER fail_fault_update BEFORE INSERT ON replay_highwater
+            WHEN NEW.node = 'fault'
+            BEGIN SELECT RAISE(ABORT, 'injected failure'); END
+        """)
+        with self.assertRaises(__import__("sqlite3").DatabaseError):
+            self.gate.admit_authenticated_batch(
+                [("honest", 5), ("fault", 1)], authenticated=True)
+        self.assertEqual(self.gate.connection.execute(
+            "SELECT seq FROM replay_highwater WHERE node='honest'").fetchone()[0], 4)
+        self.assertTrue(self.gate.admit_authenticated("honest", 5, authenticated=True))
+
+
 if __name__ == "__main__":
     unittest.main()
