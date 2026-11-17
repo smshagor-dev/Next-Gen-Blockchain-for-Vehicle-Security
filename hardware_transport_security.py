@@ -544,6 +544,12 @@ class AuthenticatedLineFramer:
     def feed(self, data: bytes) -> list[bytes]:
         if not isinstance(data, (bytes, bytearray)):
             raise HardwareTransportError("HW_FRAME_TYPE_INVALID")
+        # Reject oversized transport chunks before allocating/copying them.
+        # Production sockets read bounded chunks; this also protects direct
+        # callers of the framing API from one-shot oversized input.
+        if len(data) > self.max_frame_bytes:
+            self._buffer.clear()
+            raise HardwareTransportError("HW_FRAME_TOO_LARGE")
         self._buffer.extend(data)
         frames: list[bytes] = []
         while True:
