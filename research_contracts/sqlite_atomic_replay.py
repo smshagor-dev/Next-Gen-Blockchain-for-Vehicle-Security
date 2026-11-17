@@ -9,6 +9,7 @@ import math
 import itertools
 
 MAX_BATCH_ENTRIES = 4096
+MAX_NODE_ID_BYTES = 128
 
 
 class ReplayStoreError(RuntimeError):
@@ -52,7 +53,9 @@ class SQLiteAtomicReplayGate:
         if len(entries) > MAX_BATCH_ENTRIES:
             raise ValueError("replay batch exceeds maximum entries")
         for node, seq in entries:
-            if not isinstance(node, str) or not node or type(seq) is not int or not 0 <= seq <= 9223372036854775807:
+            if (not isinstance(node, str) or not node or len(node.encode("utf-8")) > MAX_NODE_ID_BYTES
+                    or any(ord(ch) < 32 or ord(ch) == 127 for ch in node)
+                    or type(seq) is not int or not 0 <= seq <= 9223372036854775807):
                 raise ValueError("invalid replay identity or sequence")
         if not entries:
             return True
