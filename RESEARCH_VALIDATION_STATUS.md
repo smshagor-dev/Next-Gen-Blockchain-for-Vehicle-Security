@@ -255,3 +255,19 @@ Added `tests/test_production_pi_handler_loopback.py` (commit `f639b838`) to comp
 **Execution:** Full repository checkout unavailable (`github.com` DNS resolution failed); committed tests have **not** been run, so behavior remains unverified. Execute `python -m unittest discover -s research_contracts -p 'test_sqlite_atomic_replay.py' -v` on a complete checkout and then the full suite. No merge.
 
 **Matrix:** SQLite SQL-error rollback = regression implemented / execution pending; production authenticated Pi ingress = partial; local emergency stop = physically unverified; ledger crash/power-loss = blocked; authentic VeReMi/CAN provenance = upcoming; independent multi-seed adversarial baselines and effect sizes = blocked; paper = blocked. Next: run these failure tests and integrate durable replay admission with production Pi socket handler, followed by real loopback fault injection.
+
+
+## 2026-11-17 process-termination replay regression checkpoint
+
+**Implemented:** `research_contracts/test_replay_process_termination.py` (commit `c21e5dd`) adds three executable subprocess tests: committed multi-node high-water survives abrupt `os._exit(0)` without connection close; an uncommitted high-water update rolls back after process exit; and corrupted SQLite input fails closed instead of silently initializing fresh replay state. Tests run actual SQLite file operations in independent Python processes, not mocks. **Execution pending**; neither SIGKILL/power-loss durability nor hardware safety is proven. This is a correctness prerequisite, not publishable primary scientific evidence.
+
+| Item | Status | Evidence / blocker |
+| --- | --- | --- |
+| Replay process-exit persistence and rollback | Implemented; unverified | Three subprocess tests committed, execution pending |
+| Actual power-loss/fsync durability | Blocked | No power-cut rig, crash harness or filesystem durability evidence |
+| Production Pi authenticated ingress and interlocks | Partial | Independent local emergency stop unverified |
+| Mock contract finality | Blocked | No distributed consensus finality demonstrated |
+| Original mechanism and external adversarial evaluation | Upcoming | Threat model, real datasets, matched baselines and multi-seed experiments missing |
+| Manuscript numerical claims | Blocked | Existing fixtures/microbenchmarks are non-publishable primary results |
+
+**Run:** `python -m unittest discover -s research_contracts -p 'test_replay_process_termination.py' -v`. Next code task: integrate fail-closed recovery into production hardware bridge, then run real authenticated loopback faults and collect baseline-matched latency/CPU/RAM/throughput. Do not merge without executing the branch test suite.
