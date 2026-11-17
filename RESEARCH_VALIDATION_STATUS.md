@@ -189,3 +189,16 @@ Added `tests/test_production_pi_handler_loopback.py` (commit `f639b838`) to comp
 **Matrix:** complete-frame JSON syntax preflight = implemented/unverified; general replay batch atomicity = partial; production ingress = partial; emergency-stop physical independence = unverified; ledger crash consistency = partial; real dataset provenance and independent adversarial comparisons = blocked; publication-ready evidence = blocked.
 
 **Next code task:** Add a transactional multi-frame durable replay admission API or explicit one-frame-at-a-time delivery, then real production loopback socket fault injection with measured matched-baseline resource costs.
+
+
+## 2026-11-17 complete-frame MAC preflight checkpoint
+
+**Implemented, execution pending:** Isolated receiver `research_contracts/test_receiver_fault_model.py` now checks schema, node enrollment, signed sequence range and HMAC on *every fully buffered frame* before any per-frame durable replay-store admission. This prevents a valid first frame's durable nonce from being consumed when a later complete frame in the same `feed()` call has a bad MAC. Two new executable regressions cover coalesced and fragmented-first-frame cases. Commit `6c866b4` on draft PR #141.
+
+**Important scope limit:** This is not transactional multi-frame admission. A later replay rejection or injected storage failure can still occur after an earlier commit. A complete frame received in an earlier `feed()` call is separately admitted; this change does not roll back prior calls. A transactional batch API or explicit per-frame delivery contract remains necessary. MAC preflight performs additional verification work and needs bounded latency measurements.
+
+**Validation:** GitHub connector write succeeded; no checkout-based execution was performed in this run. Run `python -m unittest discover -s research_contracts -p 'test_receiver_fault_model.py' -v`, then full regression suite and real production loopback experiments. No empirical effectiveness, hardware safety, or publication-ready result is claimed.
+
+**Matrix:** complete-frame syntax + MAC preflight = implemented/unverified; batch atomicity = partial; production ingress/independent local emergency control = partial/unverified; crash consistency and mock finality = partial; authentic VeReMi NextGen/CAN provenance = blocked; independent matched multi-seed attacks, ablations, latency/CPU/RAM/throughput = upcoming; original research manuscript = blocked until validated evidence. Existing fixtures, 3-peer poisoning sanity checks, 5-iteration microbenchmarks and offline formulas are NON-PUBLISHABLE primary evidence.
+
+**Next code task:** Design explicit per-frame delivery semantics or SQLite transactional batch admission and test later-frame replay/storage rejection without invisible nonce consumption. Then execute production authenticated loopback concurrent replay/slow-peer fault campaign and collect independent baseline metrics.
