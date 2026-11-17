@@ -213,3 +213,14 @@ Added `tests/test_production_pi_handler_loopback.py` (commit `f639b838`) to comp
 **Matrix:** coalesced replay-order preflight = implemented/unverified; general atomic replay batch = partial; production authenticated Pi integration and emergency interlock = partial/unverified; crash consistency = partial; authentic incident datasets and matched adversarial experiments = blocked; statistical manuscript evidence = blocked.
 
 **Next code task:** add an atomic `admit_authenticated_batch` SQLite transaction with rollback-on-replay/storage-fault and test against restart; preserve per-frame delivery semantics or ensure all-or-nothing caller visibility. Then execute production loopback slow-peer/concurrent replay fault injections with honest-client latency and resource measurements. Fixture-only and microbenchmark outcomes remain non-publishable.
+
+
+## 2026-11-17 atomic SQLite replay batch primitive
+
+**Implemented, not yet integrated:** Added `research_contracts/sqlite_atomic_replay.py` with SQLite `BEGIN IMMEDIATE` multi-node replay high-water admission, rollback on stale/duplicate later entries and exception, strict authenticated caller flag, and persisted high-water after normal close/reopen. Added `research_contracts/test_sqlite_atomic_replay.py` covering later stale entry rollback, duplicate-in-batch rollback, restart, unauthenticated rejection and invalid input. Commits bc67dba, b8f12a9.
+
+**Verification:** GitHub writes succeeded; checked-in tests not executed in this run. Run `python -m unittest discover -s research_contracts -p 'test_sqlite_atomic_replay.py' -v` followed by receiver tests. No crash/power-loss durability or concurrency guarantee has been experimentally established. SQLite local atomic commit is NOT distributed blockchain finality.
+
+**Status matrix:** SQLite atomic batch gate = implemented/unverified; receiver integration = upcoming; production TCP ingress = partial; emergency hardware interlocks = blocked; independent multi-seed adversarial experiments and authentic datasets = blocked; paper = not ready. Existing fixture CSVs, 3-peer poisoning sanity check, five-iteration microbenchmarks and offline formulas are NON-PUBLISHABLE primary evidence.
+
+**Next code task:** Wire `BoundedReceiver.feed` to `admit_authenticated_batch` only after full frame/MAC preflight, return events only after successful commit; test second-frame replay and injected SQL failures with no earlier sequence consumption. Then execute real production Pi loopback tests.
