@@ -50,7 +50,40 @@ class SQLiteAtomicReplayGate:
         except BaseException:
             self.connection.close()
             raise
-        self.connection.execute("CREATE TABLE IF NOT EXISTS replay_highwater (node TEXT PRIMARY KEY, seq INTEGER NOT NULL CHECK(seq >= 0))")
+        try:
+            if require_existing:
+                # Never provision schema on recovery: a nonempty unrelated SQLite
+                # file would otherwise silently reset all replay principals.
+                integrity = self.connection.execute("PRAGMA integrity_check").fetchone()
+                if integrity is None or integrity[0] != "ok":
+                    raise ReplayStoreError("replay database integrity check failed")
+                schema = self.connection.execute(
+                    "SELECT sql FROM sqlite_master WHERE type='table' AND name='replay_highwater'"
+                ).fetchone()
+                if schema is None:
+                    raise ReplayStoreError("replay high-water schema missing; recovery denied")
+                columns = self.connection.execute(
+                    "PRAGMA table_info(replay_highwater)"
+                ).fetchall()
+                if [(c[1], c[2].upper(), c[5]) for c in columns] != [
+                    ("node", "TEXT", 1), ("seq", "INTEGER", 0)
+                ]:
+                    raise ReplayStoreError("replay high-water schema mismatch")
+                # Validate persisted rows, including constraint-bypassing imports.
+                invalid = self.connection.execute(
+                    "SELECT 1 FROM replay_highwater "
+                    "WHERE node IS NULL OR node='' OR seq IS NULL OR seq < 0 LIMIT 1"
+                ).fetchone()
+                if invalid is not None:
+                    raise ReplayStoreError("invalid persisted replay high-water")
+            else:
+                self.connection.execute(
+                    "CREATE TABLE IF NOT EXISTS replay_highwater "
+                    "(node TEXT PRIMARY KEY, seq INTEGER NOT NULL CHECK(seq >= 0))"
+                )
+        except BaseException:
+            self.connection.close()
+            raise
 
     def close(self):
         with self._lock:
