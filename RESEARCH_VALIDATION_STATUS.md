@@ -306,3 +306,16 @@ Next: reconcile enrolled-node identifier canonicalization in hardware_bridge and
 - **Blocked:** privileged database snapshot rollback remains possible without an independent trusted monotonic anchor; no physical safety or power-loss evidence.
 - **Upcoming highest-priority code:** integrate fail-closed persistent replay recovery into production hardware_bridge ingress, keeping physical emergency stop independent; then authenticated socket fault injection and matched performance baselines.
 - **Publication gate:** fixture CSVs, microbenchmarks, 3-peer sanity checks and offline formulas are not primary experimental results. No effectiveness claim or statistical significance claim from n>=30 alone.
+
+
+## 2026-11-17 authenticated framer preallocation boundary
+
+| Workstream | State | Evidence and remaining limitation |
+| --- | --- | --- |
+| Oversized single-chunk preallocation | Implemented; repository tests pending | `AuthenticatedLineFramer.feed` now rejects chunks exceeding configured frame budget before extending its buffer, and clears pending partial bytes |
+| Framer chunk-boundary regression | Added; not yet executed in full checkout | `tests/test_hardware_framer_chunk_budget.py` covers over-budget input, recovery after partial input, and exact-budget multiple frames |
+| Production TCP replay durability | Partial | Live `HardwareEnvelopeVerifier` uses an in-memory nonce cache; durable research replay-store is not wired to Pi/serial production ingestion |
+| Independent local emergency stop | Software path isolated; physical behavior unverified | Remote CAN/serial command dispatch remains disabled; no physical bench/hardware evidence |
+| Authentic V2X/CAN paired adversarial study | Pending | No publishable incident-level matched baseline, multi-seed runtime or uncertainty measurements from this change |
+
+Run `python -m unittest discover -s tests -p 'test_hardware_framer_chunk_budget.py' -v` and the complete transport suite before merging. This resource-limit change does not prove end-to-end DoS resilience, physical safety or scientific detection performance. Next: integrate fail-closed durable replay provisioning/recovery into production Pi ingestion, then measure real authenticated loopback fault-injection behavior.
