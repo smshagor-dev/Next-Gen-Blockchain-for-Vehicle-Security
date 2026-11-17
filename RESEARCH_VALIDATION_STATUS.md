@@ -271,3 +271,12 @@ Added `tests/test_production_pi_handler_loopback.py` (commit `f639b838`) to comp
 | Manuscript numerical claims | Blocked | Existing fixtures/microbenchmarks are non-publishable primary results |
 
 **Run:** `python -m unittest discover -s research_contracts -p 'test_replay_process_termination.py' -v`. Next code task: integrate fail-closed recovery into production hardware bridge, then run real authenticated loopback faults and collect baseline-matched latency/CPU/RAM/throughput. Do not merge without executing the branch test suite.
+
+
+## 2026-11-17 replay durability configuration hardening
+
+- **Implemented, branch PR #141:** SQLite replay gate now requires `journal_mode=WAL` and `synchronous=FULL`, checking both pragmas before accepting events. Initialization fails closed and closes the connection if these guarantees cannot be configured. Non-finite busy timeouts are rejected. Commits `f5ae887`, `f6a6e0e`.
+- **New executable tests:** `python -m unittest discover -s research_contracts -p 'test_replay_durability_configuration.py' -v`. These check file-backed WAL/FULL, restart replay rejection, unsupported in-memory journal and NaN/infinite timeouts. Full committed suite **not executed**.
+- **Locally verified independent SQLite configuration probe:** file-backed SQLite returned `wal` and synchronous `2` (FULL); in-memory WAL request returned `memory`, confirming a fail-closed condition. This is an environment probe, not a full branch test or a crash/power-loss experiment.
+- **Matrix:** file-backed replay durability configuration = implemented/branch tests pending; SQLite batch atomicity = implemented/full tests pending; production hardware ingress = partial; emergency-stop independence = unverified; physical power-loss durability = blocked; mock consensus finality = blocked; authentic V2X/CAN datasets = upcoming; matched adversarial multi-seed evaluation = blocked; paper = not ready.
+- **Next:** run committed tests, audit production hardware bridge for replay-store path and restart behavior, then conduct real authenticated loopback slow-client and concurrent-replay experiments with matched baselines. No publishable scientific effect or physical safety claim.
