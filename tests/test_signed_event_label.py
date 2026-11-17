@@ -23,9 +23,15 @@ class SignedEventLabelTests(unittest.TestCase):
 
     def test_ambiguous_or_missing_labels_rejected(self):
         validate, _ = load_validator()
-        for value in (None, 0, False, [], {}, "", "x" * 129):
+        for value in (None, 0, False, [], {}, "", "x" * 161):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 validate(value)
+
+    def test_multibyte_utf8_budget(self):
+        validate, _ = load_validator()
+        self.assertEqual(validate("é" * 80), "é" * 80)
+        with self.assertRaises(ValueError):
+            validate("é" * 81)
 
     def test_control_characters_rejected(self):
         validate, _ = load_validator()
