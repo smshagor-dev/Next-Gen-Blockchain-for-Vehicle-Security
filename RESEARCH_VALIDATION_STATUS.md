@@ -280,3 +280,20 @@ Added `tests/test_production_pi_handler_loopback.py` (commit `f639b838`) to comp
 - **Locally verified independent SQLite configuration probe:** file-backed SQLite returned `wal` and synchronous `2` (FULL); in-memory WAL request returned `memory`, confirming a fail-closed condition. This is an environment probe, not a full branch test or a crash/power-loss experiment.
 - **Matrix:** file-backed replay durability configuration = implemented/branch tests pending; SQLite batch atomicity = implemented/full tests pending; production hardware ingress = partial; emergency-stop independence = unverified; physical power-loss durability = blocked; mock consensus finality = blocked; authentic V2X/CAN datasets = upcoming; matched adversarial multi-seed evaluation = blocked; paper = not ready.
 - **Next:** run committed tests, audit production hardware bridge for replay-store path and restart behavior, then conduct real authenticated loopback slow-client and concurrent-replay experiments with matched baselines. No publishable scientific effect or physical safety claim.
+
+
+## 2026-11-17 authenticated replay identity canonicalization checkpoint
+
+| Workstream | Status | Evidence / limitation |
+| --- | --- | --- |
+| Replay principal encoding and NFC admission | Implemented, unverified | Rejects ill-formed UTF-8 surrogates, non-NFC aliases, malformed batch entry shapes before SQLite transaction |
+| Replay identity compatibility | Partial | Enrollment/device registry must use the same canonical NFC policy; legacy non-NFC IDs will be rejected |
+| Regression suite | Added, execution blocked | Four cases in research_contracts/test_replay_identity_canonicalization.py; no full-checkout execution |
+| Real authenticated socket and physical interlocks | Blocked | No Pi/hardware or full repository checkout; independent local emergency control must remain available |
+| Independent adversarial evidence | Pending | No authentic incident dataset, independent multi-seed baselines, measured effect sizes |
+| Publication readiness | Blocked | This is security hardening, not publishable V2X effectiveness evidence |
+
+Commits: a8d2d8394db6d6e9092aeb930ce038f06f1e9508, 56f67e7b7c52229c24456055a4f94d7f5e925ef0.
+Validation command: `python -m unittest discover -s research_contracts -p 'test_replay_identity_canonicalization.py' -v`.
+Local `git ls-remote` failed with `Could not resolve host: github.com`; do not claim tests passed. PR #141 remains draft and must not merge without validation.
+Next: reconcile enrolled-node identifier canonicalization in hardware_bridge and device registry; run focused/full suites, then authenticated loopback replay/slow-peer faults and matched performance baselines.
