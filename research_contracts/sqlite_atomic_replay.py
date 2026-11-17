@@ -72,7 +72,9 @@ class SQLiteAtomicReplayGate:
                 # Validate persisted rows, including constraint-bypassing imports.
                 invalid = self.connection.execute(
                     "SELECT 1 FROM replay_highwater "
-                    "WHERE node IS NULL OR node='' OR seq IS NULL OR seq < 0 LIMIT 1"
+                    "WHERE typeof(node) != 'text' OR node='' "
+                    "OR length(CAST(node AS BLOB)) > 128 "
+                    "OR typeof(seq) != 'integer' OR seq < 0 LIMIT 1"
                 ).fetchone()
                 if invalid is not None:
                     raise ReplayStoreError("invalid persisted replay high-water")
