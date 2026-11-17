@@ -246,3 +246,12 @@ Added `tests/test_production_pi_handler_loopback.py` (commit `f639b838`) to comp
 **Validation command:** `python -m unittest discover -s research_contracts -p 'test_sqlite_concurrent_replay.py' -v`; then run the existing SQLite and receiver integration suites. **Status matrix:** concurrent replay transaction serialization = implemented/unverified; production bridge integration = partial; emergency interlock = unverified; crash durability = partial; authentic dataset provenance and independent multi-seed baseline experiments = blocked; paper primary evidence = not ready.
 
 **Next code task:** integrate the shared gate into the production Pi handler (not just research receiver simulation), run actual authenticated loopback concurrent replay/slow-peer/storage-failure tests, and record rejection latency and honest throughput under matched baselines. Review multi-process SQLite locking, crash injection, and actuator isolation before any merge.
+
+
+## 2026-11-17 SQLite injected-failure regression checkpoint
+
+**Implemented:** Two executable regression tests in `research_contracts/test_sqlite_atomic_replay.py` (commit `020ec69`) inject a real SQLite `RAISE(ABORT)` trigger on the second insert. They assert that an earlier new high-water entry is rolled back, the transaction is closed and the connection remains usable; a second test checks that an existing high-water value is not advanced by a failed batch. These are fault-injection correctness tests, not publishable independent V2X experiments.
+
+**Execution:** Full repository checkout unavailable (`github.com` DNS resolution failed); committed tests have **not** been run, so behavior remains unverified. Execute `python -m unittest discover -s research_contracts -p 'test_sqlite_atomic_replay.py' -v` on a complete checkout and then the full suite. No merge.
+
+**Matrix:** SQLite SQL-error rollback = regression implemented / execution pending; production authenticated Pi ingress = partial; local emergency stop = physically unverified; ledger crash/power-loss = blocked; authentic VeReMi/CAN provenance = upcoming; independent multi-seed adversarial baselines and effect sizes = blocked; paper = blocked. Next: run these failure tests and integrate durable replay admission with production Pi socket handler, followed by real loopback fault injection.
