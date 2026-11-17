@@ -78,6 +78,21 @@ class SQLiteAtomicReplayGate:
                 ).fetchone()
                 if invalid is not None:
                     raise ReplayStoreError("invalid persisted replay high-water")
+                # SQLite length/type checks cannot detect Unicode aliases or
+                # control characters. Apply the same canonical identity policy
+                # on recovery as on fresh admission, before accepting traffic.
+                for (persisted_node,) in self.connection.execute(
+                    "SELECT node FROM replay_highwater"
+                ):
+                    try:
+                        raw_node = persisted_node.encode("utf-8", errors="strict")
+                    except UnicodeError as exc:
+                        raise ReplayStoreError("invalid persisted replay identity encoding") from exc
+                    if (not raw_node
+                            or len(raw_node) > MAX_NODE_ID_BYTES
+                            or unicodedata.normalize("NFC", persisted_node) != persisted_node
+                            or any(ord(ch) < 32 or ord(ch) == 127 for ch in persisted_node)):
+                        raise ReplayStoreError("invalid persisted replay identity")
             else:
                 self.connection.execute(
                     "CREATE TABLE IF NOT EXISTS replay_highwater "
