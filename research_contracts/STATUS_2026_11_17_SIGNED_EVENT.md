@@ -40,3 +40,17 @@ Commands:
 `python -m unittest discover -s tests -p 'test_authenticated_socket_session.py' -v`
 
 Next code task: bound persistent nonce table safely (without reopening expired replay during clock rollback), then run full checkout and real authenticated loopback restart/replay experiments. The current database is vulnerable to unbounded storage growth; keep PR draft and do not merge.
+
+## 2026-11-17 bounded nonce capacity checkpoint
+
+| Workstream | Status | Evidence / blocker |
+| --- | --- | --- |
+| Durable nonce capacity | Implemented, tests unexecuted | DEFAULT_MAX_NONCE_CLAIMS=100000, configurable max_claims 1..1000000; no eviction or expiration-based replay reopening |
+| Capacity/clock tests | Committed, unexecuted | tests/test_hardware_nonce_store.py checks fail-closed capacity and non-finite clock |
+| Storage/availability | Partial | SQLite pages and WAL file can grow; exhaustion intentionally denies legitimate traffic; no safe retention protocol or disk-quota enforcement |
+| Runtime performance | Blocked | COUNT(*) in every claim needs measured throughput and latency; no performance result |
+| Safety/actuation | Blocked | Independent local emergency stop not physically verified |
+| Research datasets/baselines | Upcoming | Independent attack labels and matched splits required |
+
+Validation command: `python -m unittest discover -s tests -p 'test_hardware_nonce_store.py' -v`
+Next: test committed code on full checkout, measure capacity and disk-growth behavior, design epoch-bound replay expiration with authenticated time and rollback resistance before enabling eviction. Do not merge this draft.
