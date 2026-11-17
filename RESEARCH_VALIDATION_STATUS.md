@@ -202,3 +202,14 @@ Added `tests/test_production_pi_handler_loopback.py` (commit `f639b838`) to comp
 **Matrix:** complete-frame syntax + MAC preflight = implemented/unverified; batch atomicity = partial; production ingress/independent local emergency control = partial/unverified; crash consistency and mock finality = partial; authentic VeReMi NextGen/CAN provenance = blocked; independent matched multi-seed attacks, ablations, latency/CPU/RAM/throughput = upcoming; original research manuscript = blocked until validated evidence. Existing fixtures, 3-peer poisoning sanity checks, 5-iteration microbenchmarks and offline formulas are NON-PUBLISHABLE primary evidence.
 
 **Next code task:** Design explicit per-frame delivery semantics or SQLite transactional batch admission and test later-frame replay/storage rejection without invisible nonce consumption. Then execute production authenticated loopback concurrent replay/slow-peer fault campaign and collect independent baseline metrics.
+
+
+## 2026-11-17 coalesced replay-order preflight checkpoint
+
+**Implemented, not yet executed:** Commit efafb27 adds a preflight monotonic sequence check for complete frames in one feed batch before any replay-store mutation. Duplicate and decreasing authenticated sequences within the same coalesced batch now reject and poison the session before the first replay-gate call. Added two executable regression tests, including a recording gate that must remain untouched. This only covers within-batch ordering, **not** durable-gate rejection against preexisting stored high-water marks or transactional multi-frame storage failure. No physical actuation changes.
+
+**Validation pending:** `python -m unittest discover -s research_contracts -p 'test_receiver_fault_model.py' -v`; then full `research_contracts` suite and production loopback socket tests. No test pass, measured performance, or publication-level evidence is claimed for this change.
+
+**Matrix:** coalesced replay-order preflight = implemented/unverified; general atomic replay batch = partial; production authenticated Pi integration and emergency interlock = partial/unverified; crash consistency = partial; authentic incident datasets and matched adversarial experiments = blocked; statistical manuscript evidence = blocked.
+
+**Next code task:** add an atomic `admit_authenticated_batch` SQLite transaction with rollback-on-replay/storage-fault and test against restart; preserve per-frame delivery semantics or ensure all-or-nothing caller visibility. Then execute production loopback slow-peer/concurrent replay fault injections with honest-client latency and resource measurements. Fixture-only and microbenchmark outcomes remain non-publishable.
