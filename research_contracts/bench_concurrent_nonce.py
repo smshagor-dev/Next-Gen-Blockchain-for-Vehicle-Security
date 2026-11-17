@@ -6,6 +6,7 @@ research samples or infer significance from their count.
 """
 import argparse
 import csv
+import random
 from concurrent.futures import ThreadPoolExecutor
 import os
 from pathlib import Path
@@ -24,10 +25,16 @@ def run(seed, workers, attempts, capacity, output):
     # A fixed, paired sequence: every even index replays the preceding
     # honest nonce; odd indices use distinct fresh nonces. Scheduling order
     # is nondeterministic, so report outcomes rather than expected rejection.
+    if type(seed) is not int or seed < 0 or seed >= 2**64:
+        raise ValueError("seed must be an unsigned 64-bit integer")
+    if type(attempts) is not int or attempts % 2:
+        raise ValueError("attempts must be even for matched nonce pairs")
     workload = [
-        (i, "fresh" if i % 2 == 0 else "replay",
+        (i, "first_copy" if i % 2 == 0 else "second_copy",
          f"{seed:016x}{i // 2:016x}") for i in range(attempts)
     ]
+    # Randomized submission order; labels are not attacker ground truth.
+    random.Random(seed).shuffle(workload)
     with tempfile.TemporaryDirectory() as d:
         path = os.path.join(d, "claims.sqlite")
         store = SQLiteNonceStore(path, provision=True, max_claims=capacity)
@@ -49,20 +56,23 @@ def run(seed, workers, attempts, capacity, output):
                 rows = list(pool.map(attempt, workload))
         finally:
             store.close()
+    # Check matched-pair safety before writing an evidence artifact.
+    accepted = {}
+    pairs = {}
+    for row in rows:
+        key = row["attempt_index"] // 2
+        pairs[key] = pairs.get(key, 0) + 1
+        if row["outcome"] == "accepted":
+            accepted[key] = accepted.get(key, 0) + 1
+    if any(n > 1 for n in accepted.values()):
+        raise AssertionError("duplicate nonce admitted under concurrency")
+    if any(n != 2 for n in pairs.values()):
+        raise AssertionError("incomplete matched nonce pair")
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=list(rows[0]))
         writer.writeheader()
         writer.writerows(rows)
-    # The same nonce cannot be accepted twice even when the replay races
-    # ahead of the nominal fresh sender.
-    accepted = {}
-    for row in rows:
-        if row["outcome"] == "accepted":
-            key = row["attempt_index"] // 2
-            accepted[key] = accepted.get(key, 0) + 1
-    if any(n > 1 for n in accepted.values()):
-        raise AssertionError("duplicate nonce admitted under concurrency")
     return {
         "attempts": len(rows),
         "accepted": sum(row["outcome"] == "accepted" for row in rows),
