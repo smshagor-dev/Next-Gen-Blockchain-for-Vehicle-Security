@@ -224,3 +224,16 @@ Added `tests/test_production_pi_handler_loopback.py` (commit `f639b838`) to comp
 **Status matrix:** SQLite atomic batch gate = implemented/unverified; receiver integration = upcoming; production TCP ingress = partial; emergency hardware interlocks = blocked; independent multi-seed adversarial experiments and authentic datasets = blocked; paper = not ready. Existing fixture CSVs, 3-peer poisoning sanity check, five-iteration microbenchmarks and offline formulas are NON-PUBLISHABLE primary evidence.
 
 **Next code task:** Wire `BoundedReceiver.feed` to `admit_authenticated_batch` only after full frame/MAC preflight, return events only after successful commit; test second-frame replay and injected SQL failures with no earlier sequence consumption. Then execute real production Pi loopback tests.
+
+
+## 2026-11-17 atomic receiver integration checkpoint
+
+**Implemented, execution pending:** BoundedReceiver now calls SQLiteAtomicReplayGate.admit_authenticated_batch for every complete authenticated frame in one feed() call before returning events. A rejected batch poisons the session; the SQLite gate rolls back all high-water updates on a later stale sequence. Added test_receiver_atomic_batch_integration.py covering cross-node later-frame disk replay rejection, rejected-batch state, normal reopen persistence, and injected SQLite error. Commits: 0f714734, d784f8d4, 6eabfe3b.
+
+**Important limits:** Atomicity is scoped to complete frames within a single feed() call, not across different socket reads or across ledger/actuator side effects. Legacy replay gates exposing only admit_authenticated still use non-atomic per-frame admission; production should require the batch API for coalesced frames. SQLite normal reopen is not power-loss evidence. No hardware actuation or independent emergency-stop verification was performed.
+
+**Validation:** GitHub connector changes succeeded; local git ls-remote failed with 'Could not resolve host: github.com'. No checked-in tests executed, no performance results claimed.
+
+**Matrix:** simulation batch integration = implemented/unverified; legacy-gate fallback = partial/risk; production hardware ingress and interlocks = partial/unverified; ledger crash durability = partial; authentic datasets = blocked; independent matched multi-seed adversarial experiments = pending; paper = blocked. Fixture CSVs, three-peer sanity checks, five-iteration microbenchmarks, and offline formulas remain non-publishable primary evidence.
+
+**Next:** run python -m unittest discover -s research_contracts -p 'test_receiver_atomic_batch_integration.py' -v and full research_contracts suite on a complete checkout. Then eliminate unsafe legacy batch fallback, test SQLite concurrent sessions and injected transaction failures, and wire production Pi loopback to the verified gate without compromising local emergency control.
