@@ -90,3 +90,9 @@ Run:
 `python research_contracts/bench_concurrent_nonce.py --seed 20261117 --workers 8 --attempts 400 --capacity 200 --output results/concurrent_nonce_seed_20261117.csv`
 
 Status: IMPLEMENTED / UNEXECUTED. This is a **component-level concurrency benchmark**, not TCP ingress, malicious enrolled-node, CAN dataset or physical safety evidence. No raw results or statistical conclusions yet. Next code task: authenticated multi-client loopback harness against production Pi TCP and independent repeated-seed experiments with raw results; do not merge draft without verified tests.
+
+## Paired concurrency experiment validity correction — 2026-11-17
+
+Completed (code, unexecuted): `research_contracts/bench_concurrent_nonce.py` now uses seeded shuffled submission and neutral `first_copy`/`second_copy` labels. Previous `fresh`/`replay` labels were scientifically invalid: a scheduler can admit the nominal replay copy first, and neither copy is independently known malicious. The experiment checks exactly two copies per pair and no more than one accepted claim before writing CSV. Regression tests cover seeded ordering, pair completeness and odd-count rejection.
+
+Status: implementation complete; repository tests not run; no raw measured results or independent samples. The shuffled paired SQLite component workload is not an authenticated TCP attack, CAN/V2X dataset, or publication-quality effect estimate. Upcoming: run `python -m unittest discover -s tests -p 'test_concurrent_nonce_experiment.py' -v`, verify actual outputs, then implement authenticated TCP paired workload with explicit sender-role ground truth, synchronized network baseline, and per-seed independent runs. Main remains unchanged.
