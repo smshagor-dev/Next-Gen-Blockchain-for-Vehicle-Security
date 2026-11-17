@@ -152,6 +152,27 @@ class BoundedReceiver:
             self.buffer.clear()
             self.expected = None
             raise FrameError("batch replay-order preflight rejected") from exc
+        # Atomic durable replay admission for all complete authenticated frames
+        # in this feed call. No event is exposed until the entire transaction
+        # commits. The legacy single-entry gate remains non-atomic and is not
+        # suitable for multi-frame production admission.
+        batch_committed = False
+        if completed_payloads and self.replay_gate is not None:
+            batch_method = getattr(self.replay_gate, "admit_authenticated_batch", None)
+            if batch_method is not None:
+                try:
+                    entries = []
+                    for candidate in completed_payloads:
+                        envelope = json.loads(candidate, object_pairs_hook=_unique_object)
+                        entries.append((envelope["node"], envelope["seq"]))
+                    if not batch_method(entries, authenticated=True):
+                        raise FrameError("durable batch replay rejected")
+                    batch_committed = True
+                except Exception as exc:
+                    self.poisoned = True
+                    self.buffer.clear()
+                    self.expected = None
+                    raise FrameError("durable batch admission failed") from exc
         accepted = []
         offset = 0
         while offset < len(chunk):
@@ -182,7 +203,7 @@ class BoundedReceiver:
                     # independently of the cumulative byte budget.
                     if self.accepted_frames >= self.session_frame_limit:
                         raise FrameError("session frame budget exhausted")
-                    item = self._admit(payload)
+                    item = self._admit(payload, replay_checked=batch_committed)
                     self.accepted_frames += 1
                     accepted.append(item)
                 except Exception as exc:  # Storage errors must also terminate this connection.
@@ -190,7 +211,7 @@ class BoundedReceiver:
                     raise FrameError("connection rejected after invalid frame") from exc
         return accepted
 
-    def _admit(self, payload):
+    def _admit(self, payload, replay_checked=False):
         try:
             envelope = json.loads(payload, object_pairs_hook=_unique_object)
             if not isinstance(envelope, dict) or set(envelope) != {"node", "seq", "event", "mac"}:
@@ -207,7 +228,7 @@ class BoundedReceiver:
                 raise ValueError("invalid authentication")
             if seq > 9223372036854775807:
                 raise ValueError("sequence exceeds durable store range")
-            if self.replay_gate is not None:
+            if self.replay_gate is not None and not replay_checked:
                 # Commit authenticated high-water mark before exposing admission.
                 # Storage failures propagate: no event is returned to the caller.
                 if not self.replay_gate.admit_authenticated(node, seq, authenticated=True):
