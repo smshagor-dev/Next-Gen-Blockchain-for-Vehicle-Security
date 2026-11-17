@@ -7,6 +7,9 @@ import os
 import sqlite3
 import threading
 import time
+import math
+
+DEFAULT_MAX_NONCE_CLAIMS = 100000
 
 
 class NonceStoreError(RuntimeError):
@@ -14,11 +17,14 @@ class NonceStoreError(RuntimeError):
 
 
 class SQLiteNonceStore:
-    def __init__(self, path, *, provision=False, clock=None):
+    def __init__(self, path, *, provision=False, clock=None, max_claims=DEFAULT_MAX_NONCE_CLAIMS):
         if not isinstance(path, (str, os.PathLike)) or not os.fspath(path):
             raise ValueError("persistent nonce database path required")
         if type(provision) is not bool:
             raise ValueError("provision must be bool")
+        if type(max_claims) is not int or not 1 <= max_claims <= 1000000:
+            raise ValueError("max_claims must be an integer within [1, 1000000]")
+        self._max_claims = max_claims
         self._clock = clock or time.time
         self._lock = threading.RLock()
         if not provision and (not os.path.isfile(path) or os.stat(path).st_size == 0):
@@ -53,6 +59,8 @@ class SQLiteNonceStore:
             raise ValueError("invalid nonce claim")
         with self._lock:
             now = float(self._clock())
+            if not math.isfinite(now):
+                raise NonceStoreError("invalid local clock; nonce admission denied")
             self._db.execute("BEGIN IMMEDIATE")
             try:
                 # Never delete an existing nonce before testing it: an expired
@@ -64,6 +72,9 @@ class SQLiteNonceStore:
                 if found is not None:
                     self._db.execute("ROLLBACK")
                     return False
+                count = self._db.execute("SELECT COUNT(*) FROM nonce_claims").fetchone()[0]
+                if count >= self._max_claims:
+                    raise NonceStoreError("nonce store capacity exhausted; admission denied")
                 self._db.execute(
                     "INSERT INTO nonce_claims(device,nonce,expires) VALUES(?,?,?)",
                     (device, nonce, now + ttl_seconds),
