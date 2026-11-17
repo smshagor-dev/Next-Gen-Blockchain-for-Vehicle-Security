@@ -21,3 +21,22 @@ Next substantive task: integrate durable replay with explicit provisioning/recov
 Implemented: hardware_bridge._signed_event_label now enforces the transport's 160-byte UTF-8 event limit, rather than an inconsistent 128-codepoint limit. This preserves acceptance of valid 129–160 byte ASCII labels and rejects multibyte labels exceeding the wire budget. Regression cases now cover 161 ASCII bytes and 162 UTF-8 bytes. Commits: 844517a, 2d408b0.
 
 Validation: GitHub DNS resolution failed in the execution container; committed tests were not run. Run `python -m unittest discover -s tests -p 'test_signed_event_label.py' -v` and the full suite before merging. Independent safety and publishable adversarial results remain blocked. Next: durable production replay recovery and actual authenticated loopback experiments.
+
+## 2026-11-17 persistent nonce admission checkpoint
+
+| Workstream | Status | Evidence / limitation |
+| --- | --- | --- |
+| SQLite authenticated nonce claims | Implemented, repository tests pending | hardware_nonce_store.py; unique device/nonce PK, WAL/FULL, explicit provisioning, fail-closed recovery |
+| Production Pi TCP startup and verifier | Implemented, repository tests pending | SMARTCAR_HW_NONCE_STORE_PATH required; no volatile replay fallback; verified envelope released after committed claim |
+| Regression tests | Committed, not executed | tests/test_hardware_nonce_store.py covers restart, unrelated SQLite DB, clock rollback |
+| Isolated SQLite behavior | Verified locally | WAL accepted, expected PK schema observed, inserted claim survived close/reopen; NOT full module execution |
+| Database capacity/retention | BLOCKED | Current persistent nonce table grows without bound. Do not merge until bounded retention and safe clock-rollback strategy are implemented |
+| End-to-end Pi loopback / full CI | BLOCKED | github.com DNS unavailable for checkout; no repository test pass claim |
+| Physical local emergency | Unverified | No actuator enabled; independent local emergency-stop not physically tested |
+| Original paper evidence | Not ready | Authentic datasets, matched independent adversarial baselines and multi-seed uncertainty missing |
+
+Commands:
+`python -m unittest discover -s tests -p 'test_hardware_nonce_store.py' -v`
+`python -m unittest discover -s tests -p 'test_authenticated_socket_session.py' -v`
+
+Next code task: bound persistent nonce table safely (without reopening expired replay during clock rollback), then run full checkout and real authenticated loopback restart/replay experiments. The current database is vulnerable to unbounded storage growth; keep PR draft and do not merge.
