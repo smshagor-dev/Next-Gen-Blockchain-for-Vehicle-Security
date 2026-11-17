@@ -137,6 +137,21 @@ class BoundedReceiver:
             self.buffer.clear()
             self.expected = None
             raise FrameError("batch authentication preflight rejected") from exc
+        # Detect within-batch replay/order violations before any durable write.
+        # This does not make external storage admission transactional.
+        batch_highwater = dict(self.seen)
+        try:
+            for candidate in completed_payloads:
+                envelope = json.loads(candidate, object_pairs_hook=_unique_object)
+                node, seq = envelope["node"], envelope["seq"]
+                if seq <= batch_highwater.get(node, -1):
+                    raise ValueError("non-increasing sequence within batch")
+                batch_highwater[node] = seq
+        except (ValueError, TypeError, KeyError) as exc:
+            self.poisoned = True
+            self.buffer.clear()
+            self.expected = None
+            raise FrameError("batch replay-order preflight rejected") from exc
         accepted = []
         offset = 0
         while offset < len(chunk):
@@ -289,6 +304,29 @@ class ReceiverFaultTests(unittest.TestCase):
         with self.assertRaises(FrameError):
             receiver.feed(frame("a", 1, {}, b"secret-a") + len(malformed).to_bytes(4, "big") + malformed)
         self.assertEqual(receiver.seen, {})
+
+    def test_duplicate_sequence_in_coalesced_batch_never_calls_gate(self):
+        class RecordingGate:
+            def __init__(self):
+                self.calls = []
+            def admit_authenticated(self, node, seq, authenticated=False):
+                self.calls.append((node, seq))
+                return True
+        gate = RecordingGate()
+        receiver = BoundedReceiver({"a": b"secret-a"}, replay_gate=gate)
+        duplicate = frame("a", 7, {}, b"secret-a")
+        with self.assertRaises(FrameError):
+            receiver.feed(duplicate + duplicate)
+        self.assertEqual(gate.calls, [])
+        self.assertEqual(receiver.accepted_frames, 0)
+        self.assertTrue(receiver.poisoned)
+
+    def test_decreasing_sequence_in_batch_rejected_before_mutation(self):
+        receiver = BoundedReceiver({"a": b"secret-a"})
+        with self.assertRaises(FrameError):
+            receiver.feed(frame("a", 8, {}, b"secret-a") + frame("a", 7, {}, b"secret-a"))
+        self.assertEqual(receiver.seen, {})
+        self.assertTrue(receiver.poisoned)
 
     def test_multiple_frames(self):
         f = frame("a", 1, {}, b"secret-a") + frame("a", 2, {}, b"secret-a")
