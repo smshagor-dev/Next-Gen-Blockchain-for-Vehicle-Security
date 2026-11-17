@@ -237,3 +237,12 @@ Added `tests/test_production_pi_handler_loopback.py` (commit `f639b838`) to comp
 **Matrix:** simulation batch integration = implemented/unverified; legacy-gate fallback = partial/risk; production hardware ingress and interlocks = partial/unverified; ledger crash durability = partial; authentic datasets = blocked; independent matched multi-seed adversarial experiments = pending; paper = blocked. Fixture CSVs, three-peer sanity checks, five-iteration microbenchmarks, and offline formulas remain non-publishable primary evidence.
 
 **Next:** run python -m unittest discover -s research_contracts -p 'test_receiver_atomic_batch_integration.py' -v and full research_contracts suite on a complete checkout. Then eliminate unsafe legacy batch fallback, test SQLite concurrent sessions and injected transaction failures, and wire production Pi loopback to the verified gate without compromising local emergency control.
+
+
+## 2026-11-17 concurrent SQLite replay checkpoint
+
+**Implemented, execution pending:** Shared SQLiteAtomicReplayGate now serializes the full BEGIN IMMEDIATE/validate/write/COMMIT transaction with an RLock, uses check_same_thread=False for concurrent Pi-style workers, and applies the configured timeout to SQLite busy_timeout rather than silently hardcoding 5 seconds. Commits: be4b539, 9b70c6d. Three new regression tests cover 16-worker same-nonce contention, independent SQLite connections racing on a shared database, and timeout validation. These tests have **not** been executed on the checked-out branch; no performance, durability, or physical safety claim follows.
+
+**Validation command:** `python -m unittest discover -s research_contracts -p 'test_sqlite_concurrent_replay.py' -v`; then run the existing SQLite and receiver integration suites. **Status matrix:** concurrent replay transaction serialization = implemented/unverified; production bridge integration = partial; emergency interlock = unverified; crash durability = partial; authentic dataset provenance and independent multi-seed baseline experiments = blocked; paper primary evidence = not ready.
+
+**Next code task:** integrate the shared gate into the production Pi handler (not just research receiver simulation), run actual authenticated loopback concurrent replay/slow-peer/storage-failure tests, and record rejection latency and honest throughput under matched baselines. Review multi-process SQLite locking, crash injection, and actuator isolation before any merge.
