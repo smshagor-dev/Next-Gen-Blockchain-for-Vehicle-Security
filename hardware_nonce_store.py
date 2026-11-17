@@ -27,6 +27,11 @@ class SQLiteNonceStore:
         self._max_claims = max_claims
         self._clock = clock or time.time
         self._lock = threading.RLock()
+        exists = os.path.exists(path)
+        if provision and exists:
+            # Never recreate an existing database after a crash or corruption.
+            # Provisioning is a one-time operation, not a recovery fallback.
+            raise NonceStoreError("nonce database already exists; provisioning denied")
         if not provision and (not os.path.isfile(path) or os.stat(path).st_size == 0):
             raise NonceStoreError("nonce database missing; explicit provisioning required")
         self._db = sqlite3.connect(path, timeout=5.0, isolation_level=None, check_same_thread=False)
