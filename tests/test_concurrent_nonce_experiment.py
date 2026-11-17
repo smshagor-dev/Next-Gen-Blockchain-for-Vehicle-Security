@@ -27,6 +27,33 @@ class ConcurrentNonceExperimentTests(unittest.TestCase):
                     accepted_by_nonce[key] = accepted_by_nonce.get(key, 0) + 1
             self.assertTrue(all(v == 1 for v in accepted_by_nonce.values()))
 
+    def test_seeded_pair_labels_are_not_attack_ground_truth(self):
+        with tempfile.TemporaryDirectory() as d:
+            output = Path(d) / "pairs.csv"
+            run(seed=23, workers=4, attempts=20, capacity=10, output=output)
+            with output.open(newline="", encoding="utf-8") as stream:
+                rows = list(csv.DictReader(stream))
+            self.assertEqual(
+                {row["workload_label"] for row in rows},
+                {"first_copy", "second_copy"}
+            )
+            self.assertNotEqual(
+                [int(row["attempt_index"]) for row in rows],
+                list(range(20))
+            )
+            for pair in range(10):
+                self.assertEqual(
+                    sum(int(row["attempt_index"]) // 2 == pair for row in rows),
+                    2
+                )
+
+    def test_odd_workload_rejected_without_artifact(self):
+        with tempfile.TemporaryDirectory() as d:
+            output = Path(d) / "invalid.csv"
+            with self.assertRaises(ValueError):
+                run(seed=1, workers=2, attempts=21, capacity=11, output=output)
+            self.assertFalse(output.exists())
+
     def test_capacity_exhaustion_has_no_extra_admissions(self):
         with tempfile.TemporaryDirectory() as d:
             result = run(seed=19, workers=6, attempts=60, capacity=5,
