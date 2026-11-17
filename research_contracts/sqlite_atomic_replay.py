@@ -5,6 +5,7 @@ Each batch is a single SQLite transaction. One writer is serialized by SQLite.
 """
 import sqlite3
 import threading
+import math
 
 
 class ReplayStoreError(RuntimeError):
@@ -13,11 +14,20 @@ class ReplayStoreError(RuntimeError):
 
 class SQLiteAtomicReplayGate:
     def __init__(self, path, timeout=5.0):
-        if not isinstance(timeout, (int, float)) or isinstance(timeout, bool) or not 0 < timeout <= 60:
+        if not isinstance(timeout, (int, float)) or isinstance(timeout, bool) or not math.isfinite(timeout) or not 0 < timeout <= 60:
             raise ValueError("timeout must be within (0, 60] seconds")
         self._lock = threading.RLock()
         self.connection = sqlite3.connect(path, timeout=timeout, isolation_level=None, check_same_thread=False)
-        self.connection.execute("PRAGMA busy_timeout = %d" % int(timeout * 1000))
+        try:
+            self.connection.execute("PRAGMA busy_timeout = %d" % int(timeout * 1000))
+            if self.connection.execute("PRAGMA journal_mode=WAL").fetchone()[0].lower() != "wal":
+                raise ReplayStoreError("WAL journal unavailable")
+            self.connection.execute("PRAGMA synchronous=FULL")
+            if self.connection.execute("PRAGMA synchronous").fetchone()[0] != 2:
+                raise ReplayStoreError("FULL synchronous mode unavailable")
+        except BaseException:
+            self.connection.close()
+            raise
         self.connection.execute("CREATE TABLE IF NOT EXISTS replay_highwater (node TEXT PRIMARY KEY, seq INTEGER NOT NULL CHECK(seq >= 0))")
 
     def close(self):
