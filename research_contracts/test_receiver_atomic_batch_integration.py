@@ -23,26 +23,26 @@ class AtomicBatchIntegrationTests(unittest.TestCase):
         self.temp.cleanup()
 
     def receiver(self):
-        return BoundedReceiver({"a": self.key}, replay_gate=self.gate)
+        return BoundedReceiver({"a": self.key, "b": b"secret-b"}, replay_gate=self.gate)
 
     def test_later_stale_sequence_rolls_back_earlier_entry(self):
-        self.assertTrue(self.gate.admit_authenticated("a", 10, authenticated=True))
+        self.assertTrue(self.gate.admit_authenticated("b", 10, authenticated=True))
         receiver = self.receiver()
         with self.assertRaises(FrameError):
-            receiver.feed(frame("a", 11, {}, self.key) + frame("a", 9, {}, self.key))
+            receiver.feed(frame("a", 11, {}, self.key) + frame("b", 9, {}, b"secret-b"))
         self.assertTrue(receiver.poisoned)
         # Sequence 11 was never committed by the rejected batch.
         fresh = self.receiver()
         self.assertEqual([event["seq"] for event in fresh.feed(frame("a", 11, {}, self.key))], [11])
 
     def test_second_frame_stale_against_disk_state_no_partial_commit(self):
-        self.assertTrue(self.gate.admit_authenticated("a", 20, authenticated=True))
+        self.assertTrue(self.gate.admit_authenticated("b", 20, authenticated=True))
         receiver = self.receiver()
         with self.assertRaises(FrameError):
-            receiver.feed(frame("a", 21, {}, self.key) + frame("a", 20, {}, self.key))
+            receiver.feed(frame("a", 21, {}, self.key) + frame("b", 20, {}, b"secret-b"))
         self.assertEqual(receiver.accepted_frames, 0)
         self.assertEqual(self.gate.connection.execute(
-            "SELECT seq FROM replay_highwater WHERE node='a'").fetchone()[0], 20)
+            "SELECT seq FROM replay_highwater WHERE node='b'").fetchone()[0], 20)
 
     def test_successful_batch_persists_after_reopen(self):
         receiver = self.receiver()
