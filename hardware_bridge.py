@@ -141,8 +141,9 @@ def to_telemetry(pkt: dict) -> TelemetryData:
 
 def _signed_event_label(value):
     """Reject ambiguous or resource-heavy signed event labels before ledger mutation."""
-    if type(value) is not str or not 1 <= len(value) <= 128:
-        raise ValueError("event: nonempty bounded string required")
+    # Match transport MAX_EVENT_BYTES (UTF-8 bytes, not code points).
+    if type(value) is not str or not value or len(value.encode("utf-8")) > 160:
+        raise ValueError("event: nonempty bounded UTF-8 string required")
     if any(ord(char) < 32 or ord(char) == 127 for char in value):
         raise ValueError("event: control characters forbidden")
     return value
