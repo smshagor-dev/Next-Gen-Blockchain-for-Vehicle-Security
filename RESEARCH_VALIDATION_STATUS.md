@@ -297,3 +297,12 @@ Commits: a8d2d8394db6d6e9092aeb930ce038f06f1e9508, 56f67e7b7c52229c24456055a4f94
 Validation command: `python -m unittest discover -s research_contracts -p 'test_replay_identity_canonicalization.py' -v`.
 Local `git ls-remote` failed with `Could not resolve host: github.com`; do not claim tests passed. PR #141 remains draft and must not merge without validation.
 Next: reconcile enrolled-node identifier canonicalization in hardware_bridge and device registry; run focused/full suites, then authenticated loopback replay/slow-peer faults and matched performance baselines.
+
+
+### 2026-11-17: persisted principal canonicalization on recovery (draft PR #141)
+- **Completed (code):** recovery now checks each persisted replay principal against the same strict UTF-8, NFC, byte-length and ASCII-control exclusion policy as authenticated admission. This closes the gap where a valid SQLite TEXT row could be noncanonical despite passing SQLite typeof/length checks. Commit 7050d419.
+- **Completed (test implementation):** four independent SQLite file/reopen regression cases for decomposed Unicode, newline, DEL and valid precomposed Unicode; commit 159830f.
+- **Partial / unverified:** committed tests have not been executed in the repository runtime. Run `python -m unittest discover -s research_contracts -p 'test_replay_persisted_identity_canonicalization.py' -v` and then `python -m unittest discover -s research_contracts -p 'test_*.py' -v`.
+- **Blocked:** privileged database snapshot rollback remains possible without an independent trusted monotonic anchor; no physical safety or power-loss evidence.
+- **Upcoming highest-priority code:** integrate fail-closed persistent replay recovery into production hardware_bridge ingress, keeping physical emergency stop independent; then authenticated socket fault injection and matched performance baselines.
+- **Publication gate:** fixture CSVs, microbenchmarks, 3-peer sanity checks and offline formulas are not primary experimental results. No effectiveness claim or statistical significance claim from n>=30 alone.
