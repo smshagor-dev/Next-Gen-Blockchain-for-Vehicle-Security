@@ -104,3 +104,20 @@ Implemented `research_contracts/bench_authenticated_envelope_attacks.py` (7785c8
 Run `python -m unittest discover -s tests -p 'test_authenticated_attack_benchmark.py' -v` and `python research_contracts/bench_authenticated_envelope_attacks.py --seed 17 --pairs 100 --output results/authenticated_attacks_seed17.csv`. Commands not executed this run: git checkout failed with DNS error resolving github.com. No measured results or passing tests claimed.
 
 Status: authenticated replay/tamper experiment code implemented, unverified; production TCP multi-client attack experiment pending; malicious enrolled-node false data, dataset provenance, independent baseline and hardware interlock blocked. Next implement actual loopback listener harness with matched workload and non-actuating receiver, validate on full checkout, and measure independent seed-level effect sizes. PR remains draft.
+
+## 2026-11-18 signed-control boundary and enrolled false-data negative control
+
+| Workstream | Status | Artifact |
+| --- | --- | --- |
+| Signed event DEL (U+007F) admission | Implemented; test pending | hardware_transport_security.py; signed builder and verifier share telemetry validator |
+| Event regression | Committed, not executed | tests/test_authenticated_event_control_boundary.py |
+| Malicious enrolled sender negative control | Implemented, not executed | research_contracts/bench_enrolled_false_data_negative_control.py; independently assigned false-data labels, signed schema-valid values, raw trial CSV |
+| Scientific inference | Blocked | A MAC is authentication, not truth. Negative control intentionally has no external physical ground truth or realistic dataset; cannot be used as effectiveness evidence |
+| Safety | Blocked | Remote actuation remains disabled; physical independent emergency control unverified |
+| Network evaluation | Upcoming | Paired TCP workload under safe loopback; measure false positives, availability, latency and resource use |
+
+Commands:
+`python -m unittest discover -s tests -p 'test_authenticated_event_control_boundary.py' -v`
+`python research_contracts/bench_enrolled_false_data_negative_control.py --seed 17 --trials 100 --output results/enrolled_false_data_17.csv`
+
+No new runtime measurements or test-pass assertions. PR remains draft. Next: independent sensor corroboration/evidence-gated admission with explicit safety isolation and matched baselines; collect authentic VeReMi NextGen/CAN provenance before publication claims.
