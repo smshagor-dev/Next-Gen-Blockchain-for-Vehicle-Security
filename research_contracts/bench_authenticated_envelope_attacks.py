@@ -18,7 +18,21 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from hardware_nonce_store import SQLiteNonceStore
 from hardware_transport_security import HardwareEnvelopeVerifier, HardwareTransportError
-from tests.test_authenticated_durable_replay import DEVICE, SECRET, signed_telemetry
+from datetime import datetime, timezone
+from hardware_transport_security import build_authenticated_envelope, _NUMERIC_RANGES, _BOOL_FIELDS
+
+DEVICE = "bench-node"
+SECRET = "lab-independent-secret-0123456789abcdef-9876543210"
+
+
+def signed_telemetry(nonce):
+    now = datetime.now(timezone.utc)
+    payload = {key: (low + high) / 2 for key, (low, high) in _NUMERIC_RANGES.items()}
+    payload.update({key: False for key in _BOOL_FIELDS})
+    payload.update(timestamp=now.isoformat(), event="BENCH_EVENT")
+    return build_authenticated_envelope(
+        DEVICE, SECRET, "TELEMETRY", payload, timestamp=now, nonce=nonce
+    )
 
 
 def run(seed, pairs, output):
