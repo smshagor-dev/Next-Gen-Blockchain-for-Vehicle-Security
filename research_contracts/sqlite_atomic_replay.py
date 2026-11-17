@@ -4,6 +4,7 @@ No physical actuator, distributed finality, or blockchain consensus is implied.
 Each batch is a single SQLite transaction. One writer is serialized by SQLite.
 """
 import sqlite3
+import threading
 
 
 class ReplayStoreError(RuntimeError):
@@ -12,12 +13,16 @@ class ReplayStoreError(RuntimeError):
 
 class SQLiteAtomicReplayGate:
     def __init__(self, path, timeout=5.0):
-        self.connection = sqlite3.connect(path, timeout=timeout, isolation_level=None)
-        self.connection.execute("PRAGMA busy_timeout = 5000")
+        if not isinstance(timeout, (int, float)) or isinstance(timeout, bool) or not 0 < timeout <= 60:
+            raise ValueError("timeout must be within (0, 60] seconds")
+        self._lock = threading.RLock()
+        self.connection = sqlite3.connect(path, timeout=timeout, isolation_level=None, check_same_thread=False)
+        self.connection.execute("PRAGMA busy_timeout = %d" % int(timeout * 1000))
         self.connection.execute("CREATE TABLE IF NOT EXISTS replay_highwater (node TEXT PRIMARY KEY, seq INTEGER NOT NULL CHECK(seq >= 0))")
 
     def close(self):
-        self.connection.close()
+        with self._lock:
+            self.connection.close()
 
     def admit_authenticated_batch(self, entries, authenticated=False):
         """Return True iff ALL authenticated (node, seq) entries advance high-water.
@@ -33,25 +38,28 @@ class SQLiteAtomicReplayGate:
                 raise ValueError("invalid replay identity or sequence")
         if not entries:
             return True
-        self.connection.execute("BEGIN IMMEDIATE")
-        try:
-            for node, seq in entries:
-                row = self.connection.execute(
-                    "SELECT seq FROM replay_highwater WHERE node = ?", (node,)
-                ).fetchone()
-                if row is not None and seq <= row[0]:
+        # One SQLite connection is shared by concurrent receiver workers.
+        # Serialize the entire transaction, not only individual statements.
+        with self._lock:
+            self.connection.execute("BEGIN IMMEDIATE")
+            try:
+                for node, seq in entries:
+                    row = self.connection.execute(
+                        "SELECT seq FROM replay_highwater WHERE node = ?", (node,)
+                    ).fetchone()
+                    if row is not None and seq <= row[0]:
+                        self.connection.execute("ROLLBACK")
+                        return False
+                    self.connection.execute(
+                        "INSERT INTO replay_highwater(node, seq) VALUES (?, ?) "
+                        "ON CONFLICT(node) DO UPDATE SET seq=excluded.seq", (node, seq)
+                    )
+                self.connection.execute("COMMIT")
+                return True
+            except BaseException:
+                if self.connection.in_transaction:
                     self.connection.execute("ROLLBACK")
-                    return False
-                self.connection.execute(
-                    "INSERT INTO replay_highwater(node, seq) VALUES (?, ?) "
-                    "ON CONFLICT(node) DO UPDATE SET seq=excluded.seq", (node, seq)
-                )
-            self.connection.execute("COMMIT")
-            return True
-        except BaseException:
-            if self.connection.in_transaction:
-                self.connection.execute("ROLLBACK")
-            raise
-
+                raise
+    
     def admit_authenticated(self, node, seq, authenticated=False):
         return self.admit_authenticated_batch([(node, seq)], authenticated=authenticated)
