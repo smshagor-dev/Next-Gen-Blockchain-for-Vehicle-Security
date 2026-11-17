@@ -235,7 +235,7 @@ def validate_telemetry_payload(
     if "event" in payload:
         if not event or len(event.encode("utf-8")) > MAX_EVENT_BYTES:
             raise HardwareTransportError("HW_TELEMETRY_EVENT_INVALID")
-        if any(ord(ch) < 32 for ch in event):
+        if any(ord(ch) < 32 or ord(ch) == 127 for ch in event):
             raise HardwareTransportError("HW_TELEMETRY_EVENT_INVALID")
         result["event"] = event
 
