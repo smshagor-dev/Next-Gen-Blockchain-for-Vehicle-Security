@@ -179,3 +179,23 @@ Next: paired seeded scenarios with independent group compromises, honest dissent
 **Blocked:** Repository execution and full tests, authentic VeReMi NextGen/CAN provenance, real incident labels, physical local stop verification, network DoS/latency and independent multi-seed inference. No results or p-values claimed. Statistical significance cannot be inferred from n>=30.
 
 **Upcoming:** Run `python -m unittest discover -s tests -p 'test_correlated_group_threats.py' -v`; then `python research_contracts/bench_correlated_group_threats.py --seed 17 --trials 1000 --compromised-groups 1 --honest-error .05 --correlated-error .05 --output results/correlated_group_seed17.csv`. Review paired raw labels, expand compromise levels 0..3 and independent seeds, then integrate non-actuating authenticated TCP workload and authentic dataset ingest. Keep PR #141 draft pending actual validation.
+
+## 2026-11-18 paired baseline primary-selection bias correction
+
+| Workstream | State | Evidence / limitation |
+| --- | --- | --- |
+| Authentication-only comparator primary selection | Implemented, unverified | Previously hard-coded device-0 from group A; now per-incident seeded uniform draw over four devices, recorded in auth_primary_sender |
+| Paired policy ground truth | Preserved by construction, tests pending | All four policies receive identical observed_bits, truth, compromised-group assignment and selected primary metadata |
+| Regression tests | Committed, not executed | Verify primary index maps to selected observed bit, all four device indices occur for seeded 200 incidents, and primary is not always device-0 |
+| Measured baseline comparison | Blocked | No repository test execution or raw independently sourced incident results; historical baseline CSVs are not comparable without regeneration |
+| Authenticated TCP / emergency stop | Partial / blocked | Component simulation cannot demonstrate physical interlock or stop reliability |
+| Authentic dataset provenance | Upcoming | VeReMi NextGen and CAN license/source/checksum validation needed |
+| Publication readiness | Blocked | No independent held-out real dataset, multi-seed effects or physical safety evidence |
+
+Methodological note: a fixed first witness in group A artificially privileged one failure domain in the authentication-only comparator. Randomized primary selection removes that fixed-position selection artifact, but does not create a fair all-evidence authentication baseline or establish independent group enrollment. Keep the primary choice and its sampling model explicit in the manuscript. Do not compare newly generated CSV against older runs without regenerating all paired policies with identical seeds and parameters.
+
+Commands:
+`python -m unittest discover -s tests -p 'test_correlated_group_threats.py' -v`
+`python research_contracts/bench_correlated_group_threats.py --seed 17 --trials 1000 --compromised-groups 1 --honest-error .05 --correlated-error .05 --output results/correlated_group_seed17.csv`
+
+Next engineering task: design a pre-registered multi-seed factorial threat grid with independent incident-level truth, explicit primary selection, clustered confidence intervals and a no-actuation TCP loopback experiment. All changes remain unverified; do not merge.
