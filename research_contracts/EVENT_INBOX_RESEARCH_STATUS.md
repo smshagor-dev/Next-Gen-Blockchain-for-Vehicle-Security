@@ -31,3 +31,18 @@ Then test SIGKILL and concurrent writers on an actual checkout.
 `python -m unittest discover -s tests -p 'test_durable_event_inbox.py' -v`
 
 No numerical effectiveness result is claimed from this code alone.
+
+## 2026-11-18 continuation: verified-inclusion reconciliation contract
+
+| Workstream | State | Evidence / limitation |
+|---|---|---|
+| Atomic-idempotent ledger adapter | IMPLEMENTED / UNVERIFIED | `ledger_inbox_reconciliation.py`; requires externally enforced atomic append_once and verified lookup; fake ledger only |
+| Crash after append before inbox commit | TEST ADDED / UNVERIFIED | Restart reopens inbox, ledger lookup reconciles without another append |
+| Ambiguous append acknowledgement | TEST ADDED / UNVERIFIED | Fail closed until inclusion can be verified |
+| Lookup outage, non-idempotent ledger, conflicting digest | TEST ADDED / UNVERIFIED | Refuse append / reconciliation |
+| Production ledger integration and consensus finality | BLOCKED | Real chain lacks proven lookup/append_once contract; no exactly-once or finality claim |
+| Repository checkout validation | BLOCKED / TRANSIENT | github.com DNS resolution unavailable in execution container |
+
+Commands: `python -m unittest discover -s tests -p 'test_ledger_inbox_reconciliation.py' -v`; `python -m unittest discover -s tests -v`.
+
+Next: validate on actual checkout, implement durable ledger inclusion adapter, run subprocess SIGKILL and concurrency fault experiments. No remote actuation or publication-ready numeric result.
