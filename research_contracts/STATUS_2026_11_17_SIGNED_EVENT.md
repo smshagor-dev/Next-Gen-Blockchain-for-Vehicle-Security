@@ -169,3 +169,13 @@ Isolated Python equivalent of the comparator passed 5/5 deterministic tests on 2
 `python -m unittest discover -s tests -p 'test_robust_group_policy.py' -v`
 
 Next: paired seeded scenarios with independent group compromises, honest dissent, correlated errors, abstention, and timestamp faults. Measure false admissions, missed hazards and admission delay; compare with strict-unanimity and other baselines, then validate against authentic datasets. Do not merge draft without full CI.
+
+## 2026-11-18 paired correlated-group stress protocol
+
+**Completed (code committed, not executed):** `research_contracts/bench_correlated_group_threats.py` and `tests/test_correlated_group_threats.py` (a83ac65, 8206ae4, 9aea6fe). Four admission policies receive identical incident observations: authentication-only, sender-count quorum, strict independent-group unanimity, and dissent-tolerant group quorum. Controlled scenarios vary honest group-level sensor error, common-mode correlated error and enrolled group compromise. Raw per-incident labels and decisions export to CSV. Tests cover deterministic pairing, zero-error boundary, and coordinated compromise limitation.
+
+**Partial:** Synthetic common-mode error is an explicit assumed generator, not a calibrated V2X model. Three trust groups and four devices are a limited toy topology. This experiment cannot establish real-world security or novelty. In particular a malicious enrolled group has authentic credentials; independence is assumed, not attested. No hardware/actuator authorization occurs.
+
+**Blocked:** Repository execution and full tests, authentic VeReMi NextGen/CAN provenance, real incident labels, physical local stop verification, network DoS/latency and independent multi-seed inference. No results or p-values claimed. Statistical significance cannot be inferred from n>=30.
+
+**Upcoming:** Run `python -m unittest discover -s tests -p 'test_correlated_group_threats.py' -v`; then `python research_contracts/bench_correlated_group_threats.py --seed 17 --trials 1000 --compromised-groups 1 --honest-error .05 --correlated-error .05 --output results/correlated_group_seed17.csv`. Review paired raw labels, expand compromise levels 0..3 and independent seeds, then integrate non-actuating authenticated TCP workload and authentic dataset ingest. Keep PR #141 draft pending actual validation.
