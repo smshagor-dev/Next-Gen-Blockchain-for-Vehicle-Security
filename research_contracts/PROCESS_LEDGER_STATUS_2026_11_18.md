@@ -26,6 +26,10 @@ python -m unittest discover -s tests -v
 
 The source code and assertions are committed, but the exact GitHub checkout was not executed locally: github.com DNS is unavailable to the execution container. **No passing outcomes or effectiveness measurements are claimed.** Process-level concurrency is a correctness probe, not an independent trial of real vehicles, power-cut durability, Byzantine consensus, or real ledger finality. A start event aligns worker attempts but does not guarantee overlapping SQLite transactions. SQLite connection setup may itself contend under concurrent PRAGMA initialization. Keep draft until verified execution, test review and resource bounds assessment.
 
+## Follow-up implementation (2026-11-18)
+
+Commit `ad9d90d` records child setup failure and readiness timeout as explicit failed observations rather than silently waiting at the startup barrier; `4b13a78` adds assertions for those fields. **Execution remains unverified**; these are instrumentation improvements, not successful experimental outcomes. Failure-injection of a child exiting before readiness and independent process SIGKILL during overlapping writes remain upcoming.
+
 ## Next
 
 Run actual branch tests in CI or checkout; if PRAGMA initialization contends, isolate initialization from timed attempts and record failures rather than masking them. Add kill-at-commit-boundary while multiple independent writers race, then production ledger inclusion verification. Do not merge unverified changes.
