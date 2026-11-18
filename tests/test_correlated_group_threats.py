@@ -16,6 +16,26 @@ class PairedThreatTests(unittest.TestCase):
             self.assertEqual(len({r["observed_bits"] for r in block}), 1)
             self.assertEqual(len({r["truth_hazard"] for r in block}), 1)
 
+    def test_authentication_primary_is_recorded_and_matches_observation(self):
+        rows = run(21, 200, compromised_groups=1)
+        primaries = set()
+        for i in range(200):
+            block = rows[4*i:4*i+4]
+            sender = block[0]["auth_primary_sender"]
+            self.assertTrue(all(r["auth_primary_sender"] == sender for r in block))
+            index = int(sender.removeprefix("device-"))
+            self.assertIn(index, range(4))
+            primaries.add(index)
+            auth = block[0]
+            self.assertEqual(auth["policy"], "authentication_only")
+            self.assertEqual(auth["admitted"], int(auth["observed_bits"][index]))
+        self.assertEqual(primaries, set(range(4)))
+
+    def test_fixed_first_group_no_longer_forced_as_primary(self):
+        rows = run(9, 80, compromised_groups=0)
+        self.assertTrue(any(r["auth_primary_sender"] != "device-0"
+                            for r in rows if r["policy"] == "authentication_only"))
+
     def test_two_compromised_groups_can_forge_hazard(self):
         rows = run(5, 100, compromised_groups=3, honest_error=0,
                    correlated_error=0)
