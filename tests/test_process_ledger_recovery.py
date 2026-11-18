@@ -12,12 +12,15 @@ class ProcessLedgerRecoveryTests(unittest.TestCase):
             result = trial(Path(root), workers=3)
         self.assertTrue(result["passed"], result)
         self.assertEqual(result["ledger_records"], 1)
+        self.assertEqual(result["setup_failures"], [])
+        self.assertFalse(result["timed_out"])
 
     def test_independent_process_conflicting_payload(self):
         with tempfile.TemporaryDirectory() as root:
             result = trial(Path(root), workers=4, conflicting=True)
         self.assertTrue(result["passed"], result)
         self.assertIn("conflict", [kind for _, kind in result["outcomes"]])
+        self.assertEqual(result["setup_failures"], [])
 
     def test_repeated_mixed_process_campaign(self):
         result = run(trials=4, workers=3)
