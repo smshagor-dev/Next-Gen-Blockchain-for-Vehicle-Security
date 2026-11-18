@@ -9,7 +9,7 @@ This matrix tracks **evidence**, not code completeness. None of the SQLite surro
 | Durable SQLite inbox / ledger reconciliation | Partial | Code and fault probes in draft PRs; actual production ledger inclusion/finality adapter absent |
 | Independent process contention | Partial | Spawned-process harness; repository execution and overlap measurements pending |
 | Exit-before-readiness fail-closed barrier | Implemented, **unverified** | Commit 2001831 and regression commit 94b71e3; expected zero ledger writes when one worker exits |
-| SIGKILL during overlapping transactions | Upcoming | Need deterministic write-stage synchronization and independent restart verification |
+| SIGKILL before SQLite ledger COMMIT | Implemented, **unverified** | New spawned child inserts inside BEGIN IMMEDIATE then SIGKILL; parent asserts rollback and unique retry. This is a single-writer surrogate, not overlapping-writer proof |\n| SIGKILL during overlapping transactions | Upcoming | Need deterministic two-writer overlap, timeout controls and independent restart verification |
 | VeReMi NextGen and CAN provenance | Blocked | Authentic downloads, licensing, checksums, split manifests and validation pending |
 | Adversarial baselines and ablations | Upcoming | No publishable independent dataset experiments |
 | Multi-seed statistical effects and runtime resource measurement | Upcoming | No publishable samples; n>=30 alone does not imply statistical significance |
@@ -18,7 +18,7 @@ This matrix tracks **evidence**, not code completeness. None of the SQLite surro
 ## Reproduction
 ```bash
 python -m unittest discover -s tests -p 'test_process_ledger_recovery.py' -v
-python -m research_contracts.process_ledger_recovery --trials 10 --workers 4
+python -m research_contracts.process_ledger_recovery --trials 10 --workers 4\npython -m unittest discover -s tests -p 'test_inflight_sqlite_sigkill.py' -v\npython -m research_contracts.inflight_sqlite_sigkill --trials 10
 ```
 
 ## Next
