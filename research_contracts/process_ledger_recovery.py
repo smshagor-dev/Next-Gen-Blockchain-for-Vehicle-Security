@@ -9,6 +9,7 @@ import json
 import multiprocessing as mp
 import sqlite3
 import tempfile
+from queue import Empty
 from pathlib import Path
 
 from research_contracts.durable_event_inbox import DurableEventInbox, InboxConflict
@@ -34,6 +35,7 @@ def _worker(inbox_path, ledger_path, index, conflicting, start, ready, output):
         except (sqlite3.Error, ReconciliationUnavailable) as exc:
             output.put((index, "storage_or_ledger_error"))
     except Exception as exc:
+        ready.put(("setup_failed", index))
         output.put((index, "setup_or_unexpected_error:" + type(exc).__name__))
     finally:
         if inbox is not None:
@@ -60,15 +62,28 @@ def trial(directory, workers=4, conflicting=False):
         for i in range(workers)
     ]
     observations = []
+    setup_failures = []
+    timed_out = False
     try:
         for process in processes:
             process.start()
         # Release only after every process has opened its own DB connections.
+        # A failed child setup must not strand the parent at the readiness barrier.
         for _ in processes:
-            ready.get(timeout=20)
+            try:
+                signal = ready.get(timeout=20)
+            except Empty:
+                timed_out = True
+                break
+            if isinstance(signal, tuple) and signal[0] == "setup_failed":
+                setup_failures.append(signal[1])
         start.set()
         for _ in processes:
-            observations.append(output.get(timeout=20))
+            try:
+                observations.append(output.get(timeout=20))
+            except Empty:
+                timed_out = True
+                break
     finally:
         start.set()
         for process in processes:
@@ -90,12 +105,14 @@ def trial(directory, workers=4, conflicting=False):
     categories = [kind for _, kind in observations]
     exitcodes = [process.exitcode for process in processes]
     passed = (len(observations) == workers and all(code == 0 for code in exitcodes)
+              and not timed_out and not setup_failures
               and count == 1 and committed == 1 and pending == 0 and digests == 1
               and all(kind in ("accepted", "conflict") for kind in categories)
               and ("conflict" in categories if conflicting else
                    all(kind == "accepted" for kind in categories)))
     return {"passed": passed, "workers": workers, "conflicting": conflicting,
             "outcomes": sorted(observations), "exitcodes": exitcodes,
+            "setup_failures": sorted(setup_failures), "timed_out": timed_out,
             "ledger_records": count, "pending": pending,
             "committed": committed, "distinct_digests": digests}
 
