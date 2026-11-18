@@ -6,6 +6,7 @@ No actuation, network access, external dataset, or claimed statistical significa
 """
 import argparse
 import csv
+import math
 import random
 import sys
 from pathlib import Path
@@ -20,6 +21,8 @@ POLICIES = ("authentication_only", "sender_quorum", "strict_groups", "dissent_to
 def run(seed, trials, *, compromised_groups=1, honest_error=0.05, correlated_error=0.05):
     if (type(seed) is not int or type(trials) is not int or trials < 1
             or type(compromised_groups) is not int or not 0 <= compromised_groups <= 3
+            or type(honest_error) not in (int, float) or not math.isfinite(honest_error)
+            or type(correlated_error) not in (int, float) or not math.isfinite(correlated_error)
             or not 0 <= honest_error <= 1 or not 0 <= correlated_error <= 1):
         raise ValueError("invalid experiment parameters")
     rng = random.Random(seed)
@@ -44,7 +47,6 @@ def run(seed, trials, *, compromised_groups=1, honest_error=0.05, correlated_err
             "dissent_tolerant_groups": evaluate(reports, incident=obs[0].incident,
                                                 now=101.).admitted,
         }
-        assert all(not isinstance(v, bool) or v in (True, False) for v in verdicts.values())
         for policy in POLICIES:
             accepted = verdicts[policy]
             records.append(dict(seed=seed, incident=incident, truth_hazard=int(truth),
