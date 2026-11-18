@@ -152,3 +152,20 @@ No tests executed in this run; no result or effect size claimed. PR remains draf
 | Publication | Blocked | No authentic datasets, repeated independent seeds, uncertainty, or matched realistic attack workload |
 
 Execute `python -m unittest discover -s tests -p 'test_evidence_baselines.py' -v` and `python research_contracts/bench_evidence_baselines.py --seed 17 --trials 1000 --output results/evidence_baselines_seed17.csv`. Synthetic outcomes demonstrate a potential **availability cost**, not superiority. Next code task: add coordinated multi-group attacker models, honest sensor error, incident-level split provenance and matched seed experiments; then production non-actuating TCP testing. Keep PR draft; do not merge.
+
+## 2026-11-18 dissent-tolerant evidence quorum comparator
+
+| Workstream | State | Evidence / limitation |
+| --- | --- | --- |
+| Independent-group corroboration ablation | Implemented | `research_contracts/robust_group_policy.py` counts only unconflicted groups; negative groups do not automatically veto positive quorum |
+| Safety/limitation regression | Implemented; isolated local equivalent passed | `tests/test_robust_group_policy.py`: five cases covering dissent, same-group duplicate, conflict, stale and coordinated compromised groups |
+| Repository regression validation | Pending | Full repository checkout and integrated test suite not executed in this run |
+| Research originality | Hypothesis only | Compare strict-unanimity, dissent-tolerant quorum, sender-count quorum and authentication-only under identical incident splits |
+| Critical threat assumption | Unverified | Trust-group assignments and sender identity must be authenticated externally; two compromised independent groups can still fabricate hazard admission |
+| Physical actuation | Isolated by design | Comparator only returns event admission, never actuator permission; independent emergency-stop hardware remains untested |
+| Dataset and statistical evidence | Blocked | Authentic VeReMi NextGen/CAN provenance and multi-seed matched results not yet collected |
+
+Isolated Python equivalent of the comparator passed 5/5 deterministic tests on 2026-11-18. This verifies basic logic only, not repository CI or publication-grade empirical performance. Re-run on checkout:
+`python -m unittest discover -s tests -p 'test_robust_group_policy.py' -v`
+
+Next: paired seeded scenarios with independent group compromises, honest dissent, correlated errors, abstention, and timestamp faults. Measure false admissions, missed hazards and admission delay; compare with strict-unanimity and other baselines, then validate against authentic datasets. Do not merge draft without full CI.
