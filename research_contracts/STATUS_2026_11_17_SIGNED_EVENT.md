@@ -138,3 +138,17 @@ Research hypothesis (unproven): independently enrolled, freshness-bounded group 
 
 Run: `python -m unittest discover -s tests -p 'test_v2x_evidence_gate.py' -v`.
 No tests executed in this run; no result or effect size claimed. PR remains draft.
+
+## 2026-11-18 paired evidence baseline checkpoint
+
+| Workstream | Status | Evidence / limitation |
+| --- | --- | --- |
+| Paired synthetic baselines | Implemented, repository tests pending | research_contracts/bench_evidence_baselines.py; authentication-only, sender-count quorum, independent-group gate share each incident's truth and observations |
+| Methodology regression | Committed, tests pending | tests/test_evidence_baselines.py; paired truth, deterministic seeds, invalid parameters |
+| Local exploratory execution | Partial, NON-PUBLISHABLE | Isolated local copy of gate logic with seed=17, 1000 incidents, 4 devices, 1 malicious device: auth-only 108 false admissions/124 misses; sender-count 0/0; independent-group 0/494. This was NOT a repository checkout run; do not cite as scientific effectiveness evidence |
+| Threat realism | Blocked | Synthetic perfectly honest noncompromised devices and fixed independent groups; malicious enrolled nodes can coordinate across groups; no VeReMi NextGen or CAN provenance |
+| Network latency and resource measurement | Pending | No real TCP experiments or hardware claims |
+| Physical actuation | Unverified | No hardware or independent emergency stop verification |
+| Publication | Blocked | No authentic datasets, repeated independent seeds, uncertainty, or matched realistic attack workload |
+
+Execute `python -m unittest discover -s tests -p 'test_evidence_baselines.py' -v` and `python research_contracts/bench_evidence_baselines.py --seed 17 --trials 1000 --output results/evidence_baselines_seed17.csv`. Synthetic outcomes demonstrate a potential **availability cost**, not superiority. Next code task: add coordinated multi-group attacker models, honest sensor error, incident-level split provenance and matched seed experiments; then production non-actuating TCP testing. Keep PR draft; do not merge.
