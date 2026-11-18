@@ -121,3 +121,20 @@ Commands:
 `python research_contracts/bench_enrolled_false_data_negative_control.py --seed 17 --trials 100 --output results/enrolled_false_data_17.csv`
 
 No new runtime measurements or test-pass assertions. PR remains draft. Next: independent sensor corroboration/evidence-gated admission with explicit safety isolation and matched baselines; collect authentic VeReMi NextGen/CAN provenance before publication claims.
+
+## 2026-11-18 evidence-gated event admission prototype
+
+| Workstream | Status | Evidence / limitations |
+| --- | --- | --- |
+| Independent-group event admission | Implemented as isolated prototype, unverified | `v2x_evidence_gate.py`; requires target plus distinct trust-group witness, authenticated freshness, incident agreement, bounded witness set |
+| Command isolation | Prototype property only | `AdmissionDecision.command_authorized` always false; production actuator not wired to gate |
+| Deterministic safety properties | Committed, tests not executed | `tests/test_v2x_evidence_gate.py` covers group collusion, stale/future/unauthenticated, conflicting, duplicate and capacity cases |
+| Trust-group enrollment | BLOCKED | Group labels supplied by caller; no authenticated independent enrollment or Sybil-resistant trust-group authority |
+| False-data robustness | BLOCKED | Multiple colluding independent groups can jointly fabricate; no physical sensor corroboration |
+| Production integration | Upcoming | Verify against real signed event/ledger pipeline; preserve emergency-stop isolation |
+| Scientific evidence | Not ready | No independent dataset, measured baselines or statistical evidence |
+
+Research hypothesis (unproven): independently enrolled, freshness-bounded group corroboration lowers false hazard-event admission under a single compromised group relative to authentication-only admission, with a measurable honest-event availability and latency cost. Compare authentication-only, sender-count quorum, and independent-group quorum using the SAME independently labeled incident scenarios. Avoid assuming trust-group independence when groups share infrastructure or credentials. Neither a new cryptographic primitive nor a physical safety certification is claimed.
+
+Run: `python -m unittest discover -s tests -p 'test_v2x_evidence_gate.py' -v`.
+No tests executed in this run; no result or effect size claimed. PR remains draft.
