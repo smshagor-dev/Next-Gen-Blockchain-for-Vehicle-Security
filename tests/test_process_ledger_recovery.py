@@ -26,6 +26,20 @@ class ProcessLedgerRecoveryTests(unittest.TestCase):
         result = run(trials=4, workers=3)
         self.assertTrue(result["all_assertions_passed"], result)
 
+    def test_worker_exit_before_ready_aborts_without_ledger_write(self):
+        with tempfile.TemporaryDirectory() as root:
+            result = trial(Path(root), workers=3, exit_before_ready=1)
+        self.assertFalse(result["passed"], result)
+        self.assertIn(1, result["setup_failures"], result)
+        self.assertFalse(result["timed_out"], result)
+        self.assertEqual(result["ledger_records"], 0, result)
+        self.assertEqual(result["committed"], 0, result)
+
+    def test_invalid_exit_worker_index(self):
+        with tempfile.TemporaryDirectory() as root:
+            with self.assertRaises(ValueError):
+                trial(Path(root), workers=3, exit_before_ready=3)
+
     def test_invalid_limits(self):
         with self.assertRaises(ValueError):
             run(trials=0)
