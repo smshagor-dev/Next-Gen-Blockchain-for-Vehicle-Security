@@ -28,6 +28,7 @@ def run(seed, trials, *, compromised_groups=1, honest_error=0.05, correlated_err
     rng = random.Random(seed)
     records = []
     # Two witnesses in A, one each in B and C. Same-group agreement is not independence.
+    # Randomize the authentication-only primary to avoid a fixed A-group advantage.
     groups = ("A", "A", "B", "C")
     for incident in range(trials):
         truth = bool(rng.getrandbits(1))
@@ -40,8 +41,9 @@ def run(seed, trials, *, compromised_groups=1, honest_error=0.05, correlated_err
                     for i, (g, value) in enumerate(zip(groups, values)))
         reports = tuple(Report(o.sender, o.trust_group, o.incident, o.observed_at,
                                o.hazard, o.authenticated) for o in obs)
+        primary_index = rng.randrange(len(obs))
         verdicts = {
-            "authentication_only": obs[0].hazard,
+            "authentication_only": obs[primary_index].hazard,
             "sender_quorum": sum(o.hazard for o in obs) >= 2,
             "strict_groups": admit_hazard(obs[0], obs[1:], now=101.).admitted,
             "dissent_tolerant_groups": evaluate(reports, incident=obs[0].incident,
@@ -54,6 +56,7 @@ def run(seed, trials, *, compromised_groups=1, honest_error=0.05, correlated_err
                                 honest_error=honest_error, correlated_error=correlated_error,
                                 group_compromise=";".join(sorted(compromised)),
                                 observed_bits="".join(str(int(v)) for v in values),
+                                auth_primary_sender=obs[primary_index].sender,
                                 policy=policy, admitted=int(accepted),
                                 false_admission=int(accepted and not truth),
                                 missed_hazard=int(not accepted and truth)))
