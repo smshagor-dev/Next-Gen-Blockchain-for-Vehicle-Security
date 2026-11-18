@@ -179,15 +179,24 @@ class AuthenticatedPiTelemetrySession:
         self.framer = AuthenticatedLineFramer(verifier.max_frame_bytes)
         self.device_id = None
 
-    def receive(self, data: bytes):
-        verified = []
+    def receive_iter(self, data: bytes):
+        """Yield verified frames individually so a later bad MAC cannot discard
+        an earlier valid frame after its nonce has been claimed.
+
+        This is NOT ledger/replay atomicity: a ledger failure after verification
+        can still consume the nonce. Framing errors fail the entire read.
+        """
         for frame in self.framer.feed(data):
             item = self.verifier.verify(
                 frame, expected_kind="TELEMETRY", expected_device_id=self.device_id
             )
             self.device_id = item.device_id
-            verified.append(item)
-        return verified
+            yield item
+
+    def receive(self, data: bytes):
+        # Legacy eager API retained for existing callers. Production ingress
+        # must use receive_iter to avoid a batch-wide delivery loss.
+        return list(self.receive_iter(data))
 
 
 class SafeModeActuatorDispatcher:
@@ -317,7 +326,7 @@ def run_arduino_mode(bc: SmartCarBlockchain):
             ingress_utc = datetime.now(timezone.utc)
             last_progress = ingress_monotonic
             try:
-                verified = session.receive(chunk)
+                verified = session.receive_iter(chunk)
             except HardwareTransportError as exc:
                 print(f"[HW BRIDGE] quarantined Arduino serial input: {exc.reason}")
                 raise RuntimeError("Arduino serial authentication/framing failure") from exc
@@ -439,8 +448,9 @@ def run_pi_mode(bc: SmartCarBlockchain):
                         raise HardwareTransportError(str(exc)) from exc
                     # Verify MAC, freshness, replay nonce, schema, and per-
                     # connection identity before *any* ledger/actuation side effect.
-                    with verifier_lock:
-                        verified_items = session.receive(data)
+                    # The verifier owns its replay lock. Do not hold a global
+                    # lock across ledger I/O while iterating verified frames.
+                    verified_items = session.receive_iter(data)
                     for item in verified_items:
                         # A single recv may contain many signed frames. MAC
                         # verification can itself consume the remaining
