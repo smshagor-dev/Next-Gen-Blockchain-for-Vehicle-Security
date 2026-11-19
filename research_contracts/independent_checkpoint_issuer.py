@@ -98,12 +98,32 @@ class IndependentCheckpointIssuer:
         if fcntl is None:
             raise CheckpointRefused("exclusive locking unavailable on this platform")
         lock_path = self.path.with_suffix(".lock")
-        fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+        # A symlinked or replaced lock inode can silently split the writer
+        # serialization domain. Refuse rather than locking an attacker target.
+        flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+        if not hasattr(os, "O_NOFOLLOW"):
+            raise CheckpointRefused("safe lock-file opening unavailable")
         try:
+            fd = os.open(lock_path, flags, 0o600)
+        except OSError as exc:
+            raise CheckpointRefused("unsafe issuer lock path") from exc
+        try:
+            info = os.fstat(fd)
+            if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1
+                or info.st_uid != os.getuid() or (info.st_mode & 0o077)):
+                raise CheckpointRefused("unsafe issuer lock metadata")
             try:
                 fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError as exc:
                 raise CheckpointRefused("concurrent issuer writer") from exc
+            # Check path identity after acquiring the lock. Directory write
+            # access must still be independently restricted by deployment.
+            try:
+                current = os.lstat(lock_path)
+            except OSError as exc:
+                raise CheckpointRefused("issuer lock path disappeared") from exc
+            if (current.st_dev, current.st_ino) != (info.st_dev, info.st_ino):
+                raise CheckpointRefused("issuer lock inode replaced")
             yield
         finally:
             os.close(fd)
