@@ -8,7 +8,13 @@ import hashlib
 import hmac
 import json
 import os
+from contextlib import contextmanager
 from pathlib import Path
+
+try:
+    import fcntl
+except ImportError:  # No portable locking guarantee on this platform.
+    fcntl = None
 
 DOMAIN = "OMNIGUARD_EXTERNAL_CHECKPOINT_V1"
 
@@ -62,9 +68,30 @@ class IndependentCheckpointIssuer:
             raise CheckpointRefused("invalid issuer state")
         return state
 
+    @contextmanager
+    def _exclusive_writer(self):
+        # POSIX advisory lock: all issuers must cooperate and share this directory.
+        # A separate persistent lock inode avoids rename-induced lock bypass.
+        if fcntl is None:
+            raise CheckpointRefused("exclusive locking unavailable on this platform")
+        lock_path = self.path.with_suffix(".lock")
+        fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+        try:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError as exc:
+                raise CheckpointRefused("concurrent issuer writer") from exc
+            yield
+        finally:
+            os.close(fd)
+
     def issue(self, verified_block_hashes):
-        # Requires single-writer ownership of the issuer directory; no locking
-        # is claimed. Do not expose this method to an untrusted TCP endpoint.
+        # Lock covers state read, prefix comparison, durable write and response.
+        # Do not expose this method to an untrusted TCP endpoint.
+        with self._exclusive_writer():
+            return self._issue_locked(verified_block_hashes)
+
+    def _issue_locked(self, verified_block_hashes):
         hashes = [_tip(x) for x in verified_block_hashes]
         if not hashes:
             raise CheckpointRefused("empty chain")
