@@ -56,3 +56,10 @@ Next: verify exact branch tests; add exclusive-writer locking and fault injectio
 | Physical safety validation | BLOCKED | Local emergency control not demonstrated on hardware |
 
 Commits: `0ba4ad3c` (POSIX exclusive writer), `9cfc5cc` (negative controls). Exact branch tests not executed. Run `python -m unittest discover -s tests -p 'test_independent_checkpoint_issuer.py' -v`. Next code task: deterministic SIGKILL around file fsync/replace, cleanup/recovery of stale .pending, then Go-chain integration. Do not merge or enable actuation.
+
+
+## 2026-11-19: bounded checkpoint-history input (draft #154)
+- **Implemented, not checkout-verified:** issuer now caps consumed history at 100,000 block hashes, rejects string/bytes and non-iterable input, and refuses over-limit iterators before durable state mutation. Commit cdd3cc1.
+- **Authored negative controls:** infinite generator termination, exact-bound/over-bound behavior, and invalid sequence rejection in `tests/test_checkpoint_issuer_bounded_history.py`.
+- **Test command:** `python -m unittest discover -s tests -p 'test_checkpoint_issuer_bounded_history.py' -v` (not executed on repository checkout).
+- **Remaining:** iterator may block forever on a blocking next() and CPU cost remains linear up to the cap; issuer state is not protected against host filesystem rollback, nor is verified Go ledger integration established. No publication effectiveness evidence.
