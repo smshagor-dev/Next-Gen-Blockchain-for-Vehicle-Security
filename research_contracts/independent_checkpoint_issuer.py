@@ -95,6 +95,20 @@ class IndependentCheckpointIssuer:
         hashes = [_tip(x) for x in verified_block_hashes]
         if not hashes:
             raise CheckpointRefused("empty chain")
+        # A SIGKILL before os.replace may leave an exclusive-create .pending file.
+        # Only the locked issuer may discard it; the committed .json remains
+        # authoritative. Never promote unverified pending bytes into state.
+        pending = self.path.with_suffix(".pending")
+        if pending.is_symlink() or pending.exists():
+            try:
+                pending.unlink()
+                directory_fd = os.open(self.directory, os.O_RDONLY)
+                try:
+                    os.fsync(directory_fd)
+                finally:
+                    os.close(directory_fd)
+            except OSError as exc:
+                raise CheckpointRefused("cannot clear stale pending state") from exc
         state = self._load()
         old = state["pins"]
         if len(hashes) < len(old):
