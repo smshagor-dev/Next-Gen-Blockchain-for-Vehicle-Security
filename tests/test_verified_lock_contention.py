@@ -10,7 +10,8 @@ class VerifiedLockContentionTests(unittest.TestCase):
             result = trial(Path(root))
         self.assertTrue(result["passed"], result)
         self.assertEqual(result["lock_result"], "locked")
-        self.assertGreater(result["wait_ns"], 0)
+        self.assertGreaterEqual(result["wait_ns"], 50_000_000)
+        self.assertEqual(result["holder_exit"], -9)
         self.assertEqual(result["pre_retry_rows"], [])
         self.assertEqual(result["post_retry_rows"], [("event-1", "digest-1")])
 
