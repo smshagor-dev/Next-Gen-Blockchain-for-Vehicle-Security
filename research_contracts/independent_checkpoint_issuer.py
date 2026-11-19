@@ -8,6 +8,7 @@ import hashlib
 import hmac
 import json
 import os
+import stat
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -19,6 +20,9 @@ except ImportError:  # No portable locking guarantee on this platform.
 DOMAIN = "OMNIGUARD_EXTERNAL_CHECKPOINT_V1"
 # Simulation guardrail: reject oversized/unbounded supplied histories before persistence.
 MAX_CHECKPOINT_BLOCKS = 100_000
+# Canonical state is a compact JSON array of 64-character hex digests.
+# Bound disk-originated input separately from caller-originated iterators.
+MAX_CHECKPOINT_STATE_BYTES = MAX_CHECKPOINT_BLOCKS * 70 + 1024
 
 class CheckpointRefused(ValueError):
     pass
@@ -56,17 +60,34 @@ class IndependentCheckpointIssuer:
         self.path = self.directory / (hashlib.sha256(vehicle.encode()).hexdigest() + ".json")
 
     def _load(self):
-        if not self.path.exists():
+        if not self.path.exists() and not self.path.is_symlink():
             return {"vehicle": self.vehicle, "revision": 0, "pins": []}
+        # Refuse symlinks, special files, and oversized on-disk state before
+        # decoding. An attacker-controlled FIFO could otherwise block read_text()
+        # indefinitely, and an oversized JSON array could exhaust memory.
         try:
-            state = json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, ValueError) as exc:
+            flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+            fd = os.open(self.path, flags)
+            try:
+                info = os.fstat(fd)
+                if not stat.S_ISREG(info.st_mode):
+                    raise CheckpointRefused("issuer state is not a regular file")
+                if info.st_size > MAX_CHECKPOINT_STATE_BYTES:
+                    raise CheckpointRefused("issuer state exceeds byte limit")
+                with os.fdopen(fd, "rb", closefd=False) as stream:
+                    raw = stream.read(MAX_CHECKPOINT_STATE_BYTES + 1)
+                if len(raw) > MAX_CHECKPOINT_STATE_BYTES:
+                    raise CheckpointRefused("issuer state exceeds byte limit")
+            finally:
+                os.close(fd)
+            state = json.loads(raw.decode("utf-8"))
+        except (OSError, UnicodeError, ValueError) as exc:
             raise CheckpointRefused("unreadable issuer state") from exc
         if (not isinstance(state, dict) or set(state) != {"vehicle", "revision", "pins"}
             or state["vehicle"] != self.vehicle or type(state["revision"]) is not int
             or state["revision"] < 1 or not isinstance(state["pins"], list)
-            or len(state["pins"]) < 1 or
-            any(not isinstance(x, str) or _tip(x) != x for x in state["pins"])):
+            or not 1 <= len(state["pins"]) <= MAX_CHECKPOINT_BLOCKS
+            or any(not isinstance(x, str) or _tip(x) != x for x in state["pins"])):
             raise CheckpointRefused("invalid issuer state")
         return state
 
