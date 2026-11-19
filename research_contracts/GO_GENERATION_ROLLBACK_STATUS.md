@@ -16,3 +16,9 @@ distributed finality, and does not permit physical actuation. The unit test
 mocks Go hash verification deliberately to isolate the generation-reset defect;
 actual Go hash/link validation remains covered separately. No publication claim
 may be based on these synthetic examples.
+
+## 2026-11-19 follow-up: real-hash restart negative controls
+
+- Added `tests/test_go_generation_real_hash_restart.py` (commit `df967e0`): four deterministic tests generating internally Go-hash-valid synthetic chains without mocking `verify_go_block`. Covers same-process truncation rejection, same-process rewritten suffix rejection, restart truncation acceptance, and fresh-observer rewritten-history acceptance.
+- **Implemented, not yet executed on exact checkout:** GitHub DNS remains unavailable in local execution container. No pass/fail or latency claims. The controls demonstrate a missing external anchor; they do not establish ledger consensus finality or V2X effectiveness.
+- **Next:** execute exact checkout tests and repair failures; implement a durable independently authenticated checkpoint/receipt provider with an explicit rollback trust model; revisit hardware ingress and authentic datasets before publication.
