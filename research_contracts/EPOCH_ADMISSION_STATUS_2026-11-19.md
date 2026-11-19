@@ -31,3 +31,12 @@ The local reset API accepts a Boolean supplied by its caller, not a secure opera
 ## Next code task
 
 Audit actual hardware_bridge receiver on current main; implement authenticated, length-bounded, deadline-enforced framing and non-bypassable local stop before any physical command path. Then integrate epoch controls into identical-trace malicious enrolled-node and partition baselines. Keep draft; do not merge without exact-checkout validation.
+
+## 2026-11-19 follow-up: replay-state and nonce-budget corrections
+
+- **Implemented, exact-checkout unverified:** commit `825b320` makes repeated announcements of the *same* epoch idempotent, so they cannot erase the in-memory nonce history. A strictly newer epoch still clears history. Boolean epoch values are rejected (Python `bool` is an `int` subclass).
+- **Implemented, exact-checkout unverified:** repeated observations from a sender already counted for the same incident/epoch/event no longer consume the global nonce budget. This closes a trivial enrolled-sender capacity-exhaustion path, but does not prevent a malicious enrolled sender from submitting many distinct incidents.
+- **Tests committed, not executed:** `tests/test_epoch_replay_budget_regressions.py` covers same-epoch replay reset, 50 repeated-sender attempts, legitimate quorum under nonce pressure, capacity limits, boolean epoch rejection and transition to a new epoch.
+- **Evidence classification:** implementation and test source committed; no exact-checkout test result, no independent adversarial effectiveness measurement, no hardware safety validation. These are not publishable main research findings.
+- **Run locally:** `python -m unittest discover -s tests -p 'test_epoch_replay_budget_regressions.py' -v`; then `python -m unittest discover -s tests -v`.
+- **Next:** audit actual hardware receiver on main, implement authenticated bounded TCP framing and physical safety interlocks; then compare enrolled-node capacity attacks under matched simulation traces.
