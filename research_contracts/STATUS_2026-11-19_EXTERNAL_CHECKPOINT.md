@@ -41,3 +41,18 @@ Commits: `727650df` issuer, `3c3f26b8` tests. Exact GitHub checkout cannot be ru
 Run: `python -m unittest discover -s tests -p 'test_independent_checkpoint_issuer.py' -v`.
 
 Next: verify exact branch tests; add exclusive-writer locking and fault injection around atomic persistence, then integrate with independently validated Go chain and compare rollback acceptance under identical fault traces.
+
+
+## 2026-11-19 exclusive-writer follow-up
+
+| Workstream | State | Evidence / blocker |
+| --- | --- | --- |
+| Checkpoint issuer cross-process read-modify-write serialization | IMPLEMENTED / UNVERIFIED | POSIX nonblocking flock on persistent per-vehicle lock inode; protects load, compare, save and response |
+| Contending issuer and unsupported-platform negative controls | AUTHORED / UNEXECUTED | Two regression tests; refused writer must not create checkpoint |
+| Windows and non-cooperating writers | BLOCKED | Fail-closed on platforms without fcntl; advisory locks cannot stop writers ignoring the protocol |
+| Atomic-write SIGKILL fault injection | UPCOMING | Pending-file recovery, replace/fsync crash points and durable revision replay controls remain untested |
+| Go verified chain integration | UPCOMING | Issuer still trusts caller-supplied verified hash sequence |
+| Authentic datasets and independent V2X experiments | BLOCKED | No publishable evidence or matched-baseline uncertainty estimates |
+| Physical safety validation | BLOCKED | Local emergency control not demonstrated on hardware |
+
+Commits: `0ba4ad3c` (POSIX exclusive writer), `9cfc5cc` (negative controls). Exact branch tests not executed. Run `python -m unittest discover -s tests -p 'test_independent_checkpoint_issuer.py' -v`. Next code task: deterministic SIGKILL around file fsync/replace, cleanup/recovery of stale .pending, then Go-chain integration. Do not merge or enable actuation.
