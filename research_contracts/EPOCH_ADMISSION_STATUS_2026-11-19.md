@@ -40,3 +40,10 @@ Audit actual hardware_bridge receiver on current main; implement authenticated, 
 - **Evidence classification:** implementation and test source committed; no exact-checkout test result, no independent adversarial effectiveness measurement, no hardware safety validation. These are not publishable main research findings.
 - **Run locally:** `python -m unittest discover -s tests -p 'test_epoch_replay_budget_regressions.py' -v`; then `python -m unittest discover -s tests -v`.
 - **Next:** audit actual hardware receiver on main, implement authenticated bounded TCP framing and physical safety interlocks; then compare enrolled-node capacity attacks under matched simulation traces.
+
+## Follow-up: overlapping epoch replay retention
+
+- **Implemented (unverified on exact checkout):** commit `d92aae8` retains nonce pins and corroboration buckets for epochs still inside the admission window. Previously `advance_epoch(1)` erased epoch-0 replay pins while `window=1` still accepted epoch-0 observations, permitting replay of the same verified observation. Epochs older than `epoch - window` are pruned to recover bounded capacity.
+- **Regression source committed:** `dfd982f` adds four tests covering previous-epoch replay rejection, quorum continuity, expiry/capacity reclamation and idempotent epoch announcement.
+- **Validation:** not executed against the GitHub branch (execution container cannot resolve github.com). Run `python -m unittest discover -s tests -p 'test_epoch_window_replay.py' -v` and full suite. No measured effectiveness or physical-safety result claimed.
+- **Residual risk:** replay state remains volatile across process restart; a caller-provided verified flag is not authentication; accepting old epochs introduces an explicit freshness/availability trade-off. Priority remains authenticated bounded hardware receiver and non-bypassable local interlocks.
