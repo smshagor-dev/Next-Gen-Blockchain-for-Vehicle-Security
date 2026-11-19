@@ -16,8 +16,9 @@ import time
 
 
 def connect(path, timeout=2.0):
+    # Do not change journal mode on each worker connection: PRAGMA
+    # journal_mode can itself require locks and confound BEGIN contention.
     db = sqlite3.connect(str(path), isolation_level=None, timeout=timeout)
-    db.execute("PRAGMA journal_mode=WAL")
     db.execute("PRAGMA synchronous=FULL")
     return db
 
@@ -58,6 +59,7 @@ def trial(directory):
     path = Path(directory) / "ledger.sqlite"
     path.parent.mkdir(parents=True, exist_ok=True)
     db = connect(path)
+    db.execute("PRAGMA journal_mode=WAL")
     db.execute("CREATE TABLE events(identity TEXT PRIMARY KEY, digest TEXT NOT NULL)")
     db.close()
     ctx = mp.get_context("spawn")
@@ -90,7 +92,9 @@ def trial(directory):
             after = db.execute("SELECT identity,digest FROM events").fetchall()
         finally:
             db.close()
-        passed = (outcome == "locked" and wait_ns > 0 and
+        # Require the expected bounded SQLite busy wait, not merely any
+        # positive interval (which could be an immediate unrelated failure).
+        passed = (outcome == "locked" and wait_ns >= 50_000_000 and
                   first.exitcode == -signal.SIGKILL and before == [] and
                   after == [("event-1", "digest-1")])
         return {"passed": passed, "lock_result": outcome, "wait_ns": wait_ns,
