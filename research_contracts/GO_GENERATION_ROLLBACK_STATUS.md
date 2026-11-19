@@ -39,3 +39,17 @@ may be based on these synthetic examples.
 Validation command (not executed on exact branch because GitHub checkout DNS failed):
 `python -m unittest discover -s tests -p 'test_independent_checkpoint_issuer.py' -v`.
 Next: run committed tests; instrument subprocess SIGKILL at write/fsync/replace/directory-fsync boundaries, and then integrate verified Go ledger hashes with the issuer. The POSIX advisory lock assumes cooperating writers and independently controlled directory permissions.
+
+
+## 2026-11-19: real subprocess SIGKILL persistence-boundary controls
+
+| Area | State | Evidence / limitation |
+|---|---|---|
+| SIGKILL before pending-file fsync | Test committed, unexecuted | Old committed prefix must remain authoritative; stale pending is discarded under lock |
+| SIGKILL before atomic replace | Test committed, unexecuted | Old committed prefix must survive restart |
+| SIGKILL after replace | Test committed, unexecuted | New prefix is expected visible to a restarted process; not proof of power-loss durability |
+| SIGKILL before directory fsync | Test committed, unexecuted | New prefix expected visible after process kill; actual storage crash semantics unknown |
+| Restart rollback and replay | Test committed, unexecuted | Shorter history must be refused and extension idempotent after recovery |
+| Physical interlocks / authentic incident evidence | Blocked | No physical test or publishable attack-effectiveness evidence |
+
+Code: `tests/test_issuer_sigkill_boundaries.py` (commit `fc95d1b2`), four subprocess fault boundaries using actual `IndependentCheckpointIssuer.issue()` and fresh temporary directories. Command: `python -m unittest discover -s tests -p 'test_issuer_sigkill_boundaries.py' -v`. **Not executed on exact repository checkout**; do not claim passing trials. SIGKILL is not power loss. Next: run exact tests, fix any process synchronization/portability failures, add authenticated Go hash-chain validation at issuer ingress and independently owned checkpoint anchor, then prioritize authentic VeReMi/CAN baseline experiments. No physical actuation or merge.
