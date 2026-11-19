@@ -37,8 +37,15 @@ class EpochAdmission:
         if epoch == self.epoch:
             return  # Idempotent epoch announcement must not erase replay history.
         self.epoch = epoch
-        self._buckets.clear()
-        self._nonces.clear()
+        # Retain replay pins for epochs still admissible within the window.
+        # Clearing them here would allow an old signed observation to be
+        # replayed immediately after an epoch transition.
+        earliest = epoch - self.window
+        self._buckets = OrderedDict(
+            (key, senders) for key, senders in self._buckets.items()
+            if key[1] >= earliest
+        )
+        self._nonces = {key for key in self._nonces if key[1] >= earliest}
 
     def local_emergency_stop(self):
         self.stopped = True
