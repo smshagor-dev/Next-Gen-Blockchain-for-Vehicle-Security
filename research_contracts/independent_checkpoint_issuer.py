@@ -17,6 +17,8 @@ except ImportError:  # No portable locking guarantee on this platform.
     fcntl = None
 
 DOMAIN = "OMNIGUARD_EXTERNAL_CHECKPOINT_V1"
+# Simulation guardrail: reject oversized/unbounded supplied histories before persistence.
+MAX_CHECKPOINT_BLOCKS = 100_000
 
 class CheckpointRefused(ValueError):
     pass
@@ -92,7 +94,19 @@ class IndependentCheckpointIssuer:
             return self._issue_locked(verified_block_hashes)
 
     def _issue_locked(self, verified_block_hashes):
-        hashes = [_tip(x) for x in verified_block_hashes]
+        # Explicitly bound iterator consumption: a malicious/infinite generator must
+        # not exhaust issuer memory or hold the exclusive lock indefinitely.
+        if isinstance(verified_block_hashes, (str, bytes)):
+            raise CheckpointRefused("invalid chain sequence")
+        try:
+            iterator = iter(verified_block_hashes)
+        except TypeError as exc:
+            raise CheckpointRefused("invalid chain sequence") from exc
+        hashes = []
+        for item in iterator:
+            if len(hashes) == MAX_CHECKPOINT_BLOCKS:
+                raise CheckpointRefused("chain exceeds checkpoint block limit")
+            hashes.append(_tip(item))
         if not hashes:
             raise CheckpointRefused("empty chain")
         # A SIGKILL before os.replace may leave an exclusive-create .pending file.
