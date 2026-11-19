@@ -23,3 +23,11 @@ python -m research_contracts.process_ledger_recovery --trials 10 --workers 4\npy
 
 ## Next
 Run branch regression tests, fix failures, add bounded deterministic SIGKILL at transaction overlap, and reconcile after process restart. Preserve fail-closed non-actuating behavior. Existing fixture CSVs, three-peer sanity checks, five-iteration microbenchmarks and offline network formulas are not publishable main results.
+
+## 2026-11-19 contention measurement isolation
+
+- **Implemented, not yet branch-tested:** commit 9cad2f4 separates WAL journal-mode initialization from independent contender connections, so the measured `BEGIN IMMEDIATE` lock attempt cannot be confused with journal-mode configuration.
+- **Regression strengthened:** commit e8969b5 requires at least 50 ms of SQLite busy waiting and POSIX SIGKILL exit `-9`, rather than accepting any positive wait. The timeout configured for the contender is 200 ms; elapsed duration is an assertion threshold, not a benchmark estimate.
+- **Local diagnostic only:** an independent SQLite/WAL two-connection probe observed `BEGIN IMMEDIATE` returning `database is locked` while a writer held an uncommitted transaction. This is not execution of the committed branch or publication evidence.
+- **Blocked:** exact branch regression execution (GitHub checkout DNS failure), external finality, hardware safety, real incident labels and statistically powered multi-seed experiments.
+- **Next:** run `python -m unittest discover -s tests -p 'test_verified_lock_contention.py' -v` on the exact branch; verify wait and recovery traces, then pursue real ledger receipt integrity rather than expanding SQLite-only proxies.
