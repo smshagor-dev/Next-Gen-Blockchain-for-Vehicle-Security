@@ -23,3 +23,21 @@ Fixture CSVs, 3-peer poisoning checks, five-iteration microbenchmarks and offlin
 ## Next code task
 
 Run the exact branch tests; fix failures. Then build a separate anchor-service test double with independent monotonic revision persistence and controlled crash/replay injection, followed by independent network nodes and authentic incident-grounded adversarial campaigns. Do not enable physical actuation or merge unverified changes.
+
+
+## 2026-11-19 independent issuer simulation follow-up
+
+| Workstream | State | Evidence / blocker |
+| --- | --- | --- |
+| Isolated checkpoint issuer, durable prefix and revision | IMPLEMENTED / UNVERIFIED | `independent_checkpoint_issuer.py`: fsync file, atomic replace, fsync directory; requires exclusive writer and independent custody |
+| Restart, replay, truncation, rewritten prefix controls | AUTHORED / UNEXECUTED | Six synthetic unittest cases in `test_independent_checkpoint_issuer.py` |
+| Authentic Go-ledger integration | UPCOMING | Caller must verify the entire Go hash/link chain *before* issuer receives tip sequence; issuer does not do this itself |
+| Crash injection between fsync/replace and replay | UPCOMING | No SIGKILL interposition yet; stale .pending can block issuance until operator cleanup |
+| Physical emergency-stop and TCP ingress safety | BLOCKED / REAUDIT | No deployment or hardware safety evidence |
+| Research-grade V2X evaluation | BLOCKED | Authentic data, matched baselines and statistical campaign still outstanding |
+
+Commits: `727650df` issuer, `3c3f26b8` tests. Exact GitHub checkout cannot be run in current execution container (GitHub DNS unavailable). No tests or numerical performance claims are reported as passing. The issuer is a **simulation-only trusted-service stand-in**, not secure monotonic storage, distributed consensus finality or a novel cryptographic primitive.
+
+Run: `python -m unittest discover -s tests -p 'test_independent_checkpoint_issuer.py' -v`.
+
+Next: verify exact branch tests; add exclusive-writer locking and fault injection around atomic persistence, then integrate with independently validated Go chain and compare rollback acceptance under identical fault traces.
