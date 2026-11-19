@@ -72,6 +72,38 @@ class IndependentIssuerTests(unittest.TestCase):
                 self.issuer.issue(self.first)
         self.assertFalse(self.issuer.path.exists())
 
+    def test_stale_pending_before_first_commit_is_discarded(self):
+        pending = self.issuer.path.with_suffix(".pending")
+        pending.write_bytes(b'{"revision":999,"pins":["attacker"]}')
+        receipt = self.issuer.issue(self.first)
+        self.assertEqual(receipt["revision"], 1)
+        self.assertFalse(pending.exists())
+        self.assertEqual(self.issuer._load()["pins"], self.first)
+
+    def test_stale_pending_after_commit_preserves_committed_prefix(self):
+        first_receipt = self.issuer.issue(self.first)
+        pending = self.issuer.path.with_suffix(".pending")
+        pending.write_bytes(b'{"vehicle":"vehicle-A","revision":999,"pins":[]}')
+        restarted = IndependentCheckpointIssuer(self.tmp.name, "vehicle-A", KEY)
+        self.assertEqual(restarted.issue(self.first), first_receipt)
+        self.assertFalse(pending.exists())
+        with self.assertRaisesRegex(CheckpointRefused, "truncation"):
+            restarted.issue(self.first[:1])
+
+    def test_pending_cleanup_failure_refuses_issue_without_advancing(self):
+        self.issuer.issue(self.first)
+        pending = self.issuer.path.with_suffix(".pending")
+        pending.write_bytes(b"unfinished")
+        original_unlink = type(pending).unlink
+        def deny_pending_unlink(path, *args, **kwargs):
+            if path == pending:
+                raise PermissionError("simulated cleanup failure")
+            return original_unlink(path, *args, **kwargs)
+        with mock.patch.object(type(pending), "unlink", deny_pending_unlink):
+            with self.assertRaisesRegex(CheckpointRefused, "cannot clear stale pending"):
+                self.issuer.issue(self.first + [h("C")])
+        self.assertEqual(self.issuer._load()["pins"], self.first)
+
     def test_vehicle_separation(self):
         self.issuer.issue(self.first)
         other = IndependentCheckpointIssuer(self.tmp.name, "vehicle-B", KEY)
