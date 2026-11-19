@@ -30,6 +30,7 @@ class EpochAdmission:
         self.stopped = False
         self._buckets = OrderedDict()
         self._nonces = set()
+        self._admitted = set()
 
     def advance_epoch(self, epoch):
         if type(epoch) is not int or epoch < self.epoch:
@@ -46,18 +47,18 @@ class EpochAdmission:
             if key[1] >= earliest
         )
         self._nonces = {key for key in self._nonces if key[1] >= earliest}
+        self._admitted = {key for key in self._admitted if key[1] >= earliest}
 
     def local_emergency_stop(self):
         self.stopped = True
-        self._buckets.clear()
-        self._nonces.clear()
+        # Preserve authenticated replay pins and one-shot decisions across
+        # emergency stops. Resetting them would resurrect signed old evidence.
 
     def local_reset(self, *, operator_confirmed=False):
         if not operator_confirmed:
             return False
         self.stopped = False
-        self._buckets.clear()
-        self._nonces.clear()
+        # Operator reset restores availability, never replay eligibility.
         return True
 
     def admit(self, evidence):
@@ -69,7 +70,7 @@ class EpochAdmission:
         if type(evidence.epoch) is not int or not (self.epoch - self.window <= evidence.epoch <= self.epoch):
             return False
         key = (evidence.sender, evidence.epoch, evidence.nonce)
-        if key in self._nonces:
+        if key in self._nonces or (evidence.incident, evidence.epoch, evidence.event) in self._admitted:
             return False
         bucket = (evidence.incident, evidence.epoch, evidence.event)
         if bucket not in self._buckets and len(self._buckets) >= self.max_buckets:
@@ -84,4 +85,7 @@ class EpochAdmission:
             senders = set()
             self._buckets[bucket] = senders
         senders.add(evidence.sender)
-        return len(senders) >= self.quorum
+        if len(senders) >= self.quorum:
+            self._admitted.add(bucket)
+            return True
+        return False
