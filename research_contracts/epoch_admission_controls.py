@@ -32,8 +32,10 @@ class EpochAdmission:
         self._nonces = set()
 
     def advance_epoch(self, epoch):
-        if not isinstance(epoch, int) or epoch < self.epoch:
+        if type(epoch) is not int or epoch < self.epoch:
             raise ValueError("epoch must be monotonic")
+        if epoch == self.epoch:
+            return  # Idempotent epoch announcement must not erase replay history.
         self.epoch = epoch
         self._buckets.clear()
         self._nonces.clear()
@@ -57,7 +59,7 @@ class EpochAdmission:
         if not all(isinstance(v, str) and 0 < len(v) <= 128 for v in
                    (evidence.incident, evidence.sender, evidence.nonce, evidence.event)):
             return False
-        if not isinstance(evidence.epoch, int) or not (self.epoch - self.window <= evidence.epoch <= self.epoch):
+        if type(evidence.epoch) is not int or not (self.epoch - self.window <= evidence.epoch <= self.epoch):
             return False
         key = (evidence.sender, evidence.epoch, evidence.nonce)
         if key in self._nonces:
@@ -67,9 +69,12 @@ class EpochAdmission:
             return False
         if len(self._nonces) >= self.max_nonces:
             return False
+        senders = self._buckets.get(bucket)
+        if senders is not None and evidence.sender in senders:
+            return False  # A repeated sender cannot exhaust the global nonce budget.
         self._nonces.add(key)
-        senders = self._buckets.setdefault(bucket, set())
-        if evidence.sender in senders:
-            return False
+        if senders is None:
+            senders = set()
+            self._buckets[bucket] = senders
         senders.add(evidence.sender)
         return len(senders) >= self.quorum
