@@ -1,8 +1,10 @@
 """Non-actuating issuer controls; synthetic hashes are not research results."""
 import hashlib
 import hmac
+import os
 import tempfile
 import unittest
+from unittest import mock
 from research_contracts.independent_checkpoint_issuer import (
     IndependentCheckpointIssuer, CheckpointRefused, _message,
 )
@@ -49,6 +51,26 @@ class IndependentIssuerTests(unittest.TestCase):
             self.issuer.issue([])
         with self.assertRaisesRegex(CheckpointRefused, "invalid tip"):
             self.issuer.issue(["bad"])
+
+    @unittest.skipUnless(os.name == "posix", "POSIX flock only")
+    def test_concurrent_writer_refused_without_mutation(self):
+        import fcntl
+        lock = self.issuer.path.with_suffix(".lock")
+        fd = os.open(lock, os.O_CREAT | os.O_RDWR, 0o600)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            with self.assertRaisesRegex(CheckpointRefused, "concurrent issuer"):
+                self.issuer.issue(self.first)
+            self.assertFalse(self.issuer.path.exists())
+        finally:
+            os.close(fd)
+        self.assertEqual(self.issuer.issue(self.first)["revision"], 1)
+
+    def test_unsupported_locking_fails_closed(self):
+        with mock.patch("research_contracts.independent_checkpoint_issuer.fcntl", None):
+            with self.assertRaisesRegex(CheckpointRefused, "locking unavailable"):
+                self.issuer.issue(self.first)
+        self.assertFalse(self.issuer.path.exists())
 
     def test_vehicle_separation(self):
         self.issuer.issue(self.first)
