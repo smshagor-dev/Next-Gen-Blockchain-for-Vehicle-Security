@@ -72,6 +72,11 @@ class IndependentCheckpointIssuer:
                 info = os.fstat(fd)
                 if not stat.S_ISREG(info.st_mode):
                     raise CheckpointRefused("issuer state is not a regular file")
+                # A writable or hardlinked state file is not an independent trust anchor.
+                # Validate the opened inode, not only the path, before parsing it.
+                if (info.st_uid != os.getuid() or info.st_nlink != 1
+                    or (info.st_mode & 0o077)):
+                    raise CheckpointRefused("unsafe issuer state metadata")
                 if info.st_size > MAX_CHECKPOINT_STATE_BYTES:
                     raise CheckpointRefused("issuer state exceeds byte limit")
                 with os.fdopen(fd, "rb", closefd=False) as stream:
