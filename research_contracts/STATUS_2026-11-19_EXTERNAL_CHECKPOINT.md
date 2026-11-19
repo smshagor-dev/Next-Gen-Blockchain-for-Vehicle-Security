@@ -63,3 +63,16 @@ Commits: `0ba4ad3c` (POSIX exclusive writer), `9cfc5cc` (negative controls). Exa
 - **Authored negative controls:** infinite generator termination, exact-bound/over-bound behavior, and invalid sequence rejection in `tests/test_checkpoint_issuer_bounded_history.py`.
 - **Test command:** `python -m unittest discover -s tests -p 'test_checkpoint_issuer_bounded_history.py' -v` (not executed on repository checkout).
 - **Remaining:** iterator may block forever on a blocking next() and CPU cost remains linear up to the cap; issuer state is not protected against host filesystem rollback, nor is verified Go ledger integration established. No publication effectiveness evidence.
+
+## 2026-11-19: opened-state inode trust boundary
+
+| Workstream | Status | Evidence and limitation |
+| --- | --- | --- |
+| Issuer state inode owner/mode/link-count checks | IMPLEMENTED / UNVERIFIED | Commit e247bda: checks opened descriptor owner, private mode and single link before parsing |
+| State permission/hardlink/restart negative controls | AUTHORED / UNEXECUTED | Commit 4d96579: three synthetic tests |
+| Hostile parent-directory replacement and privileged compromise | BLOCKED | Directory custody and independent issuer key remain deployment assumptions |
+| Physical emergency interlocks and authentic V2X efficacy | BLOCKED | No HIL, real incident labels or publishable experiments |
+
+Run: `python -m unittest discover -s tests -p 'test_checkpoint_state_inode_metadata.py' -v`.
+These checks are filesystem hardening, not finality or novel V2X efficacy evidence.
+Next: execute exact branch suite and repair failures; prioritize receiver-side hardware interlocks and verified Go-chain ingress.
