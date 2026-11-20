@@ -49,7 +49,7 @@ def run_control():
     # This isolates the persistence boundary rather than merely re-instantiating
     # a verifier in the same Python process.
     child = subprocess.run(
-        [sys.executable, "-m", __name__, "--child"],
+        [sys.executable, "-m", "research_contracts.hardware_restart_replay_control", "--child"],
         input=json.dumps(envelope), text=True, capture_output=True,
         timeout=10, check=False,
     )
