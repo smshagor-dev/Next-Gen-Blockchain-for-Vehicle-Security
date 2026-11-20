@@ -79,3 +79,18 @@ Reproduce: `python -m unittest discover -s tests -p 'test_paired_numeric_evidenc
 | Publishable effectiveness | Blocked | Framing regression is not attack-detection performance or an independently validated dataset experiment |
 
 Reproduce: `python -m unittest discover -s tests -p 'test_hardware_framer_preallocation.py' -v` and `python -m unittest discover -s tests -v`. Exact checkout tests not executed. The conservative chunk bound rejects oversized batches of otherwise valid small frames; assess receiver chunk sizing before deployment. Next: independently inspect socket receive loop and impose per-connection deadline/concurrency quotas while retaining local emergency-stop priority.
+
+## 2026-11-20 — segmented TCP receive and bounded per-call output
+
+| Workstream | State | Evidence / limitation |
+|---|---|---|
+| Multi-frame TCP receive handling | Implemented, unverified | Framer scans delimiters before copying each bounded segment, allowing a recv larger than one frame when each frame is within the limit |
+| Receive batch CPU/output budget | Implemented, unverified | Rejects more than 256 nonempty frames per feed; resets pending bytes on failure; transport connection handler closes on error |
+| Framing adversarial controls | Committed, unexecuted | `tests/test_hardware_streaming_frame_admission.py`: valid batching, fragmented boundary, oversized partial, 257-frame flood, undelimited oversize |
+| Existing preallocation regression | Needs revalidation | Earlier test may intentionally reject any aggregate recv above a single-frame cap; reconcile tests with the revised per-frame semantics |
+| Replay across process restart | Partial / unresolved | Nonce cache is in-memory; timestamp freshness bounds replay window, but restart persistence is not proven |
+| Authentic dataset and independent baselines | Pending | No real labelled VeReMi NextGen/CAN evaluation in this checkpoint |
+| Physical actuation safety | Blocked | Network-to-actuator commands remain disabled; no physical interlock validation |
+| Publication-grade scientific evidence | Blocked | This is a transport engineering change, not V2X detection effectiveness |
+
+Commands: `python -m unittest discover -s tests -p 'test_hardware_streaming_frame_admission.py' -v`; `python -m unittest discover -s tests -p 'test_hardware_framer_preallocation.py' -v`; `python -m unittest discover -s tests -v`. Exact checkout execution unavailable in this run (container DNS could not resolve github.com); no test pass claimed. Next code task: reconcile old framing tests, execute the suite on the PR branch, then audit durable replay handling and authenticate dataset provenance.
