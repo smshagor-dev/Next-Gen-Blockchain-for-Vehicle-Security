@@ -28,3 +28,14 @@ python -m unittest discover -s tests -v
 No tests were executed on an exact repository checkout in this run. Review cold-start WAL-mode contention under independent process launches before merging. SQLite crash consistency is not Byzantine consensus, power-loss durability or vehicle safety.
 
 Next code task: execute exact checkout tests, fix any initialization lock errors, and collect independently measured cold/warm start latency and error distributions with multiple seeds and confidence intervals.
+
+## 2026-11-20 paired latency instrumentation
+
+Implemented `research_contracts/benchmark_durable_admission.py` and two focused contract tests. Each repetition initializes a fresh database, compares the same three evidence admissions against in-memory and SQLite implementations, checks the one-shot decision sequence, and verifies restart does not reauthorize. Raw per-operation nanosecond durations, environment, and limitations are written to a new JSON file with overwrite protection. No timing numbers are reported because the exact branch was not executed in this run.
+
+```bash
+python -m unittest discover -s tests -p 'test_durable_admission_benchmark.py' -v
+python -m research_contracts.benchmark_durable_admission --repeats 30 --output /tmp/omni-durable-30.json
+```
+
+Status: instrumentation implemented; test execution and performance analysis pending. Sequential ordering is confounded, and results cannot support scientific claims about V2X attack effectiveness or statistical significance. Next: run exact checkout, investigate test failures, then randomize paired ordering and measure independent process/network overhead under controlled loads.
