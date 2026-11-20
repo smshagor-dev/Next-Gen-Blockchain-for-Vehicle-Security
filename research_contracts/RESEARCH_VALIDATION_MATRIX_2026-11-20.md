@@ -41,3 +41,16 @@ Execute exact checkout tests, repair failures, record immutable environment meta
 | Publishable adversarial effectiveness | Blocked | Type-confusion regression is a safety invariant test, not a dataset effectiveness outcome |
 
 Reproduce: `python -m unittest discover -s tests -p 'test_strict_admission_authority_types.py' -v`, then `python -m unittest discover -s tests -v`. No exact checkout test execution is claimed. Next: audit all call sites setting `Evidence.verified` and `operator_confirmed`, especially TCP/JSON adapters; ensure cryptographic verification and operator presence are performed outside the admission state machine. Do not merge until exact checkout regression and review.
+
+## 2026-11-20 — Stratified bootstrap correction
+
+| Workstream | State | Evidence / limitation |
+|---|---|---|
+| Execution-order confounding in paired analysis | Implemented, unverified | Bootstrap now resamples complete trials within the assigned first-execution strata, preserving the observed order mix |
+| Statistical regression controls | Committed, unexecuted | tests/test_order_stratified_admission_analysis.py checks missing strata, deterministic seed, stratum counts and invalid durations |
+| Exact repository validation | Blocked transiently | Container cannot resolve github.com; connector commits do not establish test pass |
+| Hardware ingress and local emergency control | Partial / unverified | No physical actuation or hardware validation in this change |
+| Genuine V2X attack-effectiveness evidence | Blocked | No authentic VeReMi/CAN dataset, matched adversarial baseline, or independently executed multi-seed trial |
+| Paper and numeric claim ledger | Upcoming | Do not promote microbenchmark timings into paper effectiveness claims |
+
+Reproduce: `python -m unittest discover -s tests -p 'test_order_stratified_admission_analysis.py' -v` and `python -m unittest discover -s tests -v`. Next: run exact checkout tests and execute the paired benchmark, then prioritize production TCP ingress audit and verified real-dataset pipeline. Stratification reduces one known order-mix confound but does not remove time drift, disk-cache dependence or pseudoreplication across repeated process operations.
