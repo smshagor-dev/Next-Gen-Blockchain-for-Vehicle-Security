@@ -52,6 +52,35 @@ class ReplayCorruptionControls(unittest.TestCase):
             with self.assertRaises(sqlite3.DatabaseError):
                 DurableNonceStore(path, max_entries_per_device=4)
 
+    def test_preexisting_empty_database_fails_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "replay.db"
+            path.touch()
+            with self.assertRaisesRegex(sqlite3.DatabaseError, "empty"):
+                DurableNonceStore(str(path), max_entries_per_device=4)
+            self.assertEqual(path.stat().st_size, 0)
+
+    def test_truncated_committed_database_fails_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "replay.db"
+            store = DurableNonceStore(str(path), max_entries_per_device=4)
+            self.assertIsNone(store.claim("pi-1", "ab" * 16, window_seconds=60))
+            store.close()
+            path.write_bytes(b"")
+            with self.assertRaises(sqlite3.DatabaseError):
+                DurableNonceStore(str(path), max_entries_per_device=4)
+
+    def test_new_missing_path_initializes_once(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "replay.db"
+            self.assertFalse(path.exists())
+            store = DurableNonceStore(str(path), max_entries_per_device=4)
+            try:
+                self.assertIsNone(store.claim("pi-1", "ab" * 16, window_seconds=60))
+            finally:
+                store.close()
+            self.assertTrue(path.exists())
+
     def test_corrupt_database_header_rejects_startup(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "replay.db"
