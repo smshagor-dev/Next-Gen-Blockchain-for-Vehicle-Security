@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from typing import Dict, Mapping, MutableMapping, Optional
 
 from replay_security import BoundedReplayCache
+from durable_hardware_replay import DurableNonceStore
 
 
 HARDWARE_TRANSPORT_VERSION = "OMNIGUARD_HW_TRANSPORT_V1"
@@ -386,12 +387,14 @@ class HardwareEnvelopeVerifier:
         replay_cache_entries: int = DEFAULT_REPLAY_CACHE_ENTRIES,
         max_frame_bytes: int = DEFAULT_MAX_FRAME_BYTES,
         max_payload_timestamp_skew_sec: int = 5,
+        replay_store_path: Optional[str] = None,
     ):
         self.replay_window_sec = min(300, max(3, int(replay_window_sec)))
         self.replay_cache_entries = min(65536, max(16, int(replay_cache_entries)))
         self.max_frame_bytes = min(1024 * 1024, max(1024, int(max_frame_bytes)))
         self.max_payload_timestamp_skew_sec = min(300, max(1, int(max_payload_timestamp_skew_sec)))
         self._lock = threading.RLock()
+        self._durable_replay = (DurableNonceStore(replay_store_path, max_entries_per_device=self.replay_cache_entries) if replay_store_path is not None else None)
         self._keys: Dict[str, str] = {}
         self._replay: Dict[str, BoundedReplayCache] = {}
 
@@ -503,7 +506,15 @@ class HardwareEnvelopeVerifier:
             raise HardwareTransportError("HW_PAYLOAD_TIMESTAMP_MISMATCH", authenticated=True)
 
         with self._lock:
-            self._claim_nonce(self._replay[identity], nonce)
+            if self._durable_replay is not None:
+                try:
+                    rejection = self._durable_replay.claim(identity, nonce, window_seconds=self.replay_window_sec)
+                except Exception as exc:
+                    raise HardwareTransportError("HW_REPLAY_STORE_UNAVAILABLE", authenticated=True) from exc
+                if rejection:
+                    raise HardwareTransportError(rejection, authenticated=True)
+            else:
+                self._claim_nonce(self._replay[identity], nonce)
         return VerifiedHardwareEnvelope(
             device_id=identity,
             kind=kind,
@@ -529,6 +540,8 @@ class HardwareEnvelopeVerifier:
                 "max_frame_bytes": self.max_frame_bytes,
                 "direction_separated_keys": True,
                 "auth_before_replay_cache_claim": True,
+                "durable_nonce_claims": self._durable_replay is not None,
+                "rollback_resistant": False,
                 "transport_confidentiality": False,
                 "secret_values_exposed": False,
             }
