@@ -40,3 +40,12 @@ No exact checkout test passes claimed. Next: execute branch suite, fault-inject 
 - **Blocked:** Trusted checkpoint, authentic ground truth, physical interlocks and distributed finality are not established.
 - **Next code task:** Run tests on exact branch, add subprocess kill-before/after-commit fault injection with independent SQLite-state oracle, then matched-trace simulation benchmarks with identical seeds and baselines.
 - **Evidence classification:** Protocol-state integrity regression, not a publishable V2X detection-effectiveness claim.
+
+## 2026-11-20: subprocess crash-boundary experiment
+
+- **Completed (code committed, unexecuted):** `tests/test_durable_crash_boundaries.py` injects abrupt subprocess termination immediately before SQLite COMMIT (exit 73), immediately after committed admission (exit 74), and after a committed local emergency-stop latch (exit 77). Parent process independently reopens the SQLite store and tests whether the quorum is newly attainable, whether positive admission is one-shot, and whether the emergency latch survives.
+- **Partial:** Exact checkout execution and failure reproduction remain pending. SQLite trace-callback termination models process death at a software boundary, **not** power failure, filesystem loss, hostile DB rollback, or hardware actuation.
+- **Validation command:** `python -m unittest discover -s tests -p 'test_durable_crash_boundaries.py' -v`; then `python -m unittest discover -s tests -v`.
+- **Blocked:** No trustworthy rollback-resistant storage, independent hardware bench, or authentic labelled V2X/CAN cohort.
+- **Next code task:** Execute exact branch tests, resolve any failures, add identical-trace durable/in-memory throughput and latency measurements with multiple seeds and explicit host specifications; independently audit the bridge's emergency control boundary.
+- **Evidence classification:** Crash-boundary protocol regression only; not scientific effectiveness, power-loss durability, or finality evidence.
