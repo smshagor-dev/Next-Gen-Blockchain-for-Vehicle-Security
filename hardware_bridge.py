@@ -273,6 +273,22 @@ class ECUCommandGateway:
         return False
 
 
+def _hardware_replay_store_path() -> str:
+    """Require explicitly provisioned persistent replay state before opening ingress.
+
+    A missing file cannot be distinguished from deletion of a previous database.
+    Provisioning is an offline operator action, never performed by the bridge.
+    """
+    path = get_env("SMARTCAR_HW_REPLAY_DB_PATH", "").strip()
+    if not path or path == ":memory:" or path.startswith("file:"):
+        raise RuntimeError("SMARTCAR_HW_REPLAY_DB_PATH must name a provisioned SQLite file")
+    if not os.path.isfile(path) or os.path.islink(path):
+        raise RuntimeError("hardware replay database missing or not a regular non-symlink file")
+    if os.path.getsize(path) == 0:
+        raise RuntimeError("hardware replay database empty; refusing implicit reprovisioning")
+    return path
+
+
 def run_arduino_mode(bc: SmartCarBlockchain):
     """Enrolled-device authenticated serial ingress; no unsigned JSON fallback.
 
@@ -290,6 +306,7 @@ def run_arduino_mode(bc: SmartCarBlockchain):
         max_frame_bytes=get_int("SMARTCAR_HW_MAX_FRAME_BYTES", 4096),
         replay_window_sec=get_int("SMARTCAR_HW_REPLAY_WINDOW_SEC", 15),
         replay_cache_entries=get_int("SMARTCAR_HW_REPLAY_CACHE_ENTRIES", 2048),
+        replay_store_path=_hardware_replay_store_path(),
     )
     session = AuthenticatedPiTelemetrySession(verifier)
     print(f"[HW BRIDGE] authenticated Arduino serial mode: {port} @ {baud}")
@@ -363,6 +380,7 @@ def run_pi_mode(bc: SmartCarBlockchain):
         max_frame_bytes=get_int("SMARTCAR_HW_MAX_FRAME_BYTES", 32 * 1024),
         replay_window_sec=get_int("SMARTCAR_HW_REPLAY_WINDOW_SEC", 15),
         replay_cache_entries=get_int("SMARTCAR_HW_REPLAY_CACHE_ENTRIES", 2048),
+        replay_store_path=_hardware_replay_store_path(),
     )
     idle_timeout = max(1, min(30, get_int("SMARTCAR_HW_IDLE_TIMEOUT_SEC", 5)))
     max_session_sec = max(5, min(600, get_int("SMARTCAR_HW_MAX_SESSION_SEC", 120)))
