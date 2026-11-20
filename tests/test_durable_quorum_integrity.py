@@ -35,11 +35,18 @@ class DurableQuorumIntegrityTests(unittest.TestCase):
             data["admitted"] = [["incident", 0, "hazard"]]
         self._mutate(corrupt)
 
-    def test_empty_quorum_not_accepted_even_when_bucket_exists(self):
+    def test_quorum_three_rejects_two_corrobators(self):
+        self.store = DurableEpochAdmission(self.path, quorum=2)
         def corrupt(data):
-            data["buckets"] = [[["incident", 0, "hazard"], ["alice"]]]
+            data["bounds"]["quorum"] = 3
+            data["buckets"] = [[["incident", 0, "hazard"], ["alice", "bob"]]]
             data["admitted"] = [["incident", 0, "hazard"]]
-        self._mutate(corrupt)
+        with sqlite3.connect(self.path) as db:
+            data = json.loads(db.execute("SELECT payload FROM admission_state WHERE id=1").fetchone()[0])
+            corrupt(data)
+            db.execute("UPDATE admission_state SET payload=? WHERE id=1", (json.dumps(data),))
+        with self.assertRaisesRegex(ValueError, "quorum"):
+            DurableEpochAdmission(self.path, quorum=3)
 
     def test_valid_committed_quorum_survives_restart(self):
         first = Evidence("incident", "alice", 0, "n1", "hazard", True)
