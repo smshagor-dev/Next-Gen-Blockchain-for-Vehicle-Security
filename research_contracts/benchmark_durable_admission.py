@@ -10,6 +10,7 @@ import argparse
 import json
 import os
 import platform
+import random
 import statistics
 import tempfile
 import time
@@ -24,14 +25,18 @@ def observation(sender):
                     nonce="nonce-" + sender, event="hazard", verified=True)
 
 
-def trial(root, index):
+def trial(root, index, *, order=("memory", "sqlite")):
     path = str(root / ("trial-%04d.sqlite" % index))
     begin = time.perf_counter_ns()
     durable = DurableEpochAdmission(path, quorum=2)
     cold_ns = time.perf_counter_ns() - begin
     memory = EpochAdmission(quorum=2)
     samples = {}
-    for name, gate in (("memory", memory), ("sqlite", durable)):
+    gates = {"memory": memory, "sqlite": durable}
+    if set(order) != set(gates) or len(order) != 2:
+        raise ValueError("order must contain both implementations once")
+    for name in order:
+        gate = gates[name]
         durations = []
         outcomes = []
         for sender in ("peer-a", "peer-b", "peer-c"):
@@ -44,7 +49,7 @@ def trial(root, index):
     restarted = DurableEpochAdmission(path, quorum=2)
     if restarted.admit(observation("peer-d")) is not False:
         raise AssertionError("restart emitted duplicate authorization")
-    return {"cold_start_ns": cold_ns, "memory_ns": samples["memory"],
+    return {"order": list(order), "cold_start_ns": cold_ns, "memory_ns": samples["memory"],
             "sqlite_ns": samples["sqlite"]}
 
 
@@ -52,20 +57,33 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--repeats", type=int, default=30)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--seed", type=int, default=20261120,
+                        help="reproducible balanced trial-order shuffle seed")
     args = parser.parse_args()
     if not 2 <= args.repeats <= 10000:
         parser.error("--repeats must be between 2 and 10000")
     output = Path(args.output)
     if output.exists():
         parser.error("refusing to overwrite an existing evidence file")
+    # Block balance controls systematic first-run effects; seeded shuffle
+    # prevents all SQLite measurements following in-memory measurements.
+    rng = random.Random(args.seed)
+    orders = [("memory", "sqlite") if i % 2 == 0 else ("sqlite", "memory")
+              for i in range(args.repeats)]
+    rng.shuffle(orders)
     with tempfile.TemporaryDirectory() as folder:
-        results = [trial(Path(folder), i) for i in range(args.repeats)]
+        results = [trial(Path(folder), i, order=orders[i])
+                   for i in range(args.repeats)]
     payload = {
         "schema": 1, "purpose": "non-publishable engineering microbenchmark",
         "platform": platform.platform(), "python": platform.python_version(),
         "pid": os.getpid(), "clock": "perf_counter_ns",
-        "repeats": args.repeats, "samples": results,
-        "limitations": ["Sequential same-process measurements, not randomized order",
+        "repeats": args.repeats, "seed": args.seed,
+        "order_counts": {name: sum(x["order"][0] == name for x in results)
+                         for name in ("memory", "sqlite")},
+        "samples": results,
+        "limitations": ["Balanced seeded execution order; still sequential in one process",
+                        "No warmup control, process isolation, or system-load control",
                         "No network, ECU, physical interlock, or attack-detection evaluation",
                         "No inference of significance from repetition count"],
     }
