@@ -67,3 +67,15 @@ Reproduce: `python -m unittest discover -s tests -p 'test_order_stratified_admis
 | Scientific V2X effectiveness | Blocked | No authenticated real-dataset, matched-baseline adversarial trial or physical hardware evidence established |
 
 Reproduce: `python -m unittest discover -s tests -p 'test_paired_numeric_evidence_integrity.py' -v`; then `python -m unittest discover -s tests -v`. Next: execute these tests on the exact PR checkout, audit TCP envelope verifier and replay cache across restarts, then implement authenticated dataset provenance and attack-matched baselines. This is input-integrity engineering and not a publishable scientific effectiveness result.
+
+## 2026-11-20 — TCP receive preallocation bound
+
+| Workstream | State | Evidence / limitation |
+|---|---|---|
+| Bounded hardware ingress allocation | Implemented, unverified | `hardware_transport_security.AuthenticatedLineFramer.feed` rejects oversized recv chunks before bytearray.extend; clears pending partial state on overflow |
+| Oversized receive negative controls | Committed, unexecuted | `tests/test_hardware_framer_preallocation.py`: oversized single recv, fragmented overflow, valid fragmentation, batched flood |
+| Runtime receiver and resource DoS | Partial | Receiver recv size, per-peer timeouts, concurrency limits and CPU under slowloris/flood still require independent audit |
+| Hardware emergency-stop independence | Blocked physical validation | No hardware or real vehicle access; no actuation in these tests |
+| Publishable effectiveness | Blocked | Framing regression is not attack-detection performance or an independently validated dataset experiment |
+
+Reproduce: `python -m unittest discover -s tests -p 'test_hardware_framer_preallocation.py' -v` and `python -m unittest discover -s tests -v`. Exact checkout tests not executed. The conservative chunk bound rejects oversized batches of otherwise valid small frames; assess receiver chunk sizing before deployment. Next: independently inspect socket receive loop and impose per-connection deadline/concurrency quotas while retaining local emergency-stop priority.
