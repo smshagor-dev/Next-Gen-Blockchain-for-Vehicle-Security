@@ -22,6 +22,11 @@ class DurableNonceStore:
         try:
             self._db.execute("PRAGMA journal_mode=WAL")
             self._db.execute("PRAGMA synchronous=FULL")
+            # Reject damaged replay state before accepting authenticated inputs.
+            # quick_check is not an anti-tamper or anti-rollback mechanism.
+            check = self._db.execute("PRAGMA quick_check").fetchall()
+            if check != [("ok",)]:
+                raise sqlite3.DatabaseError("hardware replay database integrity check failed")
             self._db.execute("CREATE TABLE IF NOT EXISTS nonce_claims (device TEXT NOT NULL, nonce TEXT NOT NULL, expires REAL NOT NULL, PRIMARY KEY(device,nonce))")
             self._db.execute("CREATE TABLE IF NOT EXISTS replay_clock (id INTEGER PRIMARY KEY CHECK(id=1), last_seen REAL NOT NULL)")
         except Exception:
