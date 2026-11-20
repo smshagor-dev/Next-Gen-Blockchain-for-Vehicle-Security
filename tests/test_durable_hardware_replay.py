@@ -37,6 +37,38 @@ class DurableReplayTests(unittest.TestCase):
                 self.assertIsNone(store.claim("pi", "b", window_seconds=3))
             store.close()
 
+    def test_clock_rollback_rejected_across_restart(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = str(Path(d) / "clock.db")
+            with patch("durable_hardware_replay.time.time", return_value=200.0):
+                first = DurableNonceStore(path, max_entries_per_device=2)
+                self.assertIsNone(first.claim("pi", "a", window_seconds=30))
+                first.close()
+            with patch("durable_hardware_replay.time.time", return_value=199.0):
+                second = DurableNonceStore(path, max_entries_per_device=2)
+                self.assertEqual(second.claim("pi", "b", window_seconds=30), "HW_REPLAY_CLOCK_ROLLBACK")
+                second.close()
+            with patch("durable_hardware_replay.time.time", return_value=201.0):
+                third = DurableNonceStore(path, max_entries_per_device=2)
+                self.assertEqual(third.claim("pi", "a", window_seconds=30), "HW_REPLAY_DETECTED")
+                self.assertIsNone(third.claim("pi", "b", window_seconds=30))
+                third.close()
+
+    def test_invalid_capacity_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            for value in (0, -1, True, 1.5):
+                with self.subTest(value=value), self.assertRaises(ValueError):
+                    DurableNonceStore(str(Path(d) / "bad.db"), max_entries_per_device=value)
+
+    def test_invalid_window_rejected_without_claim(self):
+        with tempfile.TemporaryDirectory() as d:
+            store = DurableNonceStore(str(Path(d) / "window.db"), max_entries_per_device=2)
+            for value in (0, -2, True, 1.2):
+                with self.subTest(value=value), self.assertRaises(ValueError):
+                    store.claim("pi", "a", window_seconds=value)
+            self.assertIsNone(store.claim("pi", "a", window_seconds=30))
+            store.close()
+
     def test_memory_path_rejected(self):
         with self.assertRaises(ValueError):
             DurableNonceStore(":memory:", max_entries_per_device=16)
