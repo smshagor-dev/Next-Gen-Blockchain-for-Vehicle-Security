@@ -19,10 +19,10 @@ class Evidence:
 
 class EpochAdmission:
     def __init__(self, *, quorum=2, window=1, max_buckets=128, max_nonces=1024):
-        if not (isinstance(quorum, int) and quorum >= 2 and
-                isinstance(window, int) and window >= 0 and
-                isinstance(max_buckets, int) and max_buckets >= 1 and
-                isinstance(max_nonces, int) and max_nonces >= quorum):
+        if not (type(quorum) is int and quorum >= 2 and
+                type(window) is int and window >= 0 and
+                type(max_buckets) is int and max_buckets >= 1 and
+                type(max_nonces) is int and max_nonces >= quorum):
             raise ValueError("invalid admission bounds")
         self.quorum, self.window = quorum, window
         self.max_buckets, self.max_nonces = max_buckets, max_nonces
@@ -55,14 +55,14 @@ class EpochAdmission:
         # emergency stops. Resetting them would resurrect signed old evidence.
 
     def local_reset(self, *, operator_confirmed=False):
-        if not operator_confirmed:
+        if operator_confirmed is not True:
             return False
         self.stopped = False
         # Operator reset restores availability, never replay eligibility.
         return True
 
     def admit(self, evidence):
-        if self.stopped or not evidence.verified:
+        if self.stopped or evidence.verified is not True:
             return False
         if not all(isinstance(v, str) and 0 < len(v) <= 128 for v in
                    (evidence.incident, evidence.sender, evidence.nonce, evidence.event)):
