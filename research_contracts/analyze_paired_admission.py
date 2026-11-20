@@ -34,16 +34,23 @@ def summarize(payload, *, resamples=2000, seed=20261120):
         ratio = sum(sqlite) / sum(memory)
         ratios.append(math.log(ratio))
         orders[order[0]].append(math.log(ratio))
+    # Preserve the assigned first-execution strata in each bootstrap draw.
+    # A pooled draw can accidentally change the order mix and confound
+    # the overhead interval when first/second execution affects latency.
+    if not all(orders.values()):
+        raise ValueError("both first-execution order strata are required")
     rng = random.Random(seed)
     bootstrap = []
     for _ in range(resamples):
-        draw = [ratios[rng.randrange(len(ratios))] for _ in ratios]
+        draw = []
+        for values in orders.values():
+            draw.extend(values[rng.randrange(len(values))] for _ in values)
         bootstrap.append(statistics.mean(draw))
     bootstrap.sort()
     lo = bootstrap[int(0.025 * resamples)]
     hi = bootstrap[min(resamples - 1, int(0.975 * resamples))]
     return {
-        "analysis": "exploratory trial-cluster bootstrap of log(sqlite/memory) runtime ratio",
+        "analysis": "exploratory order-stratified trial-cluster bootstrap of log(sqlite/memory) runtime ratio",
         "trials": len(trials), "seed": seed, "resamples": resamples,
         "geometric_mean_runtime_ratio": math.exp(statistics.mean(ratios)),
         "percentile_bootstrap_95_interval": [math.exp(lo), math.exp(hi)],
@@ -54,7 +61,7 @@ def summarize(payload, *, resamples=2000, seed=20261120):
         "interpretation": "ratio > 1 means SQLite slower; interval is exploratory, not proof of security effectiveness",
         "limitations": [
             "Three operations within each trial are correlated and not independent samples",
-            "Bootstrap assumes trials exchangeable despite possible time drift and OS/disk cache effects",
+            "Bootstrap assumes exchangeability within order strata despite possible time drift and OS/disk cache effects",
             "No significance claim based on n>=30; no hypothesis-test p-value reported",
             "No physical hardware, network, CAN, VeReMi, adversarial or safety-effectiveness evaluation"
         ]
