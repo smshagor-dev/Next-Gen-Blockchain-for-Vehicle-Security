@@ -30,3 +30,13 @@ No exact checkout test passes claimed. Next: execute branch suite, fault-inject 
 - **Blocked:** No trusted external checkpoint or hardware test bench; SQLite does not detect an attacker rolling back the entire database.
 - **Upcoming:** Run exact checkout tests, add subprocess crash-before/after-commit test with independent oracle, compare durable-vs-memory admission overhead on identical simulated traces.
 - **Evidence classification:** Input-validation regressions only; not publishable effectiveness or physical safety evidence.
+
+
+## 2026-11-20: persisted positive-admission quorum integrity
+
+- **Completed (code, unverified):** Recovery now rejects an admitted incident whose stored distinct corroborator count is below the configured quorum. Previously the decoder checked bucket existence but not the positive-decision quorum invariant. This is a malformed-state fail-closed defense, not malicious database rollback protection.
+- **Completed (tests committed, unexecuted):** `tests/test_durable_quorum_integrity.py` exercises forged one-of-two and two-of-three positive decisions, legitimate two-of-two restart, and recovery of a partial evidence bucket.
+- **Partial:** No exact checkout test execution: container cannot resolve github.com; GitHub connector source writes and reads work. The complete suite and process-kill crash consistency experiments remain outstanding.
+- **Blocked:** Trusted checkpoint, authentic ground truth, physical interlocks and distributed finality are not established.
+- **Next code task:** Run tests on exact branch, add subprocess kill-before/after-commit fault injection with independent SQLite-state oracle, then matched-trace simulation benchmarks with identical seeds and baselines.
+- **Evidence classification:** Protocol-state integrity regression, not a publishable V2X detection-effectiveness claim.
