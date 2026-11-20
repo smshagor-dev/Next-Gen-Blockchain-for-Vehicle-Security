@@ -22,3 +22,11 @@ python -m unittest discover -s tests -p 'test_epoch*py' -v
 python -m unittest discover -s tests -v
 ```
 No exact checkout test passes claimed. Next: execute branch suite, fault-inject SQLite commit failures, add process-level concurrency campaign and fail-closed authenticated storage rollback negative control; review hardware bridge ingress before any integration.
+
+## 2026-11-20: corrupt durable-state negative controls
+
+- **Completed (code, unverified):** Reject non-string/oversized/unhashable state keys, boolean epochs, duplicate nonce/admission entries, and stale admitted keys on SQLite recovery. Six negative-control tests committed in `tests/test_durable_state_negative_controls.py`.
+- **Partial:** The new tests are not yet executed against the exact GitHub branch; full repository suite and subprocess kill/commit fault injection remain pending.
+- **Blocked:** No trusted external checkpoint or hardware test bench; SQLite does not detect an attacker rolling back the entire database.
+- **Upcoming:** Run exact checkout tests, add subprocess crash-before/after-commit test with independent oracle, compare durable-vs-memory admission overhead on identical simulated traces.
+- **Evidence classification:** Input-validation regressions only; not publishable effectiveness or physical safety evidence.
