@@ -21,7 +21,14 @@ class DurableNonceStore:
         self._limit = max_entries_per_device
         # A missing/empty file is a first initialization. A nonempty database
         # that has lost its replay tables must never silently start fresh.
-        existing_bytes = os.path.getsize(path) if os.path.exists(path) else 0
+        existing_file = os.path.lexists(path)
+        if existing_file and not os.path.isfile(path):
+            raise ValueError("replay store must be a regular file")
+        existing_bytes = os.path.getsize(path) if existing_file else 0
+        # An existing zero-length file can be a truncated/rolled-back replay
+        # database. Never mistake it for first initialization.
+        if existing_file and existing_bytes == 0:
+            raise sqlite3.DatabaseError("existing replay database is empty")
         self._db = sqlite3.connect(path, timeout=5, isolation_level=None, check_same_thread=False)
         try:
             self._db.execute("PRAGMA journal_mode=WAL")
