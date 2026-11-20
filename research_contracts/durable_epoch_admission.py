@@ -5,7 +5,6 @@ a trusted epoch authority, authenticated storage, consensus, or physical safety.
 """
 import json
 import sqlite3
-from collections import OrderedDict
 
 from .epoch_admission_controls import EpochAdmission
 
@@ -58,13 +57,34 @@ class DurableEpochAdmission:
             if type(data["epoch"]) is not int or data["epoch"] < 0 or type(data["stopped"]) is not bool:
                 raise ValueError("invalid epoch or stop latch")
             state.epoch, state.stopped = data["epoch"], data["stopped"]
-            for key, senders in data["buckets"]:
-                key = tuple(key)
-                if len(key) != 3 or key in state._buckets or not senders or len(senders) != len(set(senders)):
+            def checked_key(raw, *, nonce=False):
+                if type(raw) is not list or len(raw) != 3:
+                    raise ValueError("invalid durable key")
+                if any(type(raw[i]) is not str or not 0 < len(raw[i]) <= 128
+                       for i in (0, 2)):
+                    raise ValueError("invalid durable key string")
+                if type(raw[1]) is not int or not 0 <= raw[1] <= state.epoch:
+                    raise ValueError("invalid durable key epoch")
+                return tuple(raw)
+
+            if any(type(name) is not list for name in
+                   (data["buckets"], data["nonces"], data["admitted"])):
+                raise ValueError("invalid durable collections")
+            for raw_key, senders in data["buckets"]:
+                key = checked_key(raw_key)
+                if (key in state._buckets or type(senders) is not list or
+                        not senders or len(senders) > state.max_nonces or
+                        any(type(sender) is not str or
+                            not 0 < len(sender) <= 128 for sender in senders) or
+                        len(senders) != len(set(senders))):
                     raise ValueError("invalid bucket")
                 state._buckets[key] = set(senders)
-            state._nonces = {tuple(x) for x in data["nonces"]}
-            state._admitted = {tuple(x) for x in data["admitted"]}
+            nonce_keys = [checked_key(x, nonce=True) for x in data["nonces"]]
+            admitted_keys = [checked_key(x) for x in data["admitted"]]
+            if len(nonce_keys) != len(set(nonce_keys)) or len(admitted_keys) != len(set(admitted_keys)):
+                raise ValueError("duplicate durable key")
+            state._nonces = set(nonce_keys)
+            state._admitted = set(admitted_keys)
             if (len(state._buckets) > state.max_buckets or
                     len(state._nonces) > state.max_nonces or
                     len(state._nonces) != len(data["nonces"])):
@@ -74,12 +94,14 @@ class DurableEpochAdmission:
                     raise ValueError("invalid bucket epoch")
                 if any(not isinstance(s, str) or not s for s in senders):
                     raise ValueError("invalid sender")
+            if any(key[1] < state.epoch - state.window for key in state._admitted):
+                raise ValueError("admission outside epoch window")
             if not state._admitted.issubset(set(state._buckets)):
                 raise ValueError("admission without evidence bucket")
             if any(len(x) != 3 or type(x[1]) is not int or x[1] > state.epoch or x[1] < state.epoch - state.window for x in state._nonces):
                 raise ValueError("invalid nonce epoch")
             return state
-        except (KeyError, TypeError, AttributeError, json.JSONDecodeError) as exc:
+        except (KeyError, TypeError, AttributeError, IndexError, json.JSONDecodeError) as exc:
             raise ValueError("corrupt admission state; fail closed") from exc
 
     def _transition(self, method, *args, **kwargs):
