@@ -31,11 +31,14 @@ class DurableNonceStore:
     def claim(self, device: str, nonce: str, *, window_seconds: int) -> str | None:
         """Return stable rejection reason or None; commit before caller acts."""
         with self._lock:
-            now = time.time()
             if type(window_seconds) is not int or window_seconds <= 0:
                 raise ValueError("window_seconds must be a positive integer")
             try:
                 self._db.execute("BEGIN IMMEDIATE")
+                # Sample wall time after acquiring the write lock: a contender
+                # must not compare its pre-wait clock against another writer's
+                # later persisted high-water mark.
+                now = time.time()
                 # Persist the maximum observed wall time atomically with each claim.
                 # A backwards clock step cannot silently extend an old replay window.
                 row = self._db.execute("SELECT last_seen FROM replay_clock WHERE id=1").fetchone()
