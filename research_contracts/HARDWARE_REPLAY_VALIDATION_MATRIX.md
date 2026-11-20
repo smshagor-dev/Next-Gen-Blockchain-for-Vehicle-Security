@@ -5,7 +5,7 @@ Scope: draft PR #160, opt-in local SQLite nonce store. No physical actuation, in
 | Requirement | Status | Evidence / next check |
 | --- | --- | --- |
 | Atomic nonce claim before admission | Implemented, unverified | SQLite BEGIN IMMEDIATE / COMMIT; execute exact checkout tests |
-| Restart duplicate rejection | Test implemented, unexecuted | tests/test_durable_hardware_replay.py |
+| Valid SQLite file with missing replay tables | Implemented, unverified | Startup rejects missing nonce_claims/replay_clock rather than recreating; two regression tests added; standalone SQLite DROP TABLE control executed (quick_check=ok) |\n| Restart duplicate rejection | Test implemented, unexecuted | tests/test_durable_hardware_replay.py |
 | Backwards wall-clock step | Implemented, unverified | Persisted high-water mark in same transaction; restart regression added |
 | Invalid bounds fail closed | Implemented, unverified | Boolean/zero/fractional limits and windows rejected |
 | Independent-process contention | Tests committed, unexecuted | tests/test_durable_nonce_process_faults.py; exact checkout required |
@@ -20,7 +20,7 @@ Scope: draft PR #160, opt-in local SQLite nonce store. No physical actuation, in
 Run from repository root:
 
 ```bash
-python -m unittest discover -s tests -p 'test_durable_hardware_replay.py' -v
+python -m unittest discover -s tests -p 'test_durable_replay_corruption.py' -v\npython -m unittest discover -s tests -p 'test_durable_hardware_replay.py' -v
 python -m unittest discover -s tests -p 'test_nonce_transaction_boundaries.py' -v\npython -m unittest discover -s tests -p 'test_durable_nonce_process_faults.py' -v\npython -m unittest discover -s tests -v
 ```
 
