@@ -5,6 +5,7 @@ The caller must keep the database on trusted storage and fail closed on I/O erro
 """
 from __future__ import annotations
 
+import os
 import sqlite3
 import threading
 import time
@@ -18,6 +19,9 @@ class DurableNonceStore:
         if type(max_entries_per_device) is not int or max_entries_per_device < 1:
             raise ValueError("max_entries_per_device must be a positive integer")
         self._limit = max_entries_per_device
+        # A missing/empty file is a first initialization. A nonempty database
+        # that has lost its replay tables must never silently start fresh.
+        existing_bytes = os.path.getsize(path) if os.path.exists(path) else 0
         self._db = sqlite3.connect(path, timeout=5, isolation_level=None, check_same_thread=False)
         try:
             self._db.execute("PRAGMA journal_mode=WAL")
@@ -27,6 +31,12 @@ class DurableNonceStore:
             check = self._db.execute("PRAGMA quick_check").fetchall()
             if check != [("ok",)]:
                 raise sqlite3.DatabaseError("hardware replay database integrity check failed")
+            if existing_bytes:
+                tables = {row[0] for row in self._db.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                )}
+                if not {"nonce_claims", "replay_clock"}.issubset(tables):
+                    raise sqlite3.DatabaseError("existing replay database is missing required state tables")
             self._db.execute("CREATE TABLE IF NOT EXISTS nonce_claims (device TEXT NOT NULL, nonce TEXT NOT NULL, expires REAL NOT NULL, PRIMARY KEY(device,nonce))")
             self._db.execute("CREATE TABLE IF NOT EXISTS replay_clock (id INTEGER PRIMARY KEY CHECK(id=1), last_seen REAL NOT NULL)")
         except Exception:
