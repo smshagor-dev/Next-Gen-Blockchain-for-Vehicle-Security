@@ -12,12 +12,12 @@ from pathlib import Path
 
 
 def summarize(payload, *, resamples=2000, seed=20261120):
-    if payload.get("schema") != 1 or not isinstance(payload.get("samples"), list):
+    if type(payload.get("schema")) is not int or payload["schema"] != 1 or not isinstance(payload.get("samples"), list):
         raise ValueError("unsupported benchmark schema")
     if not 100 <= resamples <= 100000:
         raise ValueError("resamples must be between 100 and 100000")
     trials = payload["samples"]
-    if len(trials) < 2 or payload.get("repeats") != len(trials):
+    if len(trials) < 2 or type(payload.get("repeats")) is not int or payload["repeats"] != len(trials):
         raise ValueError("inconsistent trial count")
     ratios = []
     orders = {"memory": [], "sqlite": []}
@@ -31,9 +31,13 @@ def summarize(payload, *, resamples=2000, seed=20261120):
         if any(type(x) is not int or x <= 0 for x in memory + sqlite):
             raise ValueError("durations must be positive integer nanoseconds")
         # Treat the trial, not its three correlated operations, as the unit.
-        ratio = sum(sqlite) / sum(memory)
-        ratios.append(math.log(ratio))
-        orders[order[0]].append(math.log(ratio))
+        # Subtract log totals rather than divide huge integers into a float:
+        # the latter may overflow or underflow on adversarial JSON input.
+        log_ratio = math.log(sum(sqlite)) - math.log(sum(memory))
+        if not math.isfinite(log_ratio):
+            raise ValueError("non-finite log runtime ratio")
+        ratios.append(log_ratio)
+        orders[order[0]].append(log_ratio)
     # Preserve the assigned first-execution strata in each bootstrap draw.
     # A pooled draw can accidentally change the order mix and confound
     # the overhead interval when first/second execution affects latency.
@@ -49,6 +53,9 @@ def summarize(payload, *, resamples=2000, seed=20261120):
     bootstrap.sort()
     lo = bootstrap[int(0.025 * resamples)]
     hi = bootstrap[min(resamples - 1, int(0.975 * resamples))]
+    # Avoid serializing Infinity for extreme but syntactically valid inputs.
+    if any(abs(value) > 700 for value in ratios):
+        raise ValueError("runtime ratio outside numerically reportable range")
     return {
         "analysis": "exploratory order-stratified trial-cluster bootstrap of log(sqlite/memory) runtime ratio",
         "trials": len(trials), "seed": seed, "resamples": resamples,
