@@ -15,12 +15,15 @@ class DurableNonceStore:
         if not path or path == ":memory:" or path.startswith("file:"):
             raise ValueError("durable replay storage requires a filesystem path")
         self._lock = threading.RLock()
+        if type(max_entries_per_device) is not int or max_entries_per_device < 1:
+            raise ValueError("max_entries_per_device must be a positive integer")
         self._limit = max_entries_per_device
         self._db = sqlite3.connect(path, timeout=5, isolation_level=None, check_same_thread=False)
         try:
             self._db.execute("PRAGMA journal_mode=WAL")
             self._db.execute("PRAGMA synchronous=FULL")
             self._db.execute("CREATE TABLE IF NOT EXISTS nonce_claims (device TEXT NOT NULL, nonce TEXT NOT NULL, expires REAL NOT NULL, PRIMARY KEY(device,nonce))")
+            self._db.execute("CREATE TABLE IF NOT EXISTS replay_clock (id INTEGER PRIMARY KEY CHECK(id=1), last_seen REAL NOT NULL)")
         except Exception:
             self._db.close()
             raise
@@ -29,8 +32,17 @@ class DurableNonceStore:
         """Return stable rejection reason or None; commit before caller acts."""
         with self._lock:
             now = time.time()
+            if type(window_seconds) is not int or window_seconds <= 0:
+                raise ValueError("window_seconds must be a positive integer")
             try:
                 self._db.execute("BEGIN IMMEDIATE")
+                # Persist the maximum observed wall time atomically with each claim.
+                # A backwards clock step cannot silently extend an old replay window.
+                row = self._db.execute("SELECT last_seen FROM replay_clock WHERE id=1").fetchone()
+                if row is not None and now < row[0]:
+                    self._db.execute("ROLLBACK")
+                    return "HW_REPLAY_CLOCK_ROLLBACK"
+                self._db.execute("INSERT INTO replay_clock(id,last_seen) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET last_seen=excluded.last_seen", (now,))
                 self._db.execute("DELETE FROM nonce_claims WHERE expires <= ?", (now,))
                 if self._db.execute("SELECT 1 FROM nonce_claims WHERE device=? AND nonce=?", (device, nonce)).fetchone():
                     self._db.execute("COMMIT")
