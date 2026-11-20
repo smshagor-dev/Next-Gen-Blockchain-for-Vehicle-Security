@@ -27,16 +27,20 @@ def observation(sender):
 
 def trial(root, index, *, order=("memory", "sqlite")):
     path = str(root / ("trial-%04d.sqlite" % index))
-    begin = time.perf_counter_ns()
-    durable = DurableEpochAdmission(path, quorum=2)
-    cold_ns = time.perf_counter_ns() - begin
-    memory = EpochAdmission(quorum=2)
-    samples = {}
-    gates = {"memory": memory, "sqlite": durable}
-    if set(order) != set(gates) or len(order) != 2:
+    if tuple(order) not in (("memory", "sqlite"), ("sqlite", "memory")):
         raise ValueError("order must contain both implementations once")
+    samples = {}
+    cold_ns = None
+    # Construct each gate immediately before its assigned measurement phase.
+    # Previously SQLite was ALWAYS initialized first, even in memory-first
+    # trials, confounding the order-randomization with SQLite disk/cache work.
     for name in order:
-        gate = gates[name]
+        if name == "sqlite":
+            begin = time.perf_counter_ns()
+            gate = DurableEpochAdmission(path, quorum=2)
+            cold_ns = time.perf_counter_ns() - begin
+        else:
+            gate = EpochAdmission(quorum=2)
         durations = []
         outcomes = []
         for sender in ("peer-a", "peer-b", "peer-c"):
