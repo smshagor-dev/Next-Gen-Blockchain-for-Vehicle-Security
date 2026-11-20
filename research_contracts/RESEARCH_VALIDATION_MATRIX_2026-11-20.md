@@ -54,3 +54,16 @@ Reproduce: `python -m unittest discover -s tests -p 'test_strict_admission_autho
 | Paper and numeric claim ledger | Upcoming | Do not promote microbenchmark timings into paper effectiveness claims |
 
 Reproduce: `python -m unittest discover -s tests -p 'test_order_stratified_admission_analysis.py' -v` and `python -m unittest discover -s tests -v`. Next: run exact checkout tests and execute the paired benchmark, then prioritize production TCP ingress audit and verified real-dataset pipeline. Stratification reduces one known order-mix confound but does not remove time drift, disk-cache dependence or pseudoreplication across repeated process operations.
+
+## 2026-11-20 — Numeric evidence integrity in paired analysis
+
+| Workstream | State | Evidence / limitation |
+|---|---|---|
+| Extreme-duration ratio overflow and underflow | Implemented, unverified | Uses difference of logarithms of integer sums rather than unsafe float division; rejects non-reportable extreme ratios |
+| JSON schema and trial-count type confusion | Implemented, unverified | Rejects boolean schema and repetition counts instead of accepting Python bool-as-int |
+| Negative-control regression | Committed, unexecuted | tests/test_paired_numeric_evidence_integrity.py covers ordinary ratio, extreme integer duration, excessive ratio and malformed type metadata |
+| Exact checkout tests | Pending | GitHub connector commit confirmation is not a test execution |
+| Hardware TCP ingress and safety | Partial | Existing signed ingress and fail-closed actuation code observed in main; independent runtime and physical verification pending |
+| Scientific V2X effectiveness | Blocked | No authenticated real-dataset, matched-baseline adversarial trial or physical hardware evidence established |
+
+Reproduce: `python -m unittest discover -s tests -p 'test_paired_numeric_evidence_integrity.py' -v`; then `python -m unittest discover -s tests -v`. Next: execute these tests on the exact PR checkout, audit TCP envelope verifier and replay cache across restarts, then implement authenticated dataset provenance and attack-matched baselines. This is input-integrity engineering and not a publishable scientific effectiveness result.
