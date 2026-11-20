@@ -24,18 +24,20 @@ class DurableEpochAdmission:
                            max_buckets=max_buckets, max_nonces=max_nonces)
         EpochAdmission(**self.bounds)  # Validate before touching storage.
         with self._connect() as db:
+            db.execute("PRAGMA journal_mode=WAL")
+            db.execute("BEGIN IMMEDIATE")
             db.execute("CREATE TABLE IF NOT EXISTS admission_state "
                        "(id INTEGER PRIMARY KEY CHECK(id=1), payload TEXT NOT NULL)")
             db.execute("INSERT OR IGNORE INTO admission_state(id,payload) VALUES(1,?)",
                        (self._encode(EpochAdmission(**self.bounds)),))
             self._decode(db.execute(
                 "SELECT payload FROM admission_state WHERE id=1").fetchone()[0])
+            db.execute("COMMIT")
 
     def _connect(self):
         db = sqlite3.connect(self.path, timeout=5, isolation_level=None)
         db.execute("PRAGMA busy_timeout=5000")
         db.execute("PRAGMA synchronous=FULL")
-        db.execute("PRAGMA journal_mode=WAL")
         return db
 
     def _encode(self, state):
