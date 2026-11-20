@@ -544,6 +544,17 @@ class AuthenticatedLineFramer:
     def feed(self, data: bytes) -> list[bytes]:
         if not isinstance(data, (bytes, bytearray)):
             raise HardwareTransportError("HW_FRAME_TYPE_INVALID")
+        # Reject oversized recv chunks BEFORE copying attacker-controlled bytes.
+        # This bounds transient allocation even when a peer sends many newline
+        # frames in one recv. Receivers should use bounded recv() sizes.
+        if len(data) > self.max_frame_bytes + 1:
+            self._buffer.clear()
+            raise HardwareTransportError("HW_FRAME_TOO_LARGE")
+        if len(self._buffer) + len(data) > self.max_frame_bytes + 1:
+            # An existing partial frame cannot be completed by a chunk larger
+            # than the remaining bound without first parsing it. Reject closed.
+            self._buffer.clear()
+            raise HardwareTransportError("HW_FRAME_TOO_LARGE")
         self._buffer.extend(data)
         frames: list[bytes] = []
         while True:
