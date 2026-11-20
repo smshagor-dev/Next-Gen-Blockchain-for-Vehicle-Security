@@ -28,3 +28,16 @@ The bootstrap resamples complete trials rather than treating three operations wi
 ## Next engineering task
 
 Execute exact checkout tests, repair failures, record immutable environment metadata, and implement paired CPU/RAM/process-isolated network experiments; then move to verified labelled dataset ingest and identical-split adversarial baselines.
+
+## 2026-11-20 — Authority type-confusion negative controls
+
+| Workstream | State | Evidence / limitation |
+|---|---|---|
+| Evidence verification strictness | Implemented, unverified | Only literal boolean True is accepted; truthy strings, integers, lists and mappings cannot satisfy quorum |
+| Local emergency reset authority | Implemented, unverified | Only literal boolean True clears stop; no physical operator identity authentication is implemented here |
+| Admission configuration validation | Implemented, unverified | Boolean values rejected as integer bounds to prevent Python bool/int confusion |
+| Restart negative-control tests | Committed, unexecuted | tests/test_strict_admission_authority_types.py exercises durable stop latch and rejected reset after reopening |
+| Hardware ingress and actual local interlocks | Partial / blocked | Must verify source of verified/operator_confirmed assertions and local physical stop independently |
+| Publishable adversarial effectiveness | Blocked | Type-confusion regression is a safety invariant test, not a dataset effectiveness outcome |
+
+Reproduce: `python -m unittest discover -s tests -p 'test_strict_admission_authority_types.py' -v`, then `python -m unittest discover -s tests -v`. No exact checkout test execution is claimed. Next: audit all call sites setting `Evidence.verified` and `operator_confirmed`, especially TCP/JSON adapters; ensure cryptographic verification and operator presence are performed outside the admission state machine. Do not merge until exact checkout regression and review.
