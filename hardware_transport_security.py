@@ -550,6 +550,7 @@ class AuthenticatedLineFramer:
         # Bound output work as well as the unfinished frame's allocation.
         frames: list[bytes] = []
         offset = 0
+        delimiters = 0
         try:
             while offset < len(data):
                 newline = data.find(b"\n", offset)
@@ -560,6 +561,11 @@ class AuthenticatedLineFramer:
                 self._buffer.extend(memoryview(data)[offset:end])
                 if newline < 0:
                     break
+                # Empty frames still consume parsing work. Bound all delimiters,
+                # not only nonempty authenticated envelopes.
+                delimiters += 1
+                if delimiters > 256:
+                    raise HardwareTransportError("HW_FRAME_BATCH_LIMIT_EXCEEDED")
                 frame = bytes(self._buffer).strip()
                 self._buffer.clear()
                 if frame:
