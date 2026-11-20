@@ -27,6 +27,31 @@ class ReplayCorruptionControls(unittest.TestCase):
             finally:
                 restarted.close()
 
+    def test_deleted_nonce_table_fails_closed_instead_of_reinitializing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = str(Path(tmp) / "replay.db")
+            store = DurableNonceStore(path, max_entries_per_device=4)
+            self.assertIsNone(store.claim("pi-1", "ab" * 16, window_seconds=60))
+            store.close()
+            # Valid SQLite snapshot with deleted replay state: quick_check
+            # alone reports ok. Recreating the table would permit replay.
+            with sqlite3.connect(path) as db:
+                db.execute("DROP TABLE nonce_claims")
+            with sqlite3.connect(path) as db:
+                self.assertEqual(db.execute("PRAGMA quick_check").fetchone(), ("ok",))
+            with self.assertRaises(sqlite3.DatabaseError):
+                DurableNonceStore(path, max_entries_per_device=4)
+
+    def test_deleted_clock_table_fails_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = str(Path(tmp) / "replay.db")
+            store = DurableNonceStore(path, max_entries_per_device=4)
+            store.close()
+            with sqlite3.connect(path) as db:
+                db.execute("DROP TABLE replay_clock")
+            with self.assertRaises(sqlite3.DatabaseError):
+                DurableNonceStore(path, max_entries_per_device=4)
+
     def test_corrupt_database_header_rejects_startup(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "replay.db"
