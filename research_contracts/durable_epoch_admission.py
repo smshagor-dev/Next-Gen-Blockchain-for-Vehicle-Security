@@ -98,6 +98,12 @@ class DurableEpochAdmission:
                 raise ValueError("admission outside epoch window")
             if not state._admitted.issubset(set(state._buckets)):
                 raise ValueError("admission without evidence bucket")
+            # A persisted positive decision is valid only when the persisted
+            # corroborator set actually satisfies the configured quorum.
+            # Otherwise a malformed or partially rewritten snapshot could
+            # resurrect a positive authorization without sufficient evidence.
+            if any(len(state._buckets[key]) < state.quorum for key in state._admitted):
+                raise ValueError("admission without quorum; fail closed")
             if any(len(x) != 3 or type(x[1]) is not int or x[1] > state.epoch or x[1] < state.epoch - state.window for x in state._nonces):
                 raise ValueError("invalid nonce epoch")
             return state
