@@ -49,3 +49,11 @@ No exact checkout test passes claimed. Next: execute branch suite, fault-inject 
 - **Blocked:** No trustworthy rollback-resistant storage, independent hardware bench, or authentic labelled V2X/CAN cohort.
 - **Next code task:** Execute exact branch tests, resolve any failures, add identical-trace durable/in-memory throughput and latency measurements with multiple seeds and explicit host specifications; independently audit the bridge's emergency control boundary.
 - **Evidence classification:** Crash-boundary protocol regression only; not scientific effectiveness, power-loss durability, or finality evidence.
+
+
+## 2026-11-20: cross-process one-shot concurrency experiment
+- **Completed (code committed, unexecuted):** `tests/test_durable_multiprocess_admission.py` launches 12 independent spawned processes against one SQLite database, synchronizes their start, asserts exactly one positive quorum decision, and checks restart cannot reissue the decision. This tests a real interprocess race rather than a single-process mock.
+- **Partial:** Exact branch execution, platform-specific spawn/SQLite lock timing, full test suite, and CPU/RAM/latency measurements are not verified. Do not report test success or numerical scientific results.
+- **Blocked:** No trusted external rollback counter, physical vehicle interlock bench, authentic VeReMi NextGen/CAN cohorts, or independent consensus finality.
+- **Upcoming:** Execute `python -m unittest discover -s tests -p 'test_durable_multiprocess_admission.py' -v` and full suite; investigate any concurrent lock failures; instrument matched-trace durable versus in-memory latency with multi-seed uncertainty. Independently audit `hardware_bridge` before actuation.
+- **Evidence classification:** Unexecuted concurrency regression design; not publishable effectiveness evidence.
