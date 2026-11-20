@@ -544,37 +544,32 @@ class AuthenticatedLineFramer:
     def feed(self, data: bytes) -> list[bytes]:
         if not isinstance(data, (bytes, bytearray)):
             raise HardwareTransportError("HW_FRAME_TYPE_INVALID")
-        # Reject oversized recv chunks BEFORE copying attacker-controlled bytes.
-        # This bounds transient allocation even when a peer sends many newline
-        # frames in one recv. Receivers should use bounded recv() sizes.
-        if len(data) > self.max_frame_bytes + 1:
-            self._buffer.clear()
-            raise HardwareTransportError("HW_FRAME_TOO_LARGE")
-        if len(self._buffer) + len(data) > self.max_frame_bytes + 1:
-            # An existing partial frame cannot be completed by a chunk larger
-            # than the remaining bound without first parsing it. Reject closed.
-            self._buffer.clear()
-            raise HardwareTransportError("HW_FRAME_TOO_LARGE")
-        self._buffer.extend(data)
+        # Process each delimited segment before copying it into the pending
+        # buffer. A recv may contain several small frames even when its total
+        # length exceeds the maximum *individual* frame length.
+        # Bound output work as well as the unfinished frame's allocation.
         frames: list[bytes] = []
-        while True:
-            try:
-                newline = self._buffer.index(0x0A)
-            except ValueError:
-                break
-            if newline > self.max_frame_bytes:
-                self._buffer.clear()
-                raise HardwareTransportError("HW_FRAME_TOO_LARGE")
-            frame = bytes(self._buffer[:newline]).strip()
-            del self._buffer[: newline + 1]
-            if frame:
-                if len(frame) > self.max_frame_bytes:
-                    self._buffer.clear()
+        offset = 0
+        try:
+            while offset < len(data):
+                newline = data.find(b"\n", offset)
+                end = len(data) if newline < 0 else newline
+                segment_len = end - offset
+                if len(self._buffer) + segment_len > self.max_frame_bytes:
                     raise HardwareTransportError("HW_FRAME_TOO_LARGE")
-                frames.append(frame)
-        if len(self._buffer) > self.max_frame_bytes:
+                self._buffer.extend(memoryview(data)[offset:end])
+                if newline < 0:
+                    break
+                frame = bytes(self._buffer).strip()
+                self._buffer.clear()
+                if frame:
+                    frames.append(frame)
+                    if len(frames) > 256:
+                        raise HardwareTransportError("HW_FRAME_BATCH_LIMIT_EXCEEDED")
+                offset = newline + 1
+        except HardwareTransportError:
             self._buffer.clear()
-            raise HardwareTransportError("HW_FRAME_TOO_LARGE")
+            raise
         return frames
 
     def reset(self) -> None:
