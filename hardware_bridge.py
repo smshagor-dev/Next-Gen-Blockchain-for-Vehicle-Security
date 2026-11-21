@@ -305,8 +305,18 @@ def run_arduino_mode(bc: SmartCarBlockchain):
     port = get_env("SMARTCAR_HW_SERIAL_PORT", "COM3")
     baud = get_int("SMARTCAR_HW_SERIAL_BAUD", 115200)
     device_keys = parse_device_registry(get_env("SMARTCAR_HW_DEVICE_KEYS_JSON", "{}"))
+    # Serial transport must not silently downgrade to volatile replay state.
+    # Provision the dedicated store once, then reopen it on subsequent runs.
+    nonce_path = get_env("SMARTCAR_HW_SERIAL_NONCE_STORE_PATH", "").strip()
+    if not nonce_path:
+        raise RuntimeError("SMARTCAR_HW_SERIAL_NONCE_STORE_PATH required for Arduino ingress")
+    nonce_store = SQLiteNonceStore(
+        nonce_path,
+        provision=get_bool("SMARTCAR_HW_SERIAL_NONCE_STORE_PROVISION", False),
+    )
     verifier = HardwareEnvelopeVerifier(
         device_keys,
+        durable_nonce_store=nonce_store,
         max_frame_bytes=get_int("SMARTCAR_HW_MAX_FRAME_BYTES", 4096),
         replay_window_sec=get_int("SMARTCAR_HW_REPLAY_WINDOW_SEC", 15),
         replay_cache_entries=get_int("SMARTCAR_HW_REPLAY_CACHE_ENTRIES", 2048),
