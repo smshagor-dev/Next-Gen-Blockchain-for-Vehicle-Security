@@ -22,6 +22,7 @@ from typing import Optional
 from env_config import load_project_env_once, get_env, get_int, get_bool
 from blockchain import SmartCarBlockchain, TelemetryData
 from hardware_nonce_store import SQLiteNonceStore
+from serial_ingress_budget import SerialIngressBudget, SerialIngressBudgetExceeded
 from bounded_tcp_admission import BoundedTCPAdmission
 from hardware_actuation_safety import BenchActuationGate
 from hardware_transport_deadlines import deadline_check, DeadlineExpired
@@ -325,6 +326,14 @@ def run_arduino_mode(bc: SmartCarBlockchain):
     max_session_sec = max(5, min(600, get_int("SMARTCAR_HW_MAX_SESSION_SEC", 120)))
     deadline = time.monotonic() + max_session_sec
     last_progress = time.monotonic()
+    serial_budget = SerialIngressBudget(
+        max_bytes=max(1024, min(8 * 1024 * 1024, get_int("SMARTCAR_HW_SERIAL_MAX_SESSION_BYTES", 262144))),
+        max_frames=max(1, min(10000, get_int("SMARTCAR_HW_SERIAL_MAX_FRAMES_PER_SESSION", 256))),
+    )
+    serial_global_budget = GlobalTelemetryBudget(
+        get_int("SMARTCAR_HW_SERIAL_FRAMES_PER_SEC", 32),
+        get_int("SMARTCAR_HW_SERIAL_FRAME_BURST", 64),
+    )
     try:
         while time.monotonic() < deadline:
             if time.monotonic() - last_progress >= idle_timeout:
@@ -333,6 +342,9 @@ def run_arduino_mode(bc: SmartCarBlockchain):
             chunk = ser.read(1024)
             if not chunk:
                 continue
+            # Charge all received bytes, including unauthenticated fragments.
+            # The serial port is quarantined on exhaustion, never actuated.
+            serial_budget.charge_bytes(len(chunk))
             ingress_monotonic = time.monotonic()
             ingress_utc = datetime.now(timezone.utc)
             last_progress = ingress_monotonic
@@ -342,6 +354,9 @@ def run_arduino_mode(bc: SmartCarBlockchain):
                 print(f"[HW BRIDGE] quarantined Arduino serial input: {exc.reason}")
                 raise RuntimeError("Arduino serial authentication/framing failure") from exc
             for item in verified:
+                serial_budget.charge_frame()
+                if not serial_global_budget.claim():
+                    raise SerialIngressBudgetExceeded("HW_SERIAL_GLOBAL_FRAME_RATE_EXCEEDED")
                 # A single serial read may contain several valid envelopes.
                 # Verification and earlier ledger writes consume time; do not
                 # admit later envelopes after the absolute session deadline.
