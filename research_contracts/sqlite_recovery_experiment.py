@@ -20,8 +20,8 @@ class RecoveryExperiment:
     def __init__(self, local_path, anchor_path):
         if Path(local_path).resolve() == Path(anchor_path).resolve():
             raise ValueError("stores must have distinct paths")
-        self.local = sqlite3.connect(local_path, isolation_level=None)
-        self.anchor = sqlite3.connect(anchor_path, isolation_level=None)
+        self.local = sqlite3.connect(local_path, isolation_level='DEFERRED')
+        self.anchor = sqlite3.connect(anchor_path, isolation_level='DEFERRED')
         for db in (self.local, self.anchor):
             db.execute("PRAGMA journal_mode=WAL")
             db.execute("PRAGMA synchronous=FULL")
