@@ -293,6 +293,22 @@ class ECUCommandGateway:
         return False
 
 
+
+def _quarantined_serial_frames(session, chunk):
+    """Consume the lazy verifier inside the quarantine boundary.
+
+    receive_iter is a generator: its MAC/framing exceptions are raised by
+    iteration, not by constructing the iterator. Keep per-frame streaming so
+    an earlier verified observation is not silently dropped if a later frame
+    in the same serial read is invalid.
+    """
+    try:
+        yield from session.receive_iter(chunk)
+    except HardwareTransportError as exc:
+        print(f"[HW BRIDGE] quarantined Arduino serial input: {exc.reason}")
+        raise RuntimeError("Arduino serial authentication/framing failure") from exc
+
+
 def run_arduino_mode(bc: SmartCarBlockchain):
     """Enrolled-device authenticated serial ingress; no unsigned JSON fallback.
 
@@ -336,12 +352,7 @@ def run_arduino_mode(bc: SmartCarBlockchain):
             ingress_monotonic = time.monotonic()
             ingress_utc = datetime.now(timezone.utc)
             last_progress = ingress_monotonic
-            try:
-                verified = session.receive_iter(chunk)
-            except HardwareTransportError as exc:
-                print(f"[HW BRIDGE] quarantined Arduino serial input: {exc.reason}")
-                raise RuntimeError("Arduino serial authentication/framing failure") from exc
-            for item in verified:
+            for item in _quarantined_serial_frames(session, chunk):
                 # A single serial read may contain several valid envelopes.
                 # Verification and earlier ledger writes consume time; do not
                 # admit later envelopes after the absolute session deadline.
