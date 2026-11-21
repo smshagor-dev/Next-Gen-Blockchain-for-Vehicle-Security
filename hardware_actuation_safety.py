@@ -102,7 +102,20 @@ class BenchActuationGate:
                 return ActuationGateDecision(False, "BENCH_INTERLOCK_NOT_REGULAR_FILE")
             if (opened.st_dev, opened.st_ino) != (lst.st_dev, lst.st_ino):
                 return ActuationGateDecision(False, "BENCH_INTERLOCK_CHANGED_DURING_CHECK")
-            raw = os.read(fd, _MAX_INTERLOCK_BYTES + 1)
+            # Validate the opened descriptor, not only the path metadata. An
+            # attacker able to chmod/truncate the inode between lstat and open
+            # must not leave an apparently armed bench actuator.
+            if opened.st_size <= 0 or opened.st_size > _MAX_INTERLOCK_BYTES:
+                return ActuationGateDecision(False, "BENCH_INTERLOCK_FILE_SIZE_INVALID")
+            if os.name != "nt":
+                if hasattr(os, "getuid") and opened.st_uid != os.getuid():
+                    return ActuationGateDecision(False, "BENCH_INTERLOCK_OWNER_INVALID")
+                if opened.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+                    return ActuationGateDecision(False, "BENCH_INTERLOCK_PERMISSIONS_INVALID")
+            try:
+                raw = os.read(fd, _MAX_INTERLOCK_BYTES + 1)
+            except OSError:
+                return ActuationGateDecision(False, "BENCH_INTERLOCK_READ_FAILED")
         finally:
             os.close(fd)
 
