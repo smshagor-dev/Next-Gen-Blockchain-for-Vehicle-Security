@@ -235,7 +235,7 @@ def validate_telemetry_payload(
     if "event" in payload:
         if not event or len(event.encode("utf-8")) > MAX_EVENT_BYTES:
             raise HardwareTransportError("HW_TELEMETRY_EVENT_INVALID")
-        if any(ord(ch) < 32 for ch in event):
+        if any(ord(ch) < 32 or ord(ch) == 127 for ch in event):
             raise HardwareTransportError("HW_TELEMETRY_EVENT_INVALID")
         result["event"] = event
 
@@ -386,11 +386,13 @@ class HardwareEnvelopeVerifier:
         replay_cache_entries: int = DEFAULT_REPLAY_CACHE_ENTRIES,
         max_frame_bytes: int = DEFAULT_MAX_FRAME_BYTES,
         max_payload_timestamp_skew_sec: int = 5,
+        durable_nonce_store=None,
     ):
         self.replay_window_sec = min(300, max(3, int(replay_window_sec)))
         self.replay_cache_entries = min(65536, max(16, int(replay_cache_entries)))
         self.max_frame_bytes = min(1024 * 1024, max(1024, int(max_frame_bytes)))
         self.max_payload_timestamp_skew_sec = min(300, max(1, int(max_payload_timestamp_skew_sec)))
+        self._durable_nonce_store = durable_nonce_store
         self._lock = threading.RLock()
         self._keys: Dict[str, str] = {}
         self._replay: Dict[str, BoundedReplayCache] = {}
@@ -503,7 +505,24 @@ class HardwareEnvelopeVerifier:
             raise HardwareTransportError("HW_PAYLOAD_TIMESTAMP_MISMATCH", authenticated=True)
 
         with self._lock:
-            self._claim_nonce(self._replay[identity], nonce)
+            if self._durable_nonce_store is not None:
+                # SQLite transaction commits before any verified envelope is
+                # released. A database failure is a rejection, never fallback
+                # to the volatile cache.
+                try:
+                    claimed = self._durable_nonce_store.claim(
+                        identity, nonce, ttl_seconds=self.replay_window_sec * 2
+                    )
+                except Exception as exc:
+                    raise HardwareTransportError(
+                        "HW_DURABLE_REPLAY_STORE_UNAVAILABLE", authenticated=True
+                    ) from exc
+                if not claimed:
+                    raise HardwareTransportError(
+                        "HW_REPLAY_NONCE_REUSED", authenticated=True
+                    )
+            else:
+                self._claim_nonce(self._replay[identity], nonce)
         return VerifiedHardwareEnvelope(
             device_id=identity,
             kind=kind,
@@ -544,6 +563,12 @@ class AuthenticatedLineFramer:
     def feed(self, data: bytes) -> list[bytes]:
         if not isinstance(data, (bytes, bytearray)):
             raise HardwareTransportError("HW_FRAME_TYPE_INVALID")
+        # Reject oversized transport chunks before allocating/copying them.
+        # Production sockets read bounded chunks; this also protects direct
+        # callers of the framing API from one-shot oversized input.
+        if len(data) > self.max_frame_bytes:
+            self._buffer.clear()
+            raise HardwareTransportError("HW_FRAME_TOO_LARGE")
         self._buffer.extend(data)
         frames: list[bytes] = []
         while True:

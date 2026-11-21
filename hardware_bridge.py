@@ -21,6 +21,7 @@ from typing import Optional
 
 from env_config import load_project_env_once, get_env, get_int, get_bool
 from blockchain import SmartCarBlockchain, TelemetryData
+from hardware_nonce_store import SQLiteNonceStore
 from bounded_tcp_admission import BoundedTCPAdmission
 from hardware_actuation_safety import BenchActuationGate
 from hardware_transport_deadlines import deadline_check, DeadlineExpired
@@ -137,6 +138,16 @@ def to_telemetry(pkt: dict) -> TelemetryData:
         driver_unwell=_strict_telemetry_bool(pkt.get("driver_unwell", False), "driver_unwell"),
         timestamp=_signed_observation_timestamp(pkt.get("timestamp")),
     )
+
+
+def _signed_event_label(value):
+    """Reject ambiguous or resource-heavy signed event labels before ledger mutation."""
+    # Match transport MAX_EVENT_BYTES (UTF-8 bytes, not code points).
+    if type(value) is not str or not value or len(value.encode("utf-8")) > 160:
+        raise ValueError("event: nonempty bounded UTF-8 string required")
+    if any(ord(char) < 32 or ord(char) == 127 for char in value):
+        raise ValueError("event: control characters forbidden")
+    return value
 
 
 class GlobalTelemetryBudget:
@@ -336,7 +347,7 @@ def run_arduino_mode(bc: SmartCarBlockchain):
                     max_future_skew_seconds=max(0, min(60, get_int("SMARTCAR_HW_OBSERVATION_FUTURE_SKEW_SEC", 2))),
                 )
                 tel = to_telemetry(item.payload)
-                event = str(item.payload["event"])
+                event = _signed_event_label(item.payload.get("event"))
                 block = bc.push_telemetry(tel, event)
                 print(f"[CHAIN] block={block.index} event={event}")
                 actuator.maybe_send_arduino(
@@ -358,8 +369,17 @@ def run_pi_mode(bc: SmartCarBlockchain):
     port = get_int("SMARTCAR_HW_BRIDGE_PORT", 9901)
     # Startup fails closed if no independent enrolled Pi secrets are configured.
     device_keys = parse_device_registry(get_env("SMARTCAR_HW_DEVICE_KEYS_JSON", "{}"))
+    # No volatile-only replay fallback for production Pi TCP. Provision once
+    # with SMARTCAR_HW_NONCE_STORE_PROVISION=true, then restart in recovery mode.
+    nonce_path = get_env("SMARTCAR_HW_NONCE_STORE_PATH", "").strip()
+    if not nonce_path:
+        raise RuntimeError("SMARTCAR_HW_NONCE_STORE_PATH required for Pi ingress")
+    nonce_store = SQLiteNonceStore(
+        nonce_path, provision=get_bool("SMARTCAR_HW_NONCE_STORE_PROVISION", False)
+    )
     verifier = HardwareEnvelopeVerifier(
         device_keys,
+        durable_nonce_store=nonce_store,
         max_frame_bytes=get_int("SMARTCAR_HW_MAX_FRAME_BYTES", 32 * 1024),
         replay_window_sec=get_int("SMARTCAR_HW_REPLAY_WINDOW_SEC", 15),
         replay_cache_entries=get_int("SMARTCAR_HW_REPLAY_CACHE_ENTRIES", 2048),
@@ -473,7 +493,7 @@ def run_pi_mode(bc: SmartCarBlockchain):
                             max_future_skew_seconds=max(0, min(60, get_int("SMARTCAR_HW_OBSERVATION_FUTURE_SKEW_SEC", 2))),
                         )
                         tel = to_telemetry(item.payload)
-                        event = str(item.payload["event"])
+                        event = _signed_event_label(item.payload.get("event"))
                         with ledger_lock:
                             block = bc.push_telemetry(tel, event)
                         # Network sendall may block for the peer's socket timeout.
