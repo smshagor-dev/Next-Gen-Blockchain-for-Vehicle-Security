@@ -9,7 +9,6 @@ while the external anchor remains intact.
 from __future__ import annotations
 
 import hashlib
-import hmac
 import sqlite3
 from typing import Protocol
 
@@ -34,7 +33,7 @@ class AnchoredNonceAdmission:
         # Domain separation and length-prefixing avoid ambiguous concatenations.
         device_bytes = device.encode("utf-8")
         nonce_bytes = nonce.encode("utf-8")
-        material = (b"omni-v2x-anchor-v1\\x00"
+        material = (b"omni-v2x-anchor-v1\x00"
                     + len(device_bytes).to_bytes(4, "big") + device_bytes
                     + len(nonce_bytes).to_bytes(4, "big") + nonce_bytes)
         digest = hashlib.sha256(material).digest()
