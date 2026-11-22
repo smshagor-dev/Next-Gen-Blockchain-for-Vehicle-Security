@@ -190,14 +190,19 @@ class AuthenticatedPiTelemetrySession:
         self.framer = AuthenticatedLineFramer(verifier.max_frame_bytes)
         self.device_id = None
 
-    def receive_iter(self, data: bytes):
+    def receive_iter(self, data: bytes, *, remaining_frames=None):
         """Yield verified frames individually so a later bad MAC cannot discard
         an earlier valid frame after its nonce has been claimed.
 
         This is NOT ledger/replay atomicity: a ledger failure after verification
         can still consume the nonce. Framing errors fail the entire read.
         """
-        for frame in self.framer.feed(data):
+        # Check a connection's remaining frame allowance BEFORE verification:
+        # verify() may durably claim a nonce, even if the caller later rejects.
+        # The framer may return multiple complete frames in a single read.
+        for index, frame in enumerate(self.framer.feed(data)):
+            if remaining_frames is not None and index >= remaining_frames:
+                raise HardwareTransportError("HW_SESSION_FRAME_BUDGET_EXCEEDED")
             item = self.verifier.verify(
                 frame, expected_kind="TELEMETRY", expected_device_id=self.device_id
             )
@@ -325,6 +330,10 @@ def run_arduino_mode(bc: SmartCarBlockchain):
     max_session_sec = max(5, min(600, get_int("SMARTCAR_HW_MAX_SESSION_SEC", 120)))
     deadline = time.monotonic() + max_session_sec
     last_progress = time.monotonic()
+    max_frames = max(1, min(10000, get_int("SMARTCAR_HW_MAX_FRAMES_PER_SESSION", 256)))
+    max_session_bytes = max(4096, min(8 * 1024 * 1024, get_int("SMARTCAR_HW_MAX_SESSION_BYTES", 262144)))
+    received_bytes = 0
+    accepted_frames = 0
     try:
         while time.monotonic() < deadline:
             if time.monotonic() - last_progress >= idle_timeout:
@@ -336,12 +345,16 @@ def run_arduino_mode(bc: SmartCarBlockchain):
             ingress_monotonic = time.monotonic()
             ingress_utc = datetime.now(timezone.utc)
             last_progress = ingress_monotonic
+            received_bytes += len(chunk)
+            if received_bytes > max_session_bytes:
+                raise RuntimeError("Arduino serial byte budget exceeded; port quarantined")
             try:
-                verified = session.receive_iter(chunk)
+                verified = session.receive_iter(chunk, remaining_frames=max_frames - accepted_frames)
             except HardwareTransportError as exc:
                 print(f"[HW BRIDGE] quarantined Arduino serial input: {exc.reason}")
                 raise RuntimeError("Arduino serial authentication/framing failure") from exc
             for item in verified:
+                accepted_frames += 1
                 # A single serial read may contain several valid envelopes.
                 # Verification and earlier ledger writes consume time; do not
                 # admit later envelopes after the absolute session deadline.
@@ -470,7 +483,9 @@ def run_pi_mode(bc: SmartCarBlockchain):
                     # connection identity before *any* ledger/actuation side effect.
                     # The verifier owns its replay lock. Do not hold a global
                     # lock across ledger I/O while iterating verified frames.
-                    verified_items = session.receive_iter(data)
+                    verified_items = session.receive_iter(
+                        data, remaining_frames=max_frames - accepted_frames
+                    )
                     for item in verified_items:
                         # A single recv may contain many signed frames. MAC
                         # verification can itself consume the remaining
