@@ -305,8 +305,17 @@ def run_arduino_mode(bc: SmartCarBlockchain):
     port = get_env("SMARTCAR_HW_SERIAL_PORT", "COM3")
     baud = get_int("SMARTCAR_HW_SERIAL_BAUD", 115200)
     device_keys = parse_device_registry(get_env("SMARTCAR_HW_DEVICE_KEYS_JSON", "{}"))
+    # Serial peers require the same crash-persistent replay protection as Pi TCP.
+    # Never silently fall back to an in-memory nonce cache after restart.
+    nonce_path = get_env("SMARTCAR_HW_NONCE_STORE_PATH", "").strip()
+    if not nonce_path:
+        raise RuntimeError("SMARTCAR_HW_NONCE_STORE_PATH required for Arduino ingress")
+    nonce_store = SQLiteNonceStore(
+        nonce_path, provision=get_bool("SMARTCAR_HW_NONCE_STORE_PROVISION", False)
+    )
     verifier = HardwareEnvelopeVerifier(
         device_keys,
+        durable_nonce_store=nonce_store,
         max_frame_bytes=get_int("SMARTCAR_HW_MAX_FRAME_BYTES", 4096),
         replay_window_sec=get_int("SMARTCAR_HW_REPLAY_WINDOW_SEC", 15),
         replay_cache_entries=get_int("SMARTCAR_HW_REPLAY_CACHE_ENTRIES", 2048),
@@ -316,6 +325,7 @@ def run_arduino_mode(bc: SmartCarBlockchain):
     try:
         ser = serial.Serial(port=port, baudrate=baud, timeout=1)
     except Exception as e:
+        nonce_store.close()
         raise RuntimeError(f"Could not open serial port '{port}': {e}") from e
 
     # Remote commands remain subject to an independent bench interlock.
@@ -366,7 +376,10 @@ def run_arduino_mode(bc: SmartCarBlockchain):
                 )
         raise RuntimeError("Arduino serial session lifetime exceeded; port quarantined")
     finally:
-        ser.close()
+        try:
+            ser.close()
+        finally:
+            nonce_store.close()
 
 
 def run_pi_mode(bc: SmartCarBlockchain):
