@@ -66,6 +66,9 @@ class SQLiteNonceStore:
             now = float(self._clock())
             if not math.isfinite(now):
                 raise NonceStoreError("invalid local clock; nonce admission denied")
+            expires = now + float(ttl_seconds)
+            if not math.isfinite(expires) or expires <= now:
+                raise NonceStoreError("invalid nonce expiry; admission denied")
             self._db.execute("BEGIN IMMEDIATE")
             try:
                 # Never delete an existing nonce before testing it: an expired
@@ -82,7 +85,7 @@ class SQLiteNonceStore:
                     raise NonceStoreError("nonce store capacity exhausted; admission denied")
                 self._db.execute(
                     "INSERT INTO nonce_claims(device,nonce,expires) VALUES(?,?,?)",
-                    (device, nonce, now + ttl_seconds),
+                    (device, nonce, expires),
                 )
                 self._db.execute("COMMIT")
                 return True
