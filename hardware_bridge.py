@@ -325,6 +325,12 @@ def run_arduino_mode(bc: SmartCarBlockchain):
     max_session_sec = max(5, min(600, get_int("SMARTCAR_HW_MAX_SESSION_SEC", 120)))
     deadline = time.monotonic() + max_session_sec
     last_progress = time.monotonic()
+    # A continuously streaming enrolled serial peer must not obtain an
+    # unlimited ledger-write or byte-processing budget within one session.
+    max_frames = max(1, min(10000, get_int("SMARTCAR_HW_MAX_FRAMES_PER_SESSION", 256)))
+    max_session_bytes = max(1024, min(8 * 1024 * 1024, get_int("SMARTCAR_HW_MAX_SESSION_BYTES", 262144)))
+    accepted_frames = 0
+    received_bytes = 0
     try:
         while time.monotonic() < deadline:
             if time.monotonic() - last_progress >= idle_timeout:
@@ -333,6 +339,9 @@ def run_arduino_mode(bc: SmartCarBlockchain):
             chunk = ser.read(1024)
             if not chunk:
                 continue
+            received_bytes += len(chunk)
+            if received_bytes > max_session_bytes:
+                raise RuntimeError("Arduino serial byte budget exceeded; port quarantined")
             ingress_monotonic = time.monotonic()
             ingress_utc = datetime.now(timezone.utc)
             last_progress = ingress_monotonic
@@ -342,6 +351,9 @@ def run_arduino_mode(bc: SmartCarBlockchain):
                 print(f"[HW BRIDGE] quarantined Arduino serial input: {exc.reason}")
                 raise RuntimeError("Arduino serial authentication/framing failure") from exc
             for item in verified:
+                accepted_frames += 1
+                if accepted_frames > max_frames:
+                    raise RuntimeError("Arduino serial frame budget exceeded; port quarantined")
                 # A single serial read may contain several valid envelopes.
                 # Verification and earlier ledger writes consume time; do not
                 # admit later envelopes after the absolute session deadline.
