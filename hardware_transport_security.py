@@ -129,7 +129,7 @@ def _canonical_bytes(value: Mapping[str, object]) -> bytes:
             ensure_ascii=False,
             allow_nan=False,
         ).encode("utf-8")
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, RecursionError, OverflowError) as exc:
         raise HardwareTransportError("HW_CANONICAL_ENCODING_INVALID") from exc
 
 
@@ -422,7 +422,12 @@ class HardwareEnvelopeVerifier:
                 raise HardwareTransportError("HW_FRAME_TOO_LARGE")
             parsed = _strict_json_loads(raw.strip())
         elif isinstance(raw, Mapping):
-            parsed = dict(raw)
+            # Programmatic callers must obey the same size and nesting boundary
+            # as wire callers. A deep dict must not escape as RecursionError.
+            encoded = _canonical_bytes(raw)
+            if len(encoded) > self.max_frame_bytes:
+                raise HardwareTransportError("HW_FRAME_TOO_LARGE")
+            parsed = _strict_json_loads(encoded.decode("utf-8"))
         else:
             raise HardwareTransportError("HW_ENVELOPE_TYPE_INVALID")
         if not isinstance(parsed, dict):
