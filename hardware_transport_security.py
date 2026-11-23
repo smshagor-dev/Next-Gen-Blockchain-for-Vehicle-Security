@@ -451,8 +451,23 @@ class HardwareEnvelopeVerifier:
                         pending.extend((k, depth + 1) for k in value.keys())
                     else:
                         pending.extend((v, depth + 1) for v in value)
-                elif isinstance(value, str) and len(value) > self.max_frame_bytes:
-                    raise HardwareTransportError("HW_FRAME_TOO_LARGE")
+                elif type(value) is str:
+                    if len(value) > self.max_frame_bytes:
+                        raise HardwareTransportError("HW_FRAME_TOO_LARGE")
+                elif type(value) is int:
+                    # Avoid unbounded decimal conversion of attacker-supplied
+                    # in-process big integers before JSON serialization.
+                    if value.bit_length() > self.max_frame_bytes * 8:
+                        raise HardwareTransportError("HW_FRAME_TOO_LARGE")
+                elif type(value) is float:
+                    if not math.isfinite(value):
+                        raise HardwareTransportError("HW_CANONICAL_ENCODING_INVALID")
+                elif value is None or type(value) is bool:
+                    pass
+                else:
+                    # Do not call user-defined __str__, __iter__, __float__,
+                    # or JSON encoder hooks while processing ingress.
+                    raise HardwareTransportError("HW_CANONICAL_ENCODING_INVALID")
             try:
                 encoded = _canonical_bytes(raw)
             except (RecursionError, OverflowError) as exc:
