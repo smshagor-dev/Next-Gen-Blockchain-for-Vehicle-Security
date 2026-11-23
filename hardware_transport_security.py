@@ -442,6 +442,13 @@ class HardwareEnvelopeVerifier:
                 if nodes > self.max_frame_bytes or depth > 32:
                     raise HardwareTransportError("HW_FRAME_TOO_LARGE")
                 if type(value) in (dict, list, tuple):
+                    # Check container fan-out BEFORE extending the worklist.
+                    # Otherwise one wide in-process container can allocate a
+                    # huge pending list even though the later node counter
+                    # would eventually reject the envelope.
+                    children = len(value) * (2 if type(value) is dict else 1)
+                    if children > self.max_frame_bytes - nodes - len(pending):
+                        raise HardwareTransportError("HW_FRAME_TOO_LARGE")
                     identity = id(value)
                     if identity in visited:
                         raise HardwareTransportError("HW_FRAME_TOO_LARGE")
