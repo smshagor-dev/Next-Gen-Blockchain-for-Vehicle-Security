@@ -1,3 +1,14 @@
+## 2026-11-23 — bounded hardware ingress fan-out (#231)
+
+| Workstream | Status | Evidence / next gate |
+| --- | --- | --- |
+| Pre-expansion worklist bound | IMPLEMENTED ON DRAFT | Commit `ea7a188` rejects exact dict/list/tuple child fan-out before adding children to pending traversal, avoiding an oversized worklist allocation |
+| Negative controls | AUTHORED, NOT EXECUTED | Commit `c827fe5`, `tests/test_hardware_ingress_fanout_budget.py`; run `python -m unittest discover -s tests -p 'test_hardware_ingress_fanout_budget.py' -v` |
+| Execution and integration | BLOCKED | Container cannot resolve github.com; repository checkout and focused test execution unavailable; no CI pass or merge claimed |
+| Research effectiveness | BLOCKED | This is synthetic ingress robustness, not independent V2X incident evidence; dataset provenance, paired baselines, and physical interlock tests still required |
+
+Next: execute focused fan-out tests and existing ingress suites on a real checkout, reconcile #227/#229/#230, inspect required checks and reviews, then squash only validated changes. Preserve local emergency control.
+
 ## 2026-11-23 — executable Mapping ingress boundary (#231)
 
 | Workstream | Status | Evidence / next gate |
