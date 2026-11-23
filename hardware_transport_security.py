@@ -116,7 +116,7 @@ def _strict_json_loads(raw: str):
                           object_pairs_hook=unique_members)
     except HardwareTransportError:
         raise
-    except (json.JSONDecodeError, UnicodeDecodeError, TypeError, ValueError) as exc:
+    except (json.JSONDecodeError, UnicodeDecodeError, TypeError, ValueError, RecursionError) as exc:
         raise HardwareTransportError("HW_JSON_MALFORMED") from exc
 
 
@@ -129,7 +129,7 @@ def _canonical_bytes(value: Mapping[str, object]) -> bytes:
             ensure_ascii=False,
             allow_nan=False,
         ).encode("utf-8")
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, RecursionError, OverflowError) as exc:
         raise HardwareTransportError("HW_CANONICAL_ENCODING_INVALID") from exc
 
 
