@@ -422,6 +422,15 @@ class HardwareEnvelopeVerifier:
                 raise HardwareTransportError("HW_FRAME_TOO_LARGE")
             parsed = _strict_json_loads(raw.strip())
         elif isinstance(raw, Mapping):
+            # In-process callers must obey the same byte budget as TCP callers.
+            # Otherwise a giant mapping bypasses the wire framing limit and
+            # reaches canonical HMAC encoding with unbounded memory/CPU cost.
+            try:
+                encoded = _canonical_bytes(raw)
+            except (RecursionError, OverflowError) as exc:
+                raise HardwareTransportError("HW_FRAME_TOO_LARGE") from exc
+            if len(encoded) > self.max_frame_bytes:
+                raise HardwareTransportError("HW_FRAME_TOO_LARGE")
             parsed = dict(raw)
         else:
             raise HardwareTransportError("HW_ENVELOPE_TYPE_INVALID")
