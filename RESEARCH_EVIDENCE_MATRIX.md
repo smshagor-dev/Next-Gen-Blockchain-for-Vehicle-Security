@@ -358,3 +358,16 @@ No accuracy, safety efficacy, statistical significance or publishable primary re
 | Next code task | Upcoming | Run exact tests and CI; pin independently verified benign donor provenance; add matching/stratification for CAN ID and DLC distributions; execute disjoint-recording trials with incident-level truth and cluster-aware uncertainty |
 
 Test: `python -m unittest tests.test_matched_can_sham_control -v`. Existing fixture CSVs and short microbenchmarks remain NON-PUBLISHABLE main results.
+
+## 2026-11-23 — strict hardware envelope field typing (draft PR #229)
+
+| Workstream | Status | Evidence / next gate |
+| --- | --- | --- |
+| Hardware wire control-field type safety | IMPLEMENTED ON DRAFT BRANCH | Six string-only control fields rejected before coercion/MAC checks in `hardware_transport_security.py`; 30 synthetic invalid-type cases plus nonce-nonconsumption and replay regression authored |
+| Focused validation | PENDING | Run `python -m unittest discover -s tests -p 'test_hardware_envelope_field_types.py' -v`; no test pass or CI claim |
+| Integration | BLOCKED | Reconcile `hardware_transport_security.py` with draft PR #227; #226 replay storage and #228 corruption negative controls separately need validation |
+| Original incident-level effectiveness | BLOCKED | No publisher-verified VeReMi NextGen/CAN cohort, independent labels, or matched multi-seed outcomes in this change |
+| Physical interlocks and emergency control | BLOCKED | Software-only input checks; no physical actuation or safety certification |
+| Next code task | UPCOMING | Execute focused suite and CI; integrate bounded ingress #227 without losing strict field validation; run paired replay/fault trials on independently sourced held-out incidents |
+
+Fixture tests are NON-PUBLISHABLE as main original research results. No claim of finality, hardware safety or statistical significance.
