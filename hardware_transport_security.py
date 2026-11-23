@@ -425,6 +425,29 @@ class HardwareEnvelopeVerifier:
             # In-process callers must obey the same byte budget as TCP callers.
             # Otherwise a giant mapping bypasses the wire framing limit and
             # reaches canonical HMAC encoding with unbounded memory/CPU cost.
+            # Bound traversal before canonical JSON allocates a potentially huge
+            # intermediate string. This is a fail-closed admission budget, not
+            # a guarantee against a hostile in-process Mapping implementation.
+            pending = [(raw, 0)]
+            visited = set()
+            nodes = 0
+            while pending:
+                value, depth = pending.pop()
+                nodes += 1
+                if nodes > self.max_frame_bytes or depth > 32:
+                    raise HardwareTransportError("HW_FRAME_TOO_LARGE")
+                if isinstance(value, (dict, list, tuple)):
+                    identity = id(value)
+                    if identity in visited:
+                        raise HardwareTransportError("HW_FRAME_TOO_LARGE")
+                    visited.add(identity)
+                    if isinstance(value, dict):
+                        pending.extend((v, depth + 1) for v in value.values())
+                        pending.extend((k, depth + 1) for k in value.keys())
+                    else:
+                        pending.extend((v, depth + 1) for v in value)
+                elif isinstance(value, str) and len(value) > self.max_frame_bytes:
+                    raise HardwareTransportError("HW_FRAME_TOO_LARGE")
             try:
                 encoded = _canonical_bytes(raw)
             except (RecursionError, OverflowError) as exc:
