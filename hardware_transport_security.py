@@ -129,7 +129,7 @@ def _canonical_bytes(value: Mapping[str, object]) -> bytes:
             ensure_ascii=False,
             allow_nan=False,
         ).encode("utf-8")
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, UnicodeError) as exc:
         raise HardwareTransportError("HW_CANONICAL_ENCODING_INVALID") from exc
 
 
@@ -418,7 +418,11 @@ class HardwareEnvelopeVerifier:
                 raise HardwareTransportError("HW_FRAME_UTF8_INVALID") from exc
             parsed = _strict_json_loads(text.strip())
         elif isinstance(raw, str):
-            if len(raw.encode("utf-8", errors="replace")) > self.max_frame_bytes:
+            try:
+                frame_bytes = raw.encode("utf-8", errors="strict")
+            except UnicodeEncodeError as exc:
+                raise HardwareTransportError("HW_FRAME_UTF8_INVALID") from exc
+            if len(frame_bytes) > self.max_frame_bytes:
                 raise HardwareTransportError("HW_FRAME_TOO_LARGE")
             parsed = _strict_json_loads(raw.strip())
         elif isinstance(raw, Mapping):
