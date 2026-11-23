@@ -296,7 +296,6 @@ def validate_safe_stop_payload(payload: Mapping[str, object]) -> Dict[str, objec
     incident_id = payload.get("incident_id", "")
     if type(incident_id) is not str:
         raise HardwareTransportError("HW_COMMAND_INCIDENT_ID_INVALID")
-    if len(incident_id) > 128
     if len(incident_id) > 128 or any(ord(ch) < 32 for ch in incident_id):
         raise HardwareTransportError("HW_COMMAND_INCIDENT_ID_INVALID")
     return dict(payload)
