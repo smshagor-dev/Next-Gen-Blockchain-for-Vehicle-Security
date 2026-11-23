@@ -23,8 +23,12 @@ class BoundedTCPAdmission:
     def dispatch(self, conn):
         """Takes ownership of conn. Rejects immediately when saturated."""
         if not self._slots.acquire(blocking=False):
+            # A hostile/failed socket close must not unwind the accept loop.
+            # Saturation is a per-peer failure, never a server-wide failure.
             try:
                 conn.close()
+            except OSError:
+                pass
             finally:
                 with self._lock:
                     self.rejected += 1
