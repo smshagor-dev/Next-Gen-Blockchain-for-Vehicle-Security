@@ -358,3 +358,15 @@ No accuracy, safety efficacy, statistical significance or publishable primary re
 | Next code task | Upcoming | Run exact tests and CI; pin independently verified benign donor provenance; add matching/stratification for CAN ID and DLC distributions; execute disjoint-recording trials with incident-level truth and cluster-aware uncertainty |
 
 Test: `python -m unittest tests.test_matched_can_sham_control -v`. Existing fixture CSVs and short microbenchmarks remain NON-PUBLISHABLE main results.
+
+## 2026-11-23 — strict safety-command payload typing
+
+| Workstream | Status | Evidence / next gate |
+| --- | --- | --- |
+| Command payload coercion rejection | IMPLEMENTED ON DRAFT BRANCH | Exact string for SAFE_MODE_STOP, UTC timestamp and optional incident ID; no permissive str()/upper() conversion |
+| Adversarial regression | AUTHORED, NOT EXECUTED | tests/test_command_payload_field_types.py covers coercible cmd, non-string timestamp/incident ID, valid command and input immutability |
+| Physical actuation | BLOCKED / DISABLED | Existing network/ECU dispatch remains fail-closed; no receiver-side interlock or hardware validation |
+| PR reconciliation | PARTIAL | Main inspected; #226-#229 changed-file overlap reviewed; #227/#229 both edit hardware_transport_security.py; do not merge before conflict and CI reconciliation |
+| Authentic incident-level research | BLOCKED | No publisher-authenticated VeReMi NextGen/CAN cohort, independent capture truth or multi-seed effectiveness results |
+
+Run focused test: `python -m unittest discover -s tests -p 'test_command_payload_field_types.py' -v`. **No passing test/CI claim:** local GitHub checkout failed (DNS); branch test execution not verified. These synthetic negative controls are not publishable original research efficacy results. Next: validate branch in GitHub CI, reconcile #227/#229 strict envelope parsing, then implement authenticated incident cohort provenance and matched safety-isolated baselines.
