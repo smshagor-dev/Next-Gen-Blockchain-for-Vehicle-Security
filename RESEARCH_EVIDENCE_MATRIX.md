@@ -1,3 +1,14 @@
+## 2026-11-23 — executable Mapping ingress boundary (#231)
+
+| Workstream | Status | Evidence / next gate |
+| --- | --- | --- |
+| Custom Mapping callback isolation | IMPLEMENTED ON DRAFT | Hardware parser now rejects non-exact dict Mapping before invoking custom iteration, length or item methods; commit 7b3c142 |
+| Adversarial callback controls | AUTHORED, EXECUTION PENDING | Three tests in `tests/test_hardware_custom_mapping_rejection.py`; commit 014c2d1; run `python -m unittest discover -s tests -p 'test_hardware_custom_mapping_rejection.py' -v` |
+| CI and merge | BLOCKED | GitHub checkout DNS unavailable in execution container; #231 remains draft, no focused suite or CI result established |
+| Safety and experimental evidence | PARTIAL / BLOCKED | Built-in dict values may still include user-defined objects with encoder callbacks; local emergency controls and physical actuation unverified; authentic incident dataset and matched independent experiments absent |
+
+This is a deliberately narrow in-process input-type restriction. It is not a claim of remote TCP DoS immunity, cryptographic novelty, or publishable attack-detection effectiveness. Next: reject executable nested subclasses or normalize to exact JSON primitives, execute focused regressions, then reconcile #227/#229/#230 and required CI before merge.
+
 ## 2026-11-23 — bounded pre-serialization Mapping traversal (draft PR #231)
 
 | Workstream | Status | Evidence / gate |
