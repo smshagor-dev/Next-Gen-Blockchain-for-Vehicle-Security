@@ -1,3 +1,13 @@
+## 2026-11-23 — bounded pre-serialization Mapping traversal (draft PR #231)
+
+| Workstream | Status | Evidence / gate |
+| --- | --- | --- |
+| In-memory mapping preflight | IMPLEMENTED ON DRAFT | Iterative depth <=32, traversal node <= configured frame bytes, cycle rejection, oversized string rejection before canonical serialization; commits a71a015, 62ad49c |
+| Adversarial tests | AUTHORED, NOT EXECUTED | `python -m unittest discover -s tests -p 'test_hardware_mapping_traversal_budget.py' -v`; deep, cyclic, wide and ordinary invalid mapping |
+| CI and integration | BLOCKED | Local GitHub DNS resolution failed; do not merge #231 or overlapping #227/#229/#230 until focused tests, CI and review succeed |
+| Residual resource risks | PARTIAL | Untrusted custom Mapping methods, non-string scalar serialization, and JSON encoder CPU remain unbounded; no real network DoS claim |
+| Original article efficacy | BLOCKED | Authentic incident provenance, matched baselines and multi-seed independent trials absent |
+
 ## 2026-11-23 — in-memory hardware frame budget (draft PR #231)
 
 | Workstream | Status | Evidence / next gate |
