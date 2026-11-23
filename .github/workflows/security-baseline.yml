@@ -42,8 +42,8 @@ jobs:
           sudo apt-get install -y gcc-13 g++-13
           echo "CC=/usr/bin/gcc-13" >> "$GITHUB_ENV"
           echo "CXX=/usr/bin/g++-13" >> "$GITHUB_ENV"
-          /usr/bin/gcc-13 -dumpfullversion | grep -E '^13\\.3(\\.|$)'
-          /usr/bin/g++-13 -dumpfullversion | grep -E '^13\\.3(\\.|$)'
+          /usr/bin/gcc-13 -dumpfullversion | grep -E '^13\.3(\.|$)'
+          /usr/bin/g++-13 -dumpfullversion | grep -E '^13\.3(\.|$)'
 
       - name: Compile hardened Python modules
         run: |
