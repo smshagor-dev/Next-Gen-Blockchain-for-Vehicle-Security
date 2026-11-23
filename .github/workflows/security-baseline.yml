@@ -34,6 +34,17 @@ jobs:
           go-version: "1.22.x"
           cache-dependency-path: api/go/go.mod
 
+      - name: Provision required GCC 13.3 validation toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y gcc-13 g++-13
+          echo "CC=/usr/bin/gcc-13" >> "$GITHUB_ENV"
+          echo "CXX=/usr/bin/g++-13" >> "$GITHUB_ENV"
+          /usr/bin/gcc-13 -dumpfullversion | grep -E '^13\\.3(\\.|$)'
+          /usr/bin/g++-13 -dumpfullversion | grep -E '^13\\.3(\\.|$)'
+
       - name: Compile hardened Python modules
         run: |
           python -m py_compile release_metadata.py release_integrity.py runtime_security_strength.py security_capabilities.py credential_policy.py key_provider.py runtime_isolation.py runtime_security_monitor.py runtime_backend_security.py runtime_backend_patch.py incident_response.py incident_response_runtime.py incident_response_validation.py env_config.py replay_security.py permissioned_consensus.py consensus_security.py identity_security.py sync_protocol_legacy.py sync_protocol.py did_identity.py v2x_protocol.py control_api_security.py ledger_integrity.py adversarial_validation.py hil_security_validation.py smartcar_backend.py smart_contracts.py dashboard_reference_raster_ui.py main.py
