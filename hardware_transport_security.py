@@ -422,6 +422,11 @@ class HardwareEnvelopeVerifier:
                 raise HardwareTransportError("HW_FRAME_TOO_LARGE")
             parsed = _strict_json_loads(raw.strip())
         elif isinstance(raw, Mapping):
+            # Only built-in dictionaries have predictable iteration and item access.
+            # User-defined Mapping methods can block, mutate or allocate without
+            # respecting any node/byte budget. Never invoke them on ingress.
+            if type(raw) is not dict:
+                raise HardwareTransportError("HW_ENVELOPE_TYPE_INVALID")
             # In-process callers must obey the same byte budget as TCP callers.
             # Otherwise a giant mapping bypasses the wire framing limit and
             # reaches canonical HMAC encoding with unbounded memory/CPU cost.
