@@ -115,7 +115,7 @@ def to_telemetry(pkt: dict) -> TelemetryData:
     # sender. Missing fields must not silently become a safe/healthy reading.
     if type(pkt) is not dict:
         raise ValueError("telemetry: expected JSON object")
-    for field in ("emergency_brake_active", "driver_unwell"):
+    # A missing signed position or motion reading is unknown, not zero.\n    # Never manufacture stationary/origin evidence for admission decisions.\n    for field in ("speed", "acceleration", "gps_lat", "gps_lon",\n                  "emergency_brake_active", "driver_unwell"):
         if field not in pkt:
             raise ValueError(f"{field}: required signed telemetry field")
     return TelemetryData(
