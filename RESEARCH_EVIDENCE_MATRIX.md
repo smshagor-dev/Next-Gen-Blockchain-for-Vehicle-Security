@@ -1,3 +1,14 @@
+## 2026-11-23 — in-memory hardware frame budget (draft PR #231)
+
+| Workstream | Status | Evidence / next gate |
+| --- | --- | --- |
+| In-process Mapping admission byte budget | IMPLEMENTED ON DRAFT BRANCH | `hardware_transport_security.py` canonical size check before schema/MAC; same configured max frame bytes as wire ingress |
+| Oversized, small-invalid, and no-mutation negative controls | AUTHORED; NOT EXECUTED | `python -m unittest discover -s tests -p 'test_hardware_mapping_frame_budget.py' -v` |
+| #227/#229/#230 overlap | INTEGRATION BLOCKED | Reconcile transport changes and run security regression suites, required CI and review before squash merge |
+| Authentic incident-level original research | BLOCKED | No independently pinned VeReMi NextGen/CAN source or paired multi-seed evidence; no physical actuation claim |
+
+**Threat boundary:** Mapping ingress is in-process, not a claim that arbitrary TCP clients can directly send Python mappings. The size check bounds accepted serialized content but still incurs serialization work; a deeply nested or enormous in-memory object can consume resources before rejection. Consider depth-limited traversal and bounded encoder next. Fixture tests are NON-PUBLISHABLE as effectiveness results. No CI or runtime success claimed.
+
 ## 2026-11-19 — issuer lock-path substitution negative controls (draft PR #154)
 
 | Workstream | Status | Evidence and next gate |
