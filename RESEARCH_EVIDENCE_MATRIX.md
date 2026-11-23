@@ -390,3 +390,15 @@ No accuracy, safety efficacy, statistical significance or publishable primary re
 | Next code task | Upcoming | Run exact tests and CI; pin independently verified benign donor provenance; add matching/stratification for CAN ID and DLC distributions; execute disjoint-recording trials with incident-level truth and cluster-aware uncertainty |
 
 Test: `python -m unittest tests.test_matched_can_sham_control -v`. Existing fixture CSVs and short microbenchmarks remain NON-PUBLISHABLE main results.
+
+
+## 2026-11-23 — nested in-memory ingress objects (draft PR #231)
+
+| Workstream | Status | Evidence / next gate |
+| --- | --- | --- |
+| Executable nested Python objects | IMPLEMENTED ON DRAFT BRANCH | Reject unsupported object types and container subclasses before JSON serialization; commit `ab52374` |
+| Adversarial negative controls | AUTHORED, NOT EXECUTED | `tests/test_nested_hardware_ingress_objects.py`; run `python -m unittest tests.test_nested_hardware_ingress_objects -v` |
+| GitHub CI and main integration | UNVERIFIED | Do not merge before focused tests, security baseline and overlapping #227/#229/#230 reconciliation |
+| Physical safety / authentic incident effectiveness | BLOCKED | No physical interlock proof, independent dataset provenance or publishable efficacy evidence |
+
+**Limitation:** This guards Python in-process mapping admission, not raw socket framing or hostile process memory. The regression tests are synthetic, and no test execution is claimed. Next: execute focused tests and review serializer semantics for repeated shared immutable references, then reconcile transport PRs.
