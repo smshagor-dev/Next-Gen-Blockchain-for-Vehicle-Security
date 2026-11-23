@@ -1,3 +1,14 @@
+## 2026-11-24 — malformed Unicode hardware ingress negative controls (#231)
+
+| Workstream | Status | Evidence and next gate |
+| --- | --- | --- |
+| UTF-8 boundary and canonical encoding | IMPLEMENTED ON DRAFT | Commit `83ed191`: reject lone surrogate in raw Python text as `HW_FRAME_UTF8_INVALID`; wrap canonical Unicode encoding failures as `HW_CANONICAL_ENCODING_INVALID` |
+| Negative controls | AUTHORED, NOT EXECUTED | Commit `17a42df`; `python -m unittest discover -s tests -p 'test_hardware_unicode_boundary.py' -v` |
+| Checkout / CI / integration | BLOCKED | Container DNS cannot resolve github.com; no repository test pass or CI success established, #231 remains draft; no merges |
+| Original research efficacy | BLOCKED | No authentic incident comparisons, physical interlock evidence, or independent multi-seed results; fixture tests are non-publishable |
+
+Next: run focused Unicode and ingress suites on exact checkout; reconcile #227/#229/#230 before merge. Preserve local emergency controls.
+
 ## 2026-11-23 — bounded hardware ingress fan-out (#231)
 
 | Workstream | Status | Evidence / next gate |
