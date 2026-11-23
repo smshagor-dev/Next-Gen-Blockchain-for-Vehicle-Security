@@ -572,7 +572,7 @@ class AuthenticatedLineFramer:
         delimiters = 0
         try:
             while offset < len(data):
-                newline = data.find(b"\\n", offset)
+                newline = data.find(b"\n", offset)
                 end = len(data) if newline < 0 else newline
                 if len(self._buffer) + end - offset > self.max_frame_bytes:
                     raise HardwareTransportError("HW_FRAME_TOO_LARGE")
