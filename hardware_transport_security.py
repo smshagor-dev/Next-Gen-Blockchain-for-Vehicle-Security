@@ -441,12 +441,12 @@ class HardwareEnvelopeVerifier:
                 nodes += 1
                 if nodes > self.max_frame_bytes or depth > 32:
                     raise HardwareTransportError("HW_FRAME_TOO_LARGE")
-                if isinstance(value, (dict, list, tuple)):
+                if type(value) in (dict, list, tuple):
                     identity = id(value)
                     if identity in visited:
                         raise HardwareTransportError("HW_FRAME_TOO_LARGE")
                     visited.add(identity)
-                    if isinstance(value, dict):
+                    if type(value) is dict:
                         pending.extend((v, depth + 1) for v in value.values())
                         pending.extend((k, depth + 1) for k in value.keys())
                     else:
