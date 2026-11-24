@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   security-validation:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
       - name: Checkout
@@ -33,6 +33,17 @@ jobs:
         with:
           go-version: "1.22.x"
           cache-dependency-path: api/go/go.mod
+
+      - name: Provision required GCC 13.3 validation toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y gcc-13 g++-13
+          echo "CC=/usr/bin/gcc-13" >> "$GITHUB_ENV"
+          echo "CXX=/usr/bin/g++-13" >> "$GITHUB_ENV"
+          /usr/bin/gcc-13 -dumpfullversion | grep -E '^13\.3(\.|$)'
+          /usr/bin/g++-13 -dumpfullversion | grep -E '^13\.3(\.|$)'
 
       - name: Compile hardened Python modules
         run: |
