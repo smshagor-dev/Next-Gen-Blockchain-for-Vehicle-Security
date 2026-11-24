@@ -23,20 +23,28 @@ class ArduinoBudgetContractTests(unittest.TestCase):
         cls.calls = [n for n in ast.walk(cls.fn) if isinstance(n, ast.Call)]
 
     def test_frame_budget_configured_and_bounded(self):
-        self.assertIn("SMARTCAR_HW_MAX_FRAMES_PER_SESSION", self.src)
-        self.assertIn("accepted_frames > max_frames", self.src)
+        self.assertIn("SMARTCAR_HW_SERIAL_MAX_FRAMES_PER_SESSION", self.src)
+        self.assertIn("max_frames=max(1, min(10000,", self.src)
+        self.assertIn("serial_budget.charge_frame()", self.src)
 
     def test_byte_budget_configured_and_bounded(self):
-        self.assertIn("SMARTCAR_HW_MAX_SESSION_BYTES", self.src)
-        self.assertIn("received_bytes > max_session_bytes", self.src)
+        self.assertIn("SMARTCAR_HW_SERIAL_MAX_SESSION_BYTES", self.src)
+        self.assertIn("max_bytes=max(1024, min(8 * 1024 * 1024,", self.src)
+        self.assertIn("serial_budget.charge_bytes(len(chunk))", self.src)
 
     def test_bytes_charged_before_frame_verification(self):
-        self.assertLess(self.src.index("received_bytes += len(chunk)"),
-                        self.src.index("verified = session.receive_iter(chunk)"))
+        self.assertLess(self.src.index("serial_budget.charge_bytes(len(chunk))"),
+                        self.src.index("_quarantined_serial_frames(session, chunk)"))
 
     def test_frames_charged_before_ledger_write(self):
-        self.assertLess(self.src.index("accepted_frames += 1"),
+        self.assertLess(self.src.index("serial_budget.charge_frame()"),
                         self.src.index("block = bc.push_telemetry(tel, event)"))
+
+    def test_budget_failure_closes_serial_and_nonce_store(self):
+        self.assertIn("except SerialIngressBudgetExceeded", self.src)
+        self.assertIn("port quarantined", self.src)
+        self.assertIn("ser.close()", self.src)
+        self.assertIn("nonce_store.close()", self.src)
 
     def test_local_emergency_control_remains_unmodified(self):
         self.assertNotIn("send_safe_mode_stop(", self.src)

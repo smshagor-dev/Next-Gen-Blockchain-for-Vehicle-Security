@@ -26,3 +26,6 @@ fake-serial end-to-end injection with authentic signed frames and assert no ledg
 after caps; reconcile replay persistence PR #180 before merging. A peer can still spend
 bounded work on a frame whose nonce is verified before the frame counter is checked;
 future work should enforce the limit before nonce claim.
+
+## Mainline reconciliation (2026-11-24)
+The production byte, authenticated-frame and rate budgets are already integrated via #175, and lazy verifier quarantine via #176. Retain the current implementation and persistent replay store; update the independent source-contract tests for the serial-specific SMARTCAR_HW_SERIAL_MAX_SESSION_BYTES and SMARTCAR_HW_SERIAL_MAX_FRAMES_PER_SESSION settings and shared SerialIngressBudget. Existing mocked serial integration tests cover quota exhaustion. These controls precede ledger writes, but the frame cap still follows nonce verification. No physical or effectiveness claim. Exact-head CI required.
