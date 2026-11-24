@@ -2,17 +2,23 @@
 import ast
 import pathlib
 import unittest
+from datetime import datetime, timezone
 
 SOURCE = pathlib.Path(__file__).resolve().parents[1] / "hardware_bridge.py"
 tree = ast.parse(SOURCE.read_text(encoding="utf-8-sig"))
-names = {"_finite_telemetry_number", "_strict_telemetry_bool", "to_telemetry"}
+names = {"_validated_gps_coordinate", "_finite_telemetry_number", "_strict_telemetry_bool", "_signed_observation_timestamp", "to_telemetry"}
 nodes = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in names]
 assert {n.name for n in nodes} == names
 # Isolate the real functions while replacing the blockchain dataclass with a
 # transparent constructor, so this test does not need hardware or a running chain.
-namespace = {"TelemetryData": lambda **kwargs: kwargs}
+namespace = {"TelemetryData": lambda **kwargs: kwargs, "datetime": datetime, "timezone": timezone}
 exec(compile(ast.Module(body=nodes, type_ignores=[]), str(SOURCE), "exec"), namespace)
-convert = namespace["to_telemetry"]
+def convert(overrides):
+    sample = {"speed": 0.0, "acceleration": 0.0, "gps_lat": 0.0, "gps_lon": 0.0,
+              "obstacle_distance": 4.0, "emergency_brake_active": False,
+              "driver_unwell": False, "timestamp": "2026-11-15T12:00:01Z"}
+    sample.update(overrides)
+    return namespace["to_telemetry"](sample)
 
 
 class SignedTelemetryValidationTests(unittest.TestCase):

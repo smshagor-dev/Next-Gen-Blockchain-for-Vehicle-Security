@@ -26,8 +26,11 @@ class ReplaySnapshotRollbackNegativeControl(unittest.TestCase):
                 self.assertIsNone(store.claim(device, earlier_nonce, window_seconds=3600))
                 # SQLite backup API creates a transaction-consistent snapshot,
                 # including committed nonce and high-water clock state.
-                with sqlite3.connect(str(snapshot)) as backup:
+                backup = sqlite3.connect(str(snapshot))
+                try:
                     store._db.backup(backup)
+                finally:
+                    backup.close()
                 self.assertIsNone(store.claim(device, later_nonce, window_seconds=3600))
                 self.assertEqual(
                     store.claim(device, later_nonce, window_seconds=3600),

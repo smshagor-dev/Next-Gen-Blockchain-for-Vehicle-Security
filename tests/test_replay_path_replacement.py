@@ -5,19 +5,22 @@ import sqlite3
 import tempfile
 import unittest
 
-from durable_hardware_replay import DurableNonceStore
+from hardware_nonce_store import SQLiteNonceStore, NonceStoreError
 
 
 class ReplayPathReplacementTests(unittest.TestCase):
     def test_unlinked_database_fails_closed_while_connection_is_live(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "replay.sqlite"
-            store = DurableNonceStore(str(path), max_entries_per_device=8)
+            store = SQLiteNonceStore(str(path), provision=True, max_claims=8)
             try:
-                self.assertIsNone(store.claim("node", "a" * 32, window_seconds=3600))
-                os.unlink(path)
-                with self.assertRaisesRegex(sqlite3.DatabaseError, "path unavailable"):
-                    store.claim("node", "b" * 32, window_seconds=3600)
+                self.assertTrue(store.claim("node", "a" * 32, ttl_seconds=600))
+                try:
+                    os.unlink(path)
+                except PermissionError:
+                    self.skipTest("platform prevents unlinking an open database")
+                with self.assertRaisesRegex(NonceStoreError, "path unavailable"):
+                    store.claim("node", "b" * 32, ttl_seconds=600)
             finally:
                 store.close()
 
@@ -25,24 +28,30 @@ class ReplayPathReplacementTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "replay.sqlite"
             replacement = Path(tmp) / "old.sqlite"
-            store = DurableNonceStore(str(path), max_entries_per_device=8)
+            store = SQLiteNonceStore(str(path), provision=True, max_claims=8)
             try:
-                self.assertIsNone(store.claim("node", "a" * 32, window_seconds=3600))
-                with sqlite3.connect(str(replacement)) as target:
+                self.assertTrue(store.claim("node", "a" * 32, ttl_seconds=600))
+                target = sqlite3.connect(str(replacement))
+                try:
                     store._db.backup(target)
-                self.assertIsNone(store.claim("node", "b" * 32, window_seconds=3600))
-                os.replace(replacement, path)
-                with self.assertRaisesRegex(sqlite3.DatabaseError, "identity changed"):
-                    store.claim("node", "c" * 32, window_seconds=3600)
+                finally:
+                    target.close()
+                self.assertTrue(store.claim("node", "b" * 32, ttl_seconds=600))
+                try:
+                    os.replace(replacement, path)
+                except PermissionError:
+                    self.skipTest("platform prevents replacing an open database")
+                with self.assertRaisesRegex(NonceStoreError, "identity changed"):
+                    store.claim("node", "c" * 32, ttl_seconds=600)
             finally:
                 store.close()
 
     def test_normal_claims_do_not_trip_identity_guard(self):
         with tempfile.TemporaryDirectory() as tmp:
-            store = DurableNonceStore(str(Path(tmp) / "replay.sqlite"), max_entries_per_device=8)
+            store = SQLiteNonceStore(str(Path(tmp) / "replay.sqlite"), provision=True, max_claims=8)
             try:
-                self.assertIsNone(store.claim("node", "a" * 32, window_seconds=3600))
-                self.assertEqual(store.claim("node", "a" * 32, window_seconds=3600), "HW_REPLAY_DETECTED")
+                self.assertTrue(store.claim("node", "a" * 32, ttl_seconds=600))
+                self.assertFalse(store.claim("node", "a" * 32, ttl_seconds=600))
             finally:
                 store.close()
 
