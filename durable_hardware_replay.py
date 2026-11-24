@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import sqlite3
+import stat
 import threading
 import time
 
@@ -29,6 +30,7 @@ class DurableNonceStore:
         # database. Never mistake it for first initialization.
         if existing_file and existing_bytes == 0:
             raise sqlite3.DatabaseError("existing replay database is empty")
+        self._path = path
         self._db = sqlite3.connect(path, timeout=5, isolation_level=None, check_same_thread=False)
         try:
             self._db.execute("PRAGMA journal_mode=WAL")
@@ -46,9 +48,22 @@ class DurableNonceStore:
                     raise sqlite3.DatabaseError("existing replay database is missing required state tables")
             self._db.execute("CREATE TABLE IF NOT EXISTS nonce_claims (device TEXT NOT NULL, nonce TEXT NOT NULL, expires REAL NOT NULL, PRIMARY KEY(device,nonce))")
             self._db.execute("CREATE TABLE IF NOT EXISTS replay_clock (id INTEGER PRIMARY KEY CHECK(id=1), last_seen REAL NOT NULL)")
+            self._identity = self._db.execute("PRAGMA database_list").fetchone()[2]
+            opened = os.stat(self._identity)
+            self._device_inode = (opened.st_dev, opened.st_ino)
+            self._check_path_identity()
         except Exception:
             self._db.close()
             raise
+
+    def _check_path_identity(self) -> None:
+        """Reject database path replacement; not privileged same-inode rollback protection."""
+        try:
+            entry = os.lstat(self._path)
+            if not stat.S_ISREG(entry.st_mode) or (entry.st_dev, entry.st_ino) != self._device_inode:
+                raise sqlite3.DatabaseError("hardware replay database path identity changed")
+        except OSError as exc:
+            raise sqlite3.DatabaseError("hardware replay database path unavailable") from exc
 
     def claim(self, device: str, nonce: str, *, window_seconds: int) -> str | None:
         """Return stable rejection reason or None; commit before caller acts."""
@@ -56,6 +71,7 @@ class DurableNonceStore:
             if type(window_seconds) is not int or window_seconds <= 0:
                 raise ValueError("window_seconds must be a positive integer")
             try:
+                self._check_path_identity()
                 self._db.execute("BEGIN IMMEDIATE")
                 # Sample wall time after acquiring the write lock: a contender
                 # must not compare its pre-wait clock against another writer's
@@ -77,6 +93,7 @@ class DurableNonceStore:
                     self._db.execute("COMMIT")
                     return "HW_REPLAY_CACHE_SATURATED"
                 self._db.execute("INSERT INTO nonce_claims(device,nonce,expires) VALUES(?,?,?)", (device, nonce, now + window_seconds))
+                self._check_path_identity()
                 self._db.execute("COMMIT")
                 return None
             except sqlite3.Error:

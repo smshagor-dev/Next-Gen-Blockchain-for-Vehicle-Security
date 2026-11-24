@@ -1,5 +1,7 @@
 """Synthetic serial ingress security tests; not hardware or research evidence."""
 import unittest
+import tempfile
+import os
 from unittest import mock
 from datetime import datetime, timezone
 
@@ -42,6 +44,16 @@ class FakeSerial:
 
 
 class SerialIngressTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        env = mock.patch.dict("os.environ", {
+            "SMARTCAR_HW_SERIAL_NONCE_STORE_PATH": os.path.join(directory.name, "serial.sqlite"),
+            "SMARTCAR_HW_SERIAL_NONCE_STORE_PROVISION": "true",
+        })
+        env.start()
+        self.addCleanup(env.stop)
+
     def run_bridge(self, frames):
         fake = FakeSerial(frames)
         bc = mock.Mock()
@@ -56,6 +68,24 @@ class SerialIngressTests(unittest.TestCase):
                 bridge.run_arduino_mode(bc)
         self.assertTrue(fake.closed)
         return bc, dispatcher
+
+    def test_serial_byte_budget_quarantines_partial_input(self):
+        with mock.patch.dict("os.environ", {"SMARTCAR_HW_SERIAL_MAX_SESSION_BYTES": "1024"}):
+            bc, dispatcher = self.run_bridge([b"x" * 1024, b"x"])
+        bc.push_telemetry.assert_not_called()
+        dispatcher.return_value.maybe_send_arduino.assert_not_called()
+
+    def test_serial_frame_budget_blocks_second_ledger_mutation(self):
+        first = encode_authenticated_envelope(build_authenticated_envelope(
+            DEVICE, SECRET, "TELEMETRY", payload()))
+        second = encode_authenticated_envelope(build_authenticated_envelope(
+            DEVICE, SECRET, "TELEMETRY", payload()))
+        chunks = [frame[i:i+1024] for frame in (first, second)
+                  for i in range(0, len(frame), 1024)]
+        with mock.patch.dict("os.environ", {"SMARTCAR_HW_SERIAL_MAX_FRAMES_PER_SESSION": "1"}):
+            bc, dispatcher = self.run_bridge(chunks)
+        bc.push_telemetry.assert_called_once()
+        dispatcher.return_value.maybe_send_arduino.assert_called_once()
 
     def test_valid_signed_frame_is_accepted(self):
         frame = encode_authenticated_envelope(build_authenticated_envelope(

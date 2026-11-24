@@ -22,6 +22,7 @@ from typing import Optional
 from env_config import load_project_env_once, get_env, get_int, get_bool
 from blockchain import SmartCarBlockchain, TelemetryData
 from hardware_nonce_store import SQLiteNonceStore
+from serial_ingress_budget import SerialIngressBudget, SerialIngressBudgetExceeded
 from bounded_tcp_admission import BoundedTCPAdmission
 from hardware_actuation_safety import BenchActuationGate
 from hardware_transport_deadlines import deadline_check, DeadlineExpired
@@ -70,6 +71,17 @@ def _finite_telemetry_number(value, field):
     return number
 
 
+def _validated_gps_coordinate(value, field):
+    """Reject coordinates outside the WGS84 latitude and longitude domains."""
+    if field not in ("gps_lat", "gps_lon"):
+        raise ValueError("unsupported GPS coordinate field")
+    number = _finite_telemetry_number(value, field)
+    limit = 90.0 if field == "gps_lat" else 180.0
+    if not -limit <= number <= limit:
+        raise ValueError(f"{field}: outside WGS84 coordinate range")
+    return number
+
+
 def _strict_telemetry_bool(value, field):
     if type(value) is not bool:
         raise ValueError(f"{field}: expected boolean")
@@ -115,17 +127,19 @@ def to_telemetry(pkt: dict) -> TelemetryData:
     # sender. Missing fields must not silently become a safe/healthy reading.
     if type(pkt) is not dict:
         raise ValueError("telemetry: expected JSON object")
-    for field in ("emergency_brake_active", "driver_unwell"):
+    # Missing motion or position is unknown, not a zero observation.
+    for field in ("emergency_brake_active", "driver_unwell", "obstacle_distance",
+                  "speed", "acceleration", "gps_lat", "gps_lon"):
         if field not in pkt:
             raise ValueError(f"{field}: required signed telemetry field")
     return TelemetryData(
-        speed=_finite_telemetry_number(pkt.get("speed", 0.0), "speed"),
-        acceleration=_finite_telemetry_number(pkt.get("acceleration", 0.0), "acceleration"),
+        speed=_finite_telemetry_number(pkt["speed"], "speed"),
+        acceleration=_finite_telemetry_number(pkt["acceleration"], "acceleration"),
         fuel_level=_finite_telemetry_number(pkt.get("fuel_level", 100.0), "fuel_level"),
         battery_voltage=_finite_telemetry_number(pkt.get("battery_voltage", 12.6), "battery_voltage"),
         engine_temp=_finite_telemetry_number(pkt.get("engine_temp", 20.0), "engine_temp"),
-        gps_lat=_finite_telemetry_number(pkt.get("gps_lat", 0.0), "gps_lat"),
-        gps_lon=_finite_telemetry_number(pkt.get("gps_lon", 0.0), "gps_lon"),
+        gps_lat=_validated_gps_coordinate(pkt["gps_lat"], "gps_lat"),
+        gps_lon=_validated_gps_coordinate(pkt["gps_lon"], "gps_lon"),
         obstacle_distance=_finite_telemetry_number(pkt.get("obstacle_distance", 999.0), "obstacle_distance"),
         emergency_brake_active=_strict_telemetry_bool(pkt.get("emergency_brake_active", False), "emergency_brake_active"),
         steering_angle=_finite_telemetry_number(pkt.get("steering_angle", 0.0), "steering_angle"),
@@ -169,7 +183,13 @@ class GlobalTelemetryBudget:
     def claim(self) -> bool:
         with self._lock:
             now = self.clock()
-            elapsed = max(0.0, now - self.last)
+            # A monotonic clock should not roll backwards, but injected clocks,
+            # host faults, and invalid readings must not mint extra quota.
+            # Keep the previous high-water mark after a rollback.
+            import math
+            if not math.isfinite(now) or now < self.last:
+                return False
+            elapsed = now - self.last
             self.last = now
             self.tokens = min(float(self.burst), self.tokens + elapsed * self.rate)
             if self.tokens < 1.0:
@@ -190,14 +210,20 @@ class AuthenticatedPiTelemetrySession:
         self.framer = AuthenticatedLineFramer(verifier.max_frame_bytes)
         self.device_id = None
 
-    def receive_iter(self, data: bytes):
+    def receive_iter(self, data: bytes, *, remaining_frames=None):
         """Yield verified frames individually so a later bad MAC cannot discard
         an earlier valid frame after its nonce has been claimed.
 
         This is NOT ledger/replay atomicity: a ledger failure after verification
         can still consume the nonce. Framing errors fail the entire read.
         """
-        for frame in self.framer.feed(data):
+        if remaining_frames is not None and (
+            type(remaining_frames) is not int or remaining_frames < 0
+        ):
+            raise HardwareTransportError("HW_INVALID_FRAME_BUDGET")
+        for index, frame in enumerate(self.framer.feed(data)):
+            if remaining_frames is not None and index >= remaining_frames:
+                raise HardwareTransportError("HW_SESSION_FRAME_BUDGET_EXCEEDED")
             item = self.verifier.verify(
                 frame, expected_kind="TELEMETRY", expected_device_id=self.device_id
             )
@@ -293,6 +319,29 @@ class ECUCommandGateway:
         return False
 
 
+def _open_hardware_nonce_store(path_key: str, provision_key: str, transport: str):
+    """Use the mainline persistent nonce store; never silently recreate lost state."""
+    path = get_env(path_key, "").strip()
+    if not path or path == ":memory:" or path.startswith("file:"):
+        raise RuntimeError(f"{path_key} required for {transport} ingress")
+    if os.path.islink(path):
+        raise RuntimeError("hardware nonce database must be a non-symlink file")
+    provision = get_bool(provision_key, False)
+    return SQLiteNonceStore(path, provision=provision)
+
+
+def _quarantined_serial_frames(session, chunk, *, remaining_frames=None):
+    """Catch lazy verifier failures without discarding already yielded frames."""
+    try:
+        if remaining_frames is None:
+            yield from session.receive_iter(chunk)
+        else:
+            yield from session.receive_iter(chunk, remaining_frames=remaining_frames)
+    except HardwareTransportError as exc:
+        print(f"[HW BRIDGE] quarantined Arduino serial input: {exc.reason}")
+        raise RuntimeError("Arduino serial authentication/framing failure") from exc
+
+
 def run_arduino_mode(bc: SmartCarBlockchain):
     """Enrolled-device authenticated serial ingress; no unsigned JSON fallback.
 
@@ -305,68 +354,92 @@ def run_arduino_mode(bc: SmartCarBlockchain):
     port = get_env("SMARTCAR_HW_SERIAL_PORT", "COM3")
     baud = get_int("SMARTCAR_HW_SERIAL_BAUD", 115200)
     device_keys = parse_device_registry(get_env("SMARTCAR_HW_DEVICE_KEYS_JSON", "{}"))
-    verifier = HardwareEnvelopeVerifier(
-        device_keys,
-        max_frame_bytes=get_int("SMARTCAR_HW_MAX_FRAME_BYTES", 4096),
-        replay_window_sec=get_int("SMARTCAR_HW_REPLAY_WINDOW_SEC", 15),
-        replay_cache_entries=get_int("SMARTCAR_HW_REPLAY_CACHE_ENTRIES", 2048),
+    nonce_store = _open_hardware_nonce_store(
+        "SMARTCAR_HW_SERIAL_NONCE_STORE_PATH",
+        "SMARTCAR_HW_SERIAL_NONCE_STORE_PROVISION",
+        "Arduino",
     )
-    session = AuthenticatedPiTelemetrySession(verifier)
-    print(f"[HW BRIDGE] authenticated Arduino serial mode: {port} @ {baud}")
     try:
-        ser = serial.Serial(port=port, baudrate=baud, timeout=1)
-    except Exception as e:
-        raise RuntimeError(f"Could not open serial port '{port}': {e}") from e
+        verifier = HardwareEnvelopeVerifier(
+            device_keys,
+            durable_nonce_store=nonce_store,
+            max_frame_bytes=get_int("SMARTCAR_HW_MAX_FRAME_BYTES", 4096),
+            replay_window_sec=get_int("SMARTCAR_HW_REPLAY_WINDOW_SEC", 15),
+            replay_cache_entries=get_int("SMARTCAR_HW_REPLAY_CACHE_ENTRIES", 2048),
+        )
+        session = AuthenticatedPiTelemetrySession(verifier)
+        serial_budget = SerialIngressBudget(
+            max_bytes=max(1024, min(8 * 1024 * 1024, get_int("SMARTCAR_HW_SERIAL_MAX_SESSION_BYTES", 262144))),
+            max_frames=max(1, min(10000, get_int("SMARTCAR_HW_SERIAL_MAX_FRAMES_PER_SESSION", 256))),
+        )
+        serial_global_budget = GlobalTelemetryBudget(
+            get_int("SMARTCAR_HW_SERIAL_FRAMES_PER_SEC", 32),
+            get_int("SMARTCAR_HW_SERIAL_FRAME_BURST", 64),
+        )
+        print(f"[HW BRIDGE] authenticated Arduino serial mode: {port} @ {baud}")
+        try:
+            ser = serial.Serial(port=port, baudrate=baud, timeout=1)
+        except Exception as e:
+            raise RuntimeError(f"Could not open serial port '{port}': {e}") from e
 
-    # Remote commands remain subject to an independent bench interlock.
-    actuator = SafeModeActuatorDispatcher()
-    # A silent or trickle-fed serial peer must not monopolize the bridge forever.
-    idle_timeout = max(1, min(30, get_int("SMARTCAR_HW_IDLE_TIMEOUT_SEC", 5)))
-    max_session_sec = max(5, min(600, get_int("SMARTCAR_HW_MAX_SESSION_SEC", 120)))
-    deadline = time.monotonic() + max_session_sec
-    last_progress = time.monotonic()
-    try:
-        while time.monotonic() < deadline:
-            if time.monotonic() - last_progress >= idle_timeout:
-                raise RuntimeError("Arduino serial idle timeout; port quarantined")
-            # Bounded read, including for a peer that never sends a newline.
-            chunk = ser.read(1024)
-            if not chunk:
-                continue
-            ingress_monotonic = time.monotonic()
-            ingress_utc = datetime.now(timezone.utc)
-            last_progress = ingress_monotonic
-            try:
-                verified = session.receive_iter(chunk)
-            except HardwareTransportError as exc:
-                print(f"[HW BRIDGE] quarantined Arduino serial input: {exc.reason}")
-                raise RuntimeError("Arduino serial authentication/framing failure") from exc
-            for item in verified:
-                # A single serial read may contain several valid envelopes.
-                # Verification and earlier ledger writes consume time; do not
-                # admit later envelopes after the absolute session deadline.
-                if time.monotonic() >= deadline:
-                    raise RuntimeError("Arduino serial session lifetime exceeded; port quarantined")
-                verify_ingress_observation(
-                    item.payload.get("timestamp"),
-                    received_utc=ingress_utc,
-                    received_monotonic=ingress_monotonic,
-                    commit_monotonic=time.monotonic(),
-                    max_age_seconds=max(1, min(3600, get_int("SMARTCAR_HW_OBSERVATION_MAX_AGE_SEC", 15))),
-                    max_future_skew_seconds=max(0, min(60, get_int("SMARTCAR_HW_OBSERVATION_FUTURE_SKEW_SEC", 2))),
-                )
-                tel = to_telemetry(item.payload)
-                event = _signed_event_label(item.payload.get("event"))
-                block = bc.push_telemetry(tel, event)
-                print(f"[CHAIN] block={block.index} event={event}")
-                actuator.maybe_send_arduino(
-                    ser, bc, block,
-                    device_id=item.device_id,
-                    device_secret=verifier.device_secret(item.device_id),
-                )
-        raise RuntimeError("Arduino serial session lifetime exceeded; port quarantined")
+        # Remote commands remain subject to an independent bench interlock.
+        actuator = SafeModeActuatorDispatcher()
+        # A silent or trickle-fed serial peer must not monopolize the bridge forever.
+        idle_timeout = max(1, min(30, get_int("SMARTCAR_HW_IDLE_TIMEOUT_SEC", 5)))
+        max_session_sec = max(5, min(600, get_int("SMARTCAR_HW_MAX_SESSION_SEC", 120)))
+        deadline = time.monotonic() + max_session_sec
+        last_progress = time.monotonic()
+        try:
+            while time.monotonic() < deadline:
+                if time.monotonic() - last_progress >= idle_timeout:
+                    raise RuntimeError("Arduino serial idle timeout; port quarantined")
+                # Bounded read, including for a peer that never sends a newline.
+                chunk = ser.read(1024)
+                if not chunk:
+                    continue
+                # Charge all bytes, including unauthenticated fragments.
+                serial_budget.charge_bytes(len(chunk))
+                ingress_monotonic = time.monotonic()
+                ingress_utc = datetime.now(timezone.utc)
+                last_progress = ingress_monotonic
+                for item in _quarantined_serial_frames(
+                    session, chunk,
+                    remaining_frames=serial_budget.max_frames - serial_budget.frames_seen,
+                ):
+                    # A single serial read may contain several valid envelopes.
+                    # Verification and earlier ledger writes consume time; do not
+                    # admit later envelopes after the absolute session deadline.
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError("Arduino serial session lifetime exceeded; port quarantined")
+                    # Limit authenticated frames before any ledger mutation.
+                    # The earlier check enforces the remaining session quota.
+                    serial_budget.charge_frame()
+                    if not serial_global_budget.claim():
+                        raise SerialIngressBudgetExceeded("HW_SERIAL_GLOBAL_FRAME_RATE_EXCEEDED")
+                    verify_ingress_observation(
+                        item.payload.get("timestamp"),
+                        received_utc=ingress_utc,
+                        received_monotonic=ingress_monotonic,
+                        commit_monotonic=time.monotonic(),
+                        max_age_seconds=max(1, min(3600, get_int("SMARTCAR_HW_OBSERVATION_MAX_AGE_SEC", 15))),
+                        max_future_skew_seconds=max(0, min(60, get_int("SMARTCAR_HW_OBSERVATION_FUTURE_SKEW_SEC", 2))),
+                    )
+                    tel = to_telemetry(item.payload)
+                    event = _signed_event_label(item.payload.get("event"))
+                    block = bc.push_telemetry(tel, event)
+                    print(f"[CHAIN] block={block.index} event={event}")
+                    actuator.maybe_send_arduino(
+                        ser, bc, block,
+                        device_id=item.device_id,
+                        device_secret=verifier.device_secret(item.device_id),
+                    )
+            raise RuntimeError("Arduino serial session lifetime exceeded; port quarantined")
+        except SerialIngressBudgetExceeded as exc:
+            raise RuntimeError(f"Arduino serial quota exceeded; port quarantined: {exc}") from exc
+        finally:
+            ser.close()
     finally:
-        ser.close()
+        nonce_store.close()
 
 
 def run_pi_mode(bc: SmartCarBlockchain):
@@ -380,11 +453,10 @@ def run_pi_mode(bc: SmartCarBlockchain):
     device_keys = parse_device_registry(get_env("SMARTCAR_HW_DEVICE_KEYS_JSON", "{}"))
     # No volatile-only replay fallback for production Pi TCP. Provision once
     # with SMARTCAR_HW_NONCE_STORE_PROVISION=true, then restart in recovery mode.
-    nonce_path = get_env("SMARTCAR_HW_NONCE_STORE_PATH", "").strip()
-    if not nonce_path:
-        raise RuntimeError("SMARTCAR_HW_NONCE_STORE_PATH required for Pi ingress")
-    nonce_store = SQLiteNonceStore(
-        nonce_path, provision=get_bool("SMARTCAR_HW_NONCE_STORE_PROVISION", False)
+    nonce_store = _open_hardware_nonce_store(
+        "SMARTCAR_HW_NONCE_STORE_PATH",
+        "SMARTCAR_HW_NONCE_STORE_PROVISION",
+        "Pi",
     )
     verifier = HardwareEnvelopeVerifier(
         device_keys,
@@ -470,7 +542,9 @@ def run_pi_mode(bc: SmartCarBlockchain):
                     # connection identity before *any* ledger/actuation side effect.
                     # The verifier owns its replay lock. Do not hold a global
                     # lock across ledger I/O while iterating verified frames.
-                    verified_items = session.receive_iter(data)
+                    verified_items = session.receive_iter(
+                        data, remaining_frames=max_frames - accepted_frames
+                    )
                     for item in verified_items:
                         # A single recv may contain many signed frames. MAC
                         # verification can itself consume the remaining

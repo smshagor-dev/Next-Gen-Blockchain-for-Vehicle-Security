@@ -34,7 +34,10 @@ def verify_ingress_observation(timestamp, *, received_utc, received_monotonic,
     # Bound arithmetic to avoid pathological floats or timedelta overflow.
     if elapsed > 86400:
         raise ValueError("ingress-to-commit delay exceeds maximum")
-    derived_commit_utc = received_utc + timedelta(seconds=elapsed)
+    try:
+        derived_commit_utc = received_utc + timedelta(seconds=elapsed)
+    except OverflowError as exc:
+        raise ValueError("ingress-to-commit UTC overflow") from exc
     age_at_commit = verify_observation_age(
         timestamp, received_utc=derived_commit_utc,
         max_age_seconds=max_age_seconds,
