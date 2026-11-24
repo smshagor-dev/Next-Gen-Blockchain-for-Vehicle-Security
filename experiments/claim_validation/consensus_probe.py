@@ -91,7 +91,11 @@ def trial(seed: int, controlled_yes: int, valid: bool):
             "final_status": final["status"], "posture_before": posture_before,
             "posture_after": posture_after,
             "unsupported_policy_acceptance": not valid and final["status"] == "ACCEPTED",
-            "runtime_evidence": evidence, "claim_gate": gate, "elapsed_ns": elapsed}
+            "runtime_evidence": evidence, "expected_scope": scope,
+            "declared_membership": before["validator_membership_enforced"],
+            "declared_signature_required": before["vote_signature_required"],
+            "declared_quorum_basis": before["quorum_basis"],
+            "claim_gate": gate, "elapsed_ns": elapsed}
 
 
 def sha256(path):

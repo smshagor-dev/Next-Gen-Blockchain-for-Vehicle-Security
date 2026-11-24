@@ -123,3 +123,35 @@ predicates deliberately use the same observed component facts as the
 narrow local claims. Next: independently adjudicated paired evaluation,
 metadata disagreement and evidence faults, coverage/abstention trade-off
 and overhead. Preserve negative and unknown outcomes. CI pending.
+
+
+## Paired exploratory baseline and fault replay protocol
+
+Three narrow claims are compared on the same actual-component trial records:
+ML-KEM-512 negotiation, enrolled-session admission, recorded quorum acceptance.
+Original posture proxy treats STRONG as eligibility (a hypothetical user
+interpretation, not a claim made by the original classifier). The declared
+capability proxy additionally requires the corresponding self-reported
+capability, registry policy or quorum configuration. This is an explicitly
+constructed metadata-only comparator, not the original manuscript's exact
+semantic-flag oracle or a published baseline. The observed gate receives
+scoped local facts. An offline ablation removes only expected scope and
+freshness checks. Ground truth is separately exported actual outcome fields
+from the same process, not gate output, but is not independent attestation.
+The broad validator-honesty and policy-validity claims remain withheld and
+are not conflated with recorded quorum acceptance.
+
+For each base trial apply eight replay conditions: clean, missing, stale,
+future-dated, wrong-scope, wrong-kind, malformed facts, and flipped declared
+capability predicate. The replay clock is synthetic, not measured clock
+failure. The last condition changes only the metadata predicate, not the
+underlying operational posture. Integrity-check trace manifest and per-record
+digest; record the expected scope separately. Digest and scope labels are not
+authentication. Total planned base trials 240, paired fault rows 1920,
+four method decisions per row. These are repeated interventions, not
+independent observations. Report eligible supported/unsupported counts,
+withheld and not-supported separately, positive eligibility rate, negative
+unsupported rate, and coverage. Undefined class denominators remain null.
+Do not pool across distinct claims or claim statistical significance.
+Independent adjudication, observer compromise sensitivity, exact manuscript
+semantic baseline, related work comparison and overhead remain open.

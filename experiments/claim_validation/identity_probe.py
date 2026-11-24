@@ -95,7 +95,8 @@ def trial(config, challenge, repeat):
             "posture_without_alerts": evaluate_security_strength(before)["level"],
             "posture_with_observed_alerts": evaluate_security_strength(with_alerts)["level"],
             "observed_reasons": [event["reason"] for event in events],
-            "runtime_evidence": evidence, "claim_gate": gate, "elapsed_ns": elapsed,
+            "runtime_evidence": evidence, "expected_scope": scope,
+            "claim_gate": gate, "elapsed_ns": elapsed,
         }
 
 

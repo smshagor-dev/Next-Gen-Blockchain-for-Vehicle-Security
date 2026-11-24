@@ -90,7 +90,8 @@ def trial(config, repeat):
                 "operational_posture": evaluate_security_strength(snapshot)["level"],
                 "observed_mlkem_session": matched and client._hs_mode == "PQC_KEM"
                     and client._negotiated_kem_alg == "ML-KEM-512",
-                "runtime_evidence": evidence, "claim_gate": gate, "elapsed_ns": elapsed}
+                "runtime_evidence": evidence, "expected_scope": scope,
+                "claim_gate": gate, "elapsed_ns": elapsed}
 
 
 def write_campaign(out: Path):
