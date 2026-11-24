@@ -1,0 +1,47 @@
+# Cross-layer security claim validity — revision execution protocol
+
+Baseline main: 0e3429a8bf6338ff99779dbc7cc4aa61972932ee (v4.0.0; frozen comparison, no rewrite).
+Research branch: research/security-claim-validation.
+
+## Scope and reviewer gates
+
+| Revision concern | Deliverable | Status |
+|---|---|---|
+| Constructed 576-row matrix follows classifier design | Preserve as analytical enumeration, report derivation; separate actual component execution | Baseline preserved |
+| Practical assurance scenario and unsupported interpretation | Show healthy operational label during controlled violation of a named policy; do not allege observed human misuse | Pilot implemented |
+| Exact PQ, identity and validator assumptions | Native handshake/fallback trace, real sync admission challenge, actual consensus votes; document trust boundaries | Consensus pilot only |
+| Gate matches oracle by construction | Compare metadata-only classifier, semantic predicate gate and a distinct observed-evidence gate; do not use scenario truth as gate input | Planned |
+| Runtime evidence, statistics, latency | Retain raw traces, execution provenance, independent experimental units; no inference from repeated deterministic orderings; measure local overhead separately from V2X latency | Pilot planned execution |
+| Code/data availability and DOI | Freeze final executable revision and deposit reproducibility artifact; match manuscript and portal statements | Pending |
+| Figures, equation, references, affiliation, funding and COI | Verify against reviewer letter and exact manuscript before final point-by-point response | Pending |
+
+## RQ1 pilot: validator assumption
+
+Use the actual Python PermissionedConsensusEngine, configured with three enrolled
+lab validators and threshold two. External policy truth is an authored test
+label: allowed or disallowed. Honest votes follow that label; zero through
+three controlled identities approve regardless. Each fresh engine runs signed
+votes in one of 12 seeded orders. The runtime classifier receives actual
+component metadata inside a constructed healthy transport snapshot, not a live
+dashboard capture. Positive controls must accept allowed proposals; disallowed
+proposals without controlled quorum should reject. A disallowed proposal
+accepted by a controlled quorum demonstrates the bounded policy assumption,
+not a defect in quorum arithmetic or proof of deployed compromise. The classifier
+is not claimed to assert validator honesty; the study tests potential
+overinterpretation of the operational label. No cryptographic novelty is claimed.
+
+96 scheduled cells/runs (12 orders x 4 control counts x 2 policy labels).
+Orders are repeated design variations, not 96 independent deployments.
+Report cell counts and raw transitions descriptively. The execution interval
+is local sign-and-submit time, not wireless latency. No statistical significance
+or security proof from this pilot. Keep all outcomes.
+
+Run:
+    python -m unittest tests.test_claim_validation_consensus_probe -v
+    python -m experiments.claim_validation.consensus_probe --out claim-results/consensus
+
+Next: actual sync enrollment and native ML-KEM/fallback probes; live metadata
+capture with explicit source/epoch/time binding; independent evidence collector
+and withheld-claim policy; frozen confirmatory protocol with negative controls,
+matched baselines, uncertainty and overhead. Review novelty against primary
+assurance/attestation literature before asserting any contribution.
