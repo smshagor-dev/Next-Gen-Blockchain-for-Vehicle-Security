@@ -305,6 +305,15 @@ def _open_hardware_nonce_store(path_key: str, provision_key: str, transport: str
     return SQLiteNonceStore(path, provision=provision)
 
 
+def _quarantined_serial_frames(session, chunk):
+    """Catch lazy verifier failures without discarding already yielded frames."""
+    try:
+        yield from session.receive_iter(chunk)
+    except HardwareTransportError as exc:
+        print(f"[HW BRIDGE] quarantined Arduino serial input: {exc.reason}")
+        raise RuntimeError("Arduino serial authentication/framing failure") from exc
+
+
 def run_arduino_mode(bc: SmartCarBlockchain):
     """Enrolled-device authenticated serial ingress; no unsigned JSON fallback.
 
@@ -365,12 +374,7 @@ def run_arduino_mode(bc: SmartCarBlockchain):
                 ingress_monotonic = time.monotonic()
                 ingress_utc = datetime.now(timezone.utc)
                 last_progress = ingress_monotonic
-                try:
-                    verified = session.receive_iter(chunk)
-                except HardwareTransportError as exc:
-                    print(f"[HW BRIDGE] quarantined Arduino serial input: {exc.reason}")
-                    raise RuntimeError("Arduino serial authentication/framing failure") from exc
-                for item in verified:
+                for item in _quarantined_serial_frames(session, chunk):
                     # A single serial read may contain several valid envelopes.
                     # Verification and earlier ledger writes consume time; do not
                     # admit later envelopes after the absolute session deadline.
