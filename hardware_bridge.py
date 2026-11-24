@@ -116,17 +116,19 @@ def to_telemetry(pkt: dict) -> TelemetryData:
     # sender. Missing fields must not silently become a safe/healthy reading.
     if type(pkt) is not dict:
         raise ValueError("telemetry: expected JSON object")
-    for field in ("emergency_brake_active", "driver_unwell", "obstacle_distance"):
+    # Missing motion or position is unknown, not a zero observation.
+    for field in ("emergency_brake_active", "driver_unwell", "obstacle_distance",
+                  "speed", "acceleration", "gps_lat", "gps_lon"):
         if field not in pkt:
             raise ValueError(f"{field}: required signed telemetry field")
     return TelemetryData(
-        speed=_finite_telemetry_number(pkt.get("speed", 0.0), "speed"),
-        acceleration=_finite_telemetry_number(pkt.get("acceleration", 0.0), "acceleration"),
+        speed=_finite_telemetry_number(pkt["speed"], "speed"),
+        acceleration=_finite_telemetry_number(pkt["acceleration"], "acceleration"),
         fuel_level=_finite_telemetry_number(pkt.get("fuel_level", 100.0), "fuel_level"),
         battery_voltage=_finite_telemetry_number(pkt.get("battery_voltage", 12.6), "battery_voltage"),
         engine_temp=_finite_telemetry_number(pkt.get("engine_temp", 20.0), "engine_temp"),
-        gps_lat=_finite_telemetry_number(pkt.get("gps_lat", 0.0), "gps_lat"),
-        gps_lon=_finite_telemetry_number(pkt.get("gps_lon", 0.0), "gps_lon"),
+        gps_lat=_finite_telemetry_number(pkt["gps_lat"], "gps_lat"),
+        gps_lon=_finite_telemetry_number(pkt["gps_lon"], "gps_lon"),
         obstacle_distance=_finite_telemetry_number(pkt.get("obstacle_distance", 999.0), "obstacle_distance"),
         emergency_brake_active=_strict_telemetry_bool(pkt.get("emergency_brake_active", False), "emergency_brake_active"),
         steering_angle=_finite_telemetry_number(pkt.get("steering_angle", 0.0), "steering_angle"),

@@ -14,6 +14,7 @@ def packet():
         "emergency_brake_active": False,
         "driver_unwell": False,
         "obstacle_distance": 4.0,
+        "speed": 0.0, "acceleration": 0.0, "gps_lat": 0.0, "gps_lon": 0.0,
     }
 
 
