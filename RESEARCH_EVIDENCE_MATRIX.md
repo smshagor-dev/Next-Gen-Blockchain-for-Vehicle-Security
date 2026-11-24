@@ -358,3 +358,13 @@ No accuracy, safety efficacy, statistical significance or publishable primary re
 | Next code task | Upcoming | Run exact tests and CI; pin independently verified benign donor provenance; add matching/stratification for CAN ID and DLC distributions; execute disjoint-recording trials with incident-level truth and cluster-aware uncertainty |
 
 Test: `python -m unittest tests.test_matched_can_sham_control -v`. Existing fixture CSVs and short microbenchmarks remain NON-PUBLISHABLE main results.
+
+### 2026-11-23 — Durable admission corruption negative controls (draft #228)
+
+| Area | Status | Evidence and limitation | Next gate |
+| --- | --- | --- | --- |
+| Durable epoch admission snapshot integrity | PARTIAL | Added four synthetic persisted-row corruption negative controls: forged positive without quorum, positive without evidence bucket, duplicate nonce, and future-epoch nonce. They assert fail-closed reopen and state transition. Commit 4ad316b24c4fc04dc986b420cd746321f769c587; execution/CI not yet verified. | Run focused unittest and full security suite; inspect CI before merge. |
+| Hardware actuation | BLOCKED | No physical receiver or independent interlock validation; remote ECU actuation intentionally disabled. | Independent hardware safety review; never infer physical safety from mocked tests. |
+| Crash durability and rollback | PARTIAL | SQLite WAL/FULL is not tamper-proof or rollback-resistant and not blockchain finality. | Fault-injected independent-process crash/restart tests and external trusted anchor. |
+| Publishable original research evidence | BLOCKED | Snapshot mutation fixtures are negative-control tests, not authentic datasets or independent incident-level evidence. | Pinned authentic V2X/CAN data, held-out baselines, paired multi-seed experiments and uncertainty. |
+| PR reconciliation | PARTIAL | #225 merged as b572cb3fd1c85ec9929edc986aa609f67a63cf67; #226/#227 remain draft, #158/#160 closed unmerged. | Reconcile unique changes and validate checks without bypassing safety gates. |
