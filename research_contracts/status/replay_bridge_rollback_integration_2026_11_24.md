@@ -1,0 +1,3 @@
+# Replay store integration — 2026-11-24
+
+Main uses SQLiteNonceStore with separate explicit serial and TCP provisioning settings. The existing bridge provisioning tests are retained unchanged. This change adds live file identity checks to the production store and retains the original legacy store changes. Replacement checks are best-effort local filesystem checks, not an independent monotonic anchor; they do not prove resistance to privileged snapshot rollback or same-inode edits. The original legacy snapshot negative control remains explicitly scoped to that store. Tests involving replacement of open files may skip on platforms that prohibit it. Exact-head CI required. No physical testing or publication-grade effectiveness claim.
