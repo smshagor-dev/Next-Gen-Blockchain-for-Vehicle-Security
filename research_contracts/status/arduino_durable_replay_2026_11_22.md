@@ -14,7 +14,10 @@
 
 ## Safety and evidence protocol
 Run `python -m unittest discover -s tests -p 'test_arduino_durable_replay.py' -v` on the exact branch.
-Provision `SMARTCAR_HW_NONCE_STORE_PATH` once using `SMARTCAR_HW_NONCE_STORE_PROVISION=true`; restart with false.
+Provision `SMARTCAR_HW_SERIAL_NONCE_STORE_PATH` once using `SMARTCAR_HW_SERIAL_NONCE_STORE_PROVISION=true`; restart with false. Keep the serial store separate from the Pi TCP configuration.
 Do not use the same nonce DB concurrently for independent bridge processes without validating deployment semantics.
 Do not present these tests, fixture CSVs, three-peer poisoning sanity checks, five-iteration microbenchmarks, or offline formulas as publication-ready main research evidence.
 Next: signed serial-envelope fake-device behavioral tests, fault injection between nonce claim and ledger commit, and authenticated Pi TCP replay/DoS integration.
+
+## Mainline reconciliation (2026-11-24)
+The production replay implementation is already integrated. Preserve the current shared provisioning helper, serial-specific configuration, cleanup and admission quotas. This PR retains the restart and missing-store regressions and adapts its source contract to main. Exact-head CI is required; no physical validation is claimed.

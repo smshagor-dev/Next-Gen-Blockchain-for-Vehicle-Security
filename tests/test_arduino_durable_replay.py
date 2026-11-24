@@ -1,6 +1,5 @@
 """Regression checks for serial restart replay durability (no physical device)."""
 import ast
-import inspect
 import os
 from pathlib import Path
 import tempfile
@@ -17,7 +16,10 @@ class ArduinoDurableReplayTests(unittest.TestCase):
         tree = ast.parse(source)
         fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "run_arduino_mode")
         body = ast.get_source_segment(source, fn)
-        self.assertIn('SMARTCAR_HW_NONCE_STORE_PATH required for Arduino ingress', body)
+        self.assertIn("_open_hardware_nonce_store(", body)
+        self.assertIn('"SMARTCAR_HW_SERIAL_NONCE_STORE_PATH"', body)
+        self.assertIn('"SMARTCAR_HW_SERIAL_NONCE_STORE_PROVISION"', body)
+        self.assertLess(body.index("_open_hardware_nonce_store("), body.index("serial.Serial("))
         self.assertIn("durable_nonce_store=nonce_store", body)
         self.assertIn("nonce_store.close()", body)
         self.assertNotIn("durable_nonce_store=None", body)
