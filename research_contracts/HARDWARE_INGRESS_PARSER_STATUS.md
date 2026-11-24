@@ -23,3 +23,6 @@ python -m unittest discover -s tests -v
 ```
 
 No exact-checkout test execution or hardware experiment is claimed for this change. Keep the PR draft; compare and reconcile with #176 before merge. Next: run parser and full suite, inspect serial read fault behavior and test malformed frames with a mocked transport, then test SIGKILL/restart nonce and ledger behavior.
+
+## Mainline reconciliation (2026-11-24)
+The serial generator quarantine implementation is already integrated through #176. Preserve current main's bridge, replay persistence and serial quotas; this PR retains the independent AST parser and quarantine regression controls. Exact-head CI remains required. No physical validation or effectiveness claim.

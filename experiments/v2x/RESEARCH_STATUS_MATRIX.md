@@ -14,3 +14,14 @@
 | Multi-seed statistics and paper | BLOCKED | No independent incident-level replication; n>=30 alone never establishes significance |
 
 No fixture CSV, 3-peer poisoning sanity check, 5-iteration microbenchmark, or offline formula is publication-ready evidence. Never infer physical actuation safety from offline simulations.
+
+### 19 November 2026 — emergency-reset replay and one-shot control
+
+| Workstream | Status | Evidence / next action |
+|---|---|---|
+| Epoch emergency-reset replay preservation | IMPLEMENTED / UNVERIFIED | PR #157: local stop/reset retains authenticated nonce and incident history; execute exact branch tests |
+| One-shot incident authorization | IMPLEMENTED / UNVERIFIED | PR #157: quorum emits at most one positive decision per incident/epoch/event; test restart and cross-process replay persistence |
+| Restart durability / independent epoch authority | BLOCKED | In-memory controls only; process restart loses pins; caller-supplied verified flag is not authentication |
+| Hardware physical emergency precedence | BLOCKED | No physical bench or vehicle verification; bridge ECU/network egress remains disabled |
+
+These are protocol regression controls, not independent effectiveness or publication evidence. Local operator reset is not a cryptographic re-enrollment event.
