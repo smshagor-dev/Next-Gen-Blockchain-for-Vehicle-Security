@@ -71,6 +71,17 @@ def _finite_telemetry_number(value, field):
     return number
 
 
+def _validated_gps_coordinate(value, field):
+    """Reject coordinates outside the WGS84 latitude and longitude domains."""
+    if field not in ("gps_lat", "gps_lon"):
+        raise ValueError("unsupported GPS coordinate field")
+    number = _finite_telemetry_number(value, field)
+    limit = 90.0 if field == "gps_lat" else 180.0
+    if not -limit <= number <= limit:
+        raise ValueError(f"{field}: outside WGS84 coordinate range")
+    return number
+
+
 def _strict_telemetry_bool(value, field):
     if type(value) is not bool:
         raise ValueError(f"{field}: expected boolean")
@@ -127,8 +138,8 @@ def to_telemetry(pkt: dict) -> TelemetryData:
         fuel_level=_finite_telemetry_number(pkt.get("fuel_level", 100.0), "fuel_level"),
         battery_voltage=_finite_telemetry_number(pkt.get("battery_voltage", 12.6), "battery_voltage"),
         engine_temp=_finite_telemetry_number(pkt.get("engine_temp", 20.0), "engine_temp"),
-        gps_lat=_finite_telemetry_number(pkt["gps_lat"], "gps_lat"),
-        gps_lon=_finite_telemetry_number(pkt["gps_lon"], "gps_lon"),
+        gps_lat=_validated_gps_coordinate(pkt["gps_lat"], "gps_lat"),
+        gps_lon=_validated_gps_coordinate(pkt["gps_lon"], "gps_lon"),
         obstacle_distance=_finite_telemetry_number(pkt.get("obstacle_distance", 999.0), "obstacle_distance"),
         emergency_brake_active=_strict_telemetry_bool(pkt.get("emergency_brake_active", False), "emergency_brake_active"),
         steering_angle=_finite_telemetry_number(pkt.get("steering_angle", 0.0), "steering_angle"),

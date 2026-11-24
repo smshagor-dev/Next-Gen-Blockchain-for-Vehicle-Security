@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 SOURCE = pathlib.Path(__file__).resolve().parents[1] / "hardware_bridge.py"
 tree = ast.parse(SOURCE.read_text(encoding="utf-8-sig"))
-names = {"_finite_telemetry_number", "_strict_telemetry_bool", "_signed_observation_timestamp", "to_telemetry"}
+names = {"_validated_gps_coordinate", "_finite_telemetry_number", "_strict_telemetry_bool", "_signed_observation_timestamp", "to_telemetry"}
 nodes = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in names]
 assert {n.name for n in nodes} == names
 # Isolate the real functions while replacing the blockchain dataclass with a
