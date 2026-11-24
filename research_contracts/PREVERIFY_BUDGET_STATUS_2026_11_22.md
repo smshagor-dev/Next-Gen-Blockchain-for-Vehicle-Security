@@ -29,3 +29,6 @@ persistent SQLite nonce store, including mid-batch quota exhaustion,
 restart replay, malformed frame, trickle DoS, and emergency-control isolation.
 No fixture-derived effectiveness, physical safety, or statistical significance
 claims are permitted.
+
+## Mainline reconciliation (2026-11-24)
+Retained mainline serial budgets, persistent replay store and quarantine. Both serial and TCP pass the remaining frame allowance to the shared receive iterator. Existing regression controls are retained. Exact-head CI required.
