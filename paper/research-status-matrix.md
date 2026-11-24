@@ -1,3 +1,16 @@
+## 2026-11-19 — independent issuer persisted-state ingestion controls (draft #154)
+
+| Workstream | Status | Evidence / limitation | Next gate |
+| --- | --- | --- | --- |
+| Issuer on-disk JSON resource exhaustion | IMPLEMENTED; EXACT TESTS PENDING | Bounded regular-file read before JSON decoding; at most 100,000 pins; rejects oversized state | Execute committed tests and cross-process fault campaign |
+| Symlink / FIFO persisted-state substitution | IMPLEMENTED; EXACT TESTS PENDING | O_NOFOLLOW where supported, nonblocking open and fstat regular-file check; POSIX-focused | Test symlink race, directory ownership, key isolation |
+| Adversarial state-input controls | AUTHORED, UNEXECUTED | Five tests: byte cap, pin cap, symlink, FIFO, valid append/restart | Run `python -m unittest discover -s tests -p 'test_checkpoint_issuer_state_input.py' -v` |
+| Independent issuer integrity | PARTIAL | Issuer is simulation-only; HMAC key custody, durable monotonic external anchor, Go-chain verification integration absent | Independently verified checkpoint origin and rollback tests |
+| Hardware safety | PARTIAL; HIL BLOCKED | Network-originated actuation remains disabled; local hardwired emergency control not physically validated | Receiver firmware + independent interlock and HIL |
+| Authentic V2X/CAN effectiveness | NOT ESTABLISHED | Existing fixture/microbenchmark evidence is not a main research result | Source-pinned independent incident truth and matched baselines |
+
+**Execution honesty:** The connector write succeeded, but the execution container could not resolve github.com for an exact checkout. No passing regression tests, power-loss durability, blockchain finality, or original V2X effectiveness is claimed. No main merge or hardware actuation.
+
 ## 2026-11-13 — process-exit crash boundaries for durable command admission
 
 - **Implemented, execution pending:** `tests/test_durable_command_crash_boundaries.py` runs two real child processes that exit with `os._exit(73)`: one after an uncommitted SQLite INSERT and one after `DurableCommandNonceStore.claim` commits. Parent assertions require uncommitted state to be reusable exactly once and committed state to reject reuse after reopening.
