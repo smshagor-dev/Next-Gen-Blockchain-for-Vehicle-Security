@@ -18,6 +18,7 @@ from permissioned_consensus import PermissionedConsensusEngine, sign_vote
 from runtime_security_strength import evaluate_security_strength
 from security_capabilities import security_capability_output
 from identity_security import identity_security_metadata
+from experiments.claim_validation.runtime_evidence import new_scope, observe_consensus
 
 BASELINE_SHA = "0e3429a8bf6338ff99779dbc7cc4aa61972932ee"
 SEEDS = tuple(range(12))
@@ -74,6 +75,7 @@ def trial(seed: int, controlled_yes: int, valid: bool):
             break
     elapsed = time.perf_counter_ns() - start
     final = engine.tally(proposal_id)
+    evidence = observe_consensus(engine, proposal_id, new_scope()).export()
     snapshot["consensus_security"] = point(engine.metadata())
     posture_after = evaluate_security_strength(snapshot)["level"]
     # The experimental policy label is not fed to the classifier.
@@ -83,7 +85,7 @@ def trial(seed: int, controlled_yes: int, valid: bool):
             "final_status": final["status"], "posture_before": posture_before,
             "posture_after": posture_after,
             "unsupported_policy_acceptance": not valid and final["status"] == "ACCEPTED",
-            "elapsed_ns": elapsed}
+            "runtime_evidence": evidence, "elapsed_ns": elapsed}
 
 
 def sha256(path):
@@ -121,7 +123,8 @@ def write_campaign(out: Path):
                                    indent=2) + "\n", encoding="utf-8")
     sources = ("permissioned_consensus.py", "runtime_security_strength.py",
                "security_capabilities.py", "identity_security.py", "release_metadata.py",
-               "VERSION", "experiments/claim_validation/consensus_probe.py")
+               "VERSION", "experiments/claim_validation/consensus_probe.py",
+               "experiments/claim_validation/runtime_evidence.py")
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     manifest = {"schema": "claim-validity-consensus-pilot/1", "baseline_sha": BASELINE_SHA,
                 "executed_sha": revision, "python": sys.version, "platform": platform.platform(),

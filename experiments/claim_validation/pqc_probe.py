@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import hmac
 import json
 import os
 import platform
@@ -22,6 +21,7 @@ from identity_security import identity_security_metadata
 from consensus_security import consensus_security_metadata
 from runtime_security_strength import evaluate_security_strength
 from experiments.claim_validation.consensus_probe import BASELINE_SHA, ROOT, point, sha256
+from experiments.claim_validation.runtime_evidence import new_scope, observe_handshake
 
 CONFIGS = {
     "native_mlkem": (False, False, False, False),
@@ -67,9 +67,8 @@ def trial(config, repeat):
         ack = server.accept_handshake_as_server(hello, session_context=ctx)
         complete = client.complete_handshake_as_client(ack, session_context=ctx)
         elapsed = time.perf_counter_ns() - start
-        matched = bool(complete and client.session_established and server.session_established
-                       and client._session_id == server._session_id
-                       and hmac.compare_digest(client._session_key, server._session_key))
+        evidence = observe_handshake(client, server, complete, new_scope()).export()
+        matched = evidence["facts"]["matched_session"]
         # Never export keys, public key material, transcript context or secret.
         declared = security_capability_output(allow_ecdh)
         snapshot = {"connection_status": point("Connected" if matched else "Not Connected"),
@@ -86,7 +85,7 @@ def trial(config, repeat):
                 "operational_posture": evaluate_security_strength(snapshot)["level"],
                 "observed_mlkem_session": matched and client._hs_mode == "PQC_KEM"
                     and client._negotiated_kem_alg == "ML-KEM-512",
-                "elapsed_ns": elapsed}
+                "runtime_evidence": evidence, "elapsed_ns": elapsed}
 
 
 def write_campaign(out: Path):
@@ -111,7 +110,8 @@ def write_campaign(out: Path):
     sources = ("v2x_protocol.py", "security_capabilities.py", "identity_security.py",
                "consensus_security.py", "runtime_security_strength.py", "env_config.py",
                "v2x_evidence_admission.py", "release_metadata.py", "VERSION",
-               "experiments/claim_validation/pqc_probe.py", "experiments/claim_validation/consensus_probe.py")
+               "experiments/claim_validation/pqc_probe.py", "experiments/claim_validation/consensus_probe.py",
+               "experiments/claim_validation/runtime_evidence.py")
     import cryptography
     import importlib.metadata
     manifest = {"schema": "claim-validity-pqc-pilot/1", "baseline_sha": BASELINE_SHA,

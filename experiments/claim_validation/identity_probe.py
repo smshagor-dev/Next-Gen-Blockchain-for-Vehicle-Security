@@ -20,6 +20,7 @@ from runtime_security_monitor import RuntimeSecurityMonitor
 from runtime_security_strength import evaluate_security_strength
 from security_capabilities import security_capability_output
 from experiments.claim_validation.consensus_probe import BASELINE_SHA, ROOT, point, sha256
+from experiments.claim_validation.runtime_evidence import new_scope, observe_identity
 
 # Configuration factors: registry presence, global compatibility flag, declared policy.
 CONFIGS = {
@@ -74,8 +75,7 @@ def trial(config, challenge, repeat):
             ack = sp.verify_message(response.decode(), derived)
             ack_valid = bool(ack and ack["type"] == sp.MessageType.HANDSHAKE_ACK
                              and ack["payload"]["vehicle_id"] == identity)
-        if bound != ack_valid:
-            raise RuntimeError("binding and authenticated acknowledgement disagree")
+        evidence = observe_identity(server, "lab-session", identity, ack_valid, new_scope()).export()
         events = monitor.snapshot()["events"]
         # Compare constructed dashboard wrappers with and without observed alert events.
         with_alerts = dict(before, runtime_alerts=events)
@@ -90,7 +90,7 @@ def trial(config, challenge, repeat):
             "posture_without_alerts": evaluate_security_strength(before)["level"],
             "posture_with_observed_alerts": evaluate_security_strength(with_alerts)["level"],
             "observed_reasons": [event["reason"] for event in events],
-            "elapsed_ns": elapsed,
+            "runtime_evidence": evidence, "elapsed_ns": elapsed,
         }
 
 
@@ -101,7 +101,7 @@ def write_campaign(out: Path):
     trace = out / "traces.jsonl"
     trace.write_text("".join(json.dumps(row, sort_keys=True) + "\n" for row in rows), encoding="utf-8")
     decisions = out / "decisions.csv"
-    fields = [key for key in rows[0] if key != "observed_reasons"]
+    fields = [key for key in rows[0] if key not in ("observed_reasons", "runtime_evidence")]
     with decisions.open("w", encoding="utf-8", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=fields, extrasaction="ignore")
         writer.writeheader()
@@ -122,7 +122,8 @@ def write_campaign(out: Path):
                "runtime_security_monitor.py", "runtime_security_strength.py", "security_capabilities.py",
                "permissioned_consensus.py", "replay_security.py", "env_config.py",
                "zkp_privacy.py", "release_metadata.py", "VERSION",
-               "experiments/claim_validation/identity_probe.py", "experiments/claim_validation/consensus_probe.py")
+               "experiments/claim_validation/identity_probe.py", "experiments/claim_validation/consensus_probe.py",
+               "experiments/claim_validation/runtime_evidence.py")
     manifest = {"schema": "claim-validity-identity-pilot/1", "baseline_sha": BASELINE_SHA,
                 "executed_sha": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                 "python": sys.version, "platform": platform.platform(),

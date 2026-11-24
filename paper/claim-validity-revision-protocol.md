@@ -84,3 +84,18 @@ or session fail-closed. This is local Python handshake execution with native
 crypto, not the separate C++ ledger, authenticated network capture, or a
 cryptographic security proof. No simulated positive result accepted.
 Repeated fresh keys measure execution variability, not independent deployments.
+
+
+## Runtime observation acquisition
+
+A separate local observation module now reads actual component outputs, never
+declared security capability metadata or experimental truth labels. Handshake
+observations compare session establishment and agreement; identity observations
+record authenticated acknowledgement, server binding and membership; consensus
+observations record actual epoch, threshold, votes and status, not validator
+honesty. Each exported record has a trial scope, monotonic timestamp, typed facts
+and SHA-256 digest. Same-process age/scope checks are available. The digest is
+not a signature; the observer is not a separate trusted principal, and
+observations are not remote attestation or durable replay protection. The next
+stage must independently bind trusted evidence to a claim and explicitly
+withhold unverifiable assumptions. Exact-head execution pending.
