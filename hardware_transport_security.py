@@ -116,6 +116,10 @@ def _strict_json_loads(raw: str):
                           object_pairs_hook=unique_members)
     except HardwareTransportError:
         raise
+    except RecursionError as exc:
+        # Deeply nested untrusted JSON must fail at the authentication boundary,
+        # not escape as an uncaught exception and terminate an ingress worker.
+        raise HardwareTransportError("HW_JSON_NESTING_EXCEEDED") from exc
     except (json.JSONDecodeError, UnicodeDecodeError, TypeError, ValueError) as exc:
         raise HardwareTransportError("HW_JSON_MALFORMED") from exc
 
