@@ -284,7 +284,7 @@ def validate_safe_stop_payload(payload: Mapping[str, object]) -> Dict[str, objec
     required = {"cmd", "throttle", "brake_pressure", "ignition_cut", "timestamp", "block_index"}
     if not required.issubset(set(payload)):
         raise HardwareTransportError("HW_COMMAND_REQUIRED_FIELD_MISSING")
-    if str(payload.get("cmd", "")).upper() != "SAFE_MODE_STOP":
+    if type(payload.get("cmd")) is not str or payload["cmd"] != "SAFE_MODE_STOP":
         raise HardwareTransportError("HW_COMMAND_NOT_ALLOWED")
     if type(payload.get("throttle")) is not int or int(payload["throttle"]) != 0:
         raise HardwareTransportError("HW_COMMAND_SEMANTICS_INVALID")
@@ -294,10 +294,12 @@ def validate_safe_stop_payload(payload: Mapping[str, object]) -> Dict[str, objec
         raise HardwareTransportError("HW_COMMAND_SEMANTICS_INVALID")
     if type(payload.get("block_index")) is not int or isinstance(payload.get("block_index"), bool):
         raise HardwareTransportError("HW_COMMAND_SEMANTICS_INVALID")
-    timestamp = str(payload.get("timestamp", ""))
-    if _parse_utc(timestamp) is None:
+    timestamp = payload.get("timestamp")
+    if type(timestamp) is not str or _parse_utc(timestamp) is None:
         raise HardwareTransportError("HW_COMMAND_TIMESTAMP_INVALID")
-    incident_id = str(payload.get("incident_id", ""))
+    incident_id = payload.get("incident_id", "")
+    if type(incident_id) is not str:
+        raise HardwareTransportError("HW_COMMAND_INCIDENT_ID_INVALID")
     if len(incident_id) > 128 or any(ord(ch) < 32 for ch in incident_id):
         raise HardwareTransportError("HW_COMMAND_INCIDENT_ID_INVALID")
     return dict(payload)
