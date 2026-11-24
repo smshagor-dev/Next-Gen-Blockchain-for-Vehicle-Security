@@ -72,3 +72,7 @@ This finite design is new relative to the pilots, not a random sample of
 deployments. Timing in the worker is illustrative single-call measurement;
 the separate block benchmark is the main overhead measurement.
 No held-out results have yet been verified.
+
+## First observed execution
+
+See claim-validity-heldout-observed.md for the CI-observed results. A separate artifact audit job now regenerates figures and tables from downloaded raw traces; execution pending.

@@ -191,3 +191,33 @@ jobs:
           name: claim-validity-heldout-pqc
           path: claim-results/heldout-pqc/
           if-no-files-found: warn
+
+  publication-evidence-audit:
+    needs: [evidence-integrity, pqc-claim-pilot]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install pinned plotting dependencies
+        run: python -m pip install --disable-pip-version-check "numpy==1.26.4" "matplotlib==3.10.0"
+      - name: Download held-out consensus and identity
+        uses: actions/download-artifact@v4
+        with:
+          name: claim-validity-heldout-consensus-identity
+          path: audit-input/local
+      - name: Download held-out PQC
+        uses: actions/download-artifact@v4
+        with:
+          name: claim-validity-heldout-pqc
+          path: audit-input/pqc
+      - name: Verify raw artifacts and regenerate publication figures
+        run: python -m experiments.claim_validation.publication_audit --input audit-input --out publication-results
+      - name: Preserve audited figures and tables
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-publication-evidence
+          path: publication-results/
+          if-no-files-found: error
