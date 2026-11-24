@@ -116,7 +116,7 @@ def to_telemetry(pkt: dict) -> TelemetryData:
     # sender. Missing fields must not silently become a safe/healthy reading.
     if type(pkt) is not dict:
         raise ValueError("telemetry: expected JSON object")
-    for field in ("emergency_brake_active", "driver_unwell"):
+    for field in ("emergency_brake_active", "driver_unwell", "obstacle_distance"):
         if field not in pkt:
             raise ValueError(f"{field}: required signed telemetry field")
     return TelemetryData(
