@@ -116,6 +116,10 @@ def _strict_json_loads(raw: str):
                           object_pairs_hook=unique_members)
     except HardwareTransportError:
         raise
+    except RecursionError as exc:
+        # Deeply nested untrusted JSON must fail at the authentication boundary,
+        # not escape as an uncaught exception and terminate an ingress worker.
+        raise HardwareTransportError("HW_JSON_NESTING_EXCEEDED") from exc
     except (json.JSONDecodeError, UnicodeDecodeError, TypeError, ValueError) as exc:
         raise HardwareTransportError("HW_JSON_MALFORMED") from exc
 
@@ -129,7 +133,7 @@ def _canonical_bytes(value: Mapping[str, object]) -> bytes:
             ensure_ascii=False,
             allow_nan=False,
         ).encode("utf-8")
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, RecursionError, OverflowError) as exc:
         raise HardwareTransportError("HW_CANONICAL_ENCODING_INVALID") from exc
 
 
@@ -422,7 +426,12 @@ class HardwareEnvelopeVerifier:
                 raise HardwareTransportError("HW_FRAME_TOO_LARGE")
             parsed = _strict_json_loads(raw.strip())
         elif isinstance(raw, Mapping):
-            parsed = dict(raw)
+            # Programmatic callers must obey the same size and nesting boundary
+            # as wire callers. A deep dict must not escape as RecursionError.
+            encoded = _canonical_bytes(raw)
+            if len(encoded) > self.max_frame_bytes:
+                raise HardwareTransportError("HW_FRAME_TOO_LARGE")
+            parsed = _strict_json_loads(encoded.decode("utf-8"))
         else:
             raise HardwareTransportError("HW_ENVELOPE_TYPE_INVALID")
         if not isinstance(parsed, dict):
@@ -568,32 +577,33 @@ class AuthenticatedLineFramer:
     def feed(self, data: bytes) -> list[bytes]:
         if not isinstance(data, (bytes, bytearray)):
             raise HardwareTransportError("HW_FRAME_TYPE_INVALID")
-        # Reject oversized transport chunks before allocating/copying them.
-        # Production sockets read bounded chunks; this also protects direct
-        # callers of the framing API from one-shot oversized input.
+        # Preserve the mainline preallocation bound for direct callers.
         if len(data) > self.max_frame_bytes:
             self._buffer.clear()
             raise HardwareTransportError("HW_FRAME_TOO_LARGE")
-        self._buffer.extend(data)
         frames: list[bytes] = []
-        while True:
-            try:
-                newline = self._buffer.index(0x0A)
-            except ValueError:
-                break
-            if newline > self.max_frame_bytes:
-                self._buffer.clear()
-                raise HardwareTransportError("HW_FRAME_TOO_LARGE")
-            frame = bytes(self._buffer[:newline]).strip()
-            del self._buffer[: newline + 1]
-            if frame:
-                if len(frame) > self.max_frame_bytes:
-                    self._buffer.clear()
+        offset = 0
+        delimiters = 0
+        try:
+            while offset < len(data):
+                newline = data.find(b"\n", offset)
+                end = len(data) if newline < 0 else newline
+                if len(self._buffer) + end - offset > self.max_frame_bytes:
                     raise HardwareTransportError("HW_FRAME_TOO_LARGE")
-                frames.append(frame)
-        if len(self._buffer) > self.max_frame_bytes:
+                self._buffer.extend(memoryview(data)[offset:end])
+                if newline < 0:
+                    break
+                delimiters += 1
+                if delimiters > 256:
+                    raise HardwareTransportError("HW_FRAME_BATCH_LIMIT_EXCEEDED")
+                frame = bytes(self._buffer).strip()
+                self._buffer.clear()
+                if frame:
+                    frames.append(frame)
+                offset = newline + 1
+        except HardwareTransportError:
             self._buffer.clear()
-            raise HardwareTransportError("HW_FRAME_TOO_LARGE")
+            raise
         return frames
 
     def reset(self) -> None:

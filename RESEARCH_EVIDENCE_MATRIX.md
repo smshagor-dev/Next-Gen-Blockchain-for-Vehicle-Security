@@ -359,15 +359,12 @@ No accuracy, safety efficacy, statistical significance or publishable primary re
 
 Test: `python -m unittest tests.test_matched_can_sham_control -v`. Existing fixture CSVs and short microbenchmarks remain NON-PUBLISHABLE main results.
 
-## 2026-11-23 — strict hardware envelope field typing (draft PR #229)
+### 2026-11-23 — Durable admission corruption negative controls (draft #228)
 
-| Workstream | Status | Evidence / next gate |
-| --- | --- | --- |
-| Hardware wire control-field type safety | IMPLEMENTED ON DRAFT BRANCH | Six string-only control fields rejected before coercion/MAC checks in `hardware_transport_security.py`; 30 synthetic invalid-type cases plus nonce-nonconsumption and replay regression authored |
-| Focused validation | PENDING | Run `python -m unittest discover -s tests -p 'test_hardware_envelope_field_types.py' -v`; no test pass or CI claim |
-| Integration | BLOCKED | Reconcile `hardware_transport_security.py` with draft PR #227; #226 replay storage and #228 corruption negative controls separately need validation |
-| Original incident-level effectiveness | BLOCKED | No publisher-verified VeReMi NextGen/CAN cohort, independent labels, or matched multi-seed outcomes in this change |
-| Physical interlocks and emergency control | BLOCKED | Software-only input checks; no physical actuation or safety certification |
-| Next code task | UPCOMING | Execute focused suite and CI; integrate bounded ingress #227 without losing strict field validation; run paired replay/fault trials on independently sourced held-out incidents |
-
-Fixture tests are NON-PUBLISHABLE as main original research results. No claim of finality, hardware safety or statistical significance.
+| Area | Status | Evidence and limitation | Next gate |
+| --- | --- | --- | --- |
+| Durable epoch admission snapshot integrity | PARTIAL | Added four synthetic persisted-row corruption negative controls: forged positive without quorum, positive without evidence bucket, duplicate nonce, and future-epoch nonce. They assert fail-closed reopen and state transition. Commit 4ad316b24c4fc04dc986b420cd746321f769c587; execution/CI not yet verified. | Run focused unittest and full security suite; inspect CI before merge. |
+| Hardware actuation | BLOCKED | No physical receiver or independent interlock validation; remote ECU actuation intentionally disabled. | Independent hardware safety review; never infer physical safety from mocked tests. |
+| Crash durability and rollback | PARTIAL | SQLite WAL/FULL is not tamper-proof or rollback-resistant and not blockchain finality. | Fault-injected independent-process crash/restart tests and external trusted anchor. |
+| Publishable original research evidence | BLOCKED | Snapshot mutation fixtures are negative-control tests, not authentic datasets or independent incident-level evidence. | Pinned authentic V2X/CAN data, held-out baselines, paired multi-seed experiments and uncertainty. |
+| PR reconciliation | PARTIAL | #225 merged as b572cb3fd1c85ec9929edc986aa609f67a63cf67; #226/#227 remain draft, #158/#160 closed unmerged. | Reconcile unique changes and validate checks without bypassing safety gates. |

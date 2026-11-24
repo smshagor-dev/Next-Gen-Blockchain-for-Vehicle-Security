@@ -5,6 +5,7 @@ finality, or protection from privileged restoration of an older disk snapshot.
 """
 import os
 import sqlite3
+import stat
 import threading
 import time
 import math
@@ -27,6 +28,13 @@ class SQLiteNonceStore:
         self._max_claims = max_claims
         self._clock = clock or time.time
         self._lock = threading.RLock()
+        raw_path = os.fspath(path)
+        if raw_path == ":memory:" or raw_path.startswith("file:"):
+            raise NonceStoreError("persistent nonce database filesystem path required")
+        self._path = os.path.abspath(raw_path)
+        path = self._path
+        if os.path.islink(path) or (os.path.lexists(path) and not os.path.isfile(path)):
+            raise NonceStoreError("nonce database must be a non-symlink regular file")
         exists = os.path.exists(path)
         if provision and exists:
             # Never recreate an existing database after a crash or corruption.
@@ -36,6 +44,9 @@ class SQLiteNonceStore:
             raise NonceStoreError("nonce database missing; explicit provisioning required")
         self._db = sqlite3.connect(path, timeout=5.0, isolation_level=None, check_same_thread=False)
         try:
+            opened = os.stat(path)
+            self._device_inode = (opened.st_dev, opened.st_ino)
+            self._check_path_identity()
             mode = self._db.execute("PRAGMA journal_mode=WAL").fetchone()[0]
             self._db.execute("PRAGMA synchronous=FULL")
             if mode.lower() != "wal" or self._db.execute("PRAGMA synchronous").fetchone()[0] != 2:
@@ -57,15 +68,28 @@ class SQLiteNonceStore:
             self._db.close()
             raise
 
+    def _check_path_identity(self):
+        """Detect live path replacement; not a trusted external rollback anchor."""
+        try:
+            entry = os.lstat(self._path)
+        except OSError as exc:
+            raise NonceStoreError("nonce database path unavailable") from exc
+        if not stat.S_ISREG(entry.st_mode) or (entry.st_dev, entry.st_ino) != self._device_inode:
+            raise NonceStoreError("nonce database path identity changed")
+
     def claim(self, device, nonce, *, ttl_seconds):
         if (type(device) is not str or not 1 <= len(device) <= 96
                 or type(nonce) is not str or not 32 <= len(nonce) <= 128
                 or type(ttl_seconds) not in (int, float) or not 1 <= ttl_seconds <= 600):
             raise ValueError("invalid nonce claim")
         with self._lock:
+            self._check_path_identity()
             now = float(self._clock())
             if not math.isfinite(now):
                 raise NonceStoreError("invalid local clock; nonce admission denied")
+            expires = now + float(ttl_seconds)
+            if not math.isfinite(expires) or expires <= now:
+                raise NonceStoreError("invalid nonce expiry; admission denied")
             self._db.execute("BEGIN IMMEDIATE")
             try:
                 # Never delete an existing nonce before testing it: an expired
@@ -82,8 +106,9 @@ class SQLiteNonceStore:
                     raise NonceStoreError("nonce store capacity exhausted; admission denied")
                 self._db.execute(
                     "INSERT INTO nonce_claims(device,nonce,expires) VALUES(?,?,?)",
-                    (device, nonce, now + ttl_seconds),
+                    (device, nonce, expires),
                 )
+                self._check_path_identity()
                 self._db.execute("COMMIT")
                 return True
             except BaseException:

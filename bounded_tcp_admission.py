@@ -23,8 +23,12 @@ class BoundedTCPAdmission:
     def dispatch(self, conn):
         """Takes ownership of conn. Rejects immediately when saturated."""
         if not self._slots.acquire(blocking=False):
+            # A hostile/failed socket close must not unwind the accept loop.
+            # Saturation is a per-peer failure, never a server-wide failure.
             try:
                 conn.close()
+            except OSError:
+                pass
             finally:
                 with self._lock:
                     self.rejected += 1
@@ -43,11 +47,27 @@ class BoundedTCPAdmission:
             self.active += 1
         try:
             threading.Thread(target=run, daemon=True).start()
+        except RuntimeError:
+            # A thread-start failure is a rejected connection, not a reason
+            # to terminate the listener. No worker owns the socket yet.
+            with self._lock:
+                self.active -= 1
+                self.rejected += 1
+            self._slots.release()
+            try:
+                conn.close()
+            except OSError:
+                pass
+            return False
         except BaseException:
+            # Do not swallow process-level interrupts.
             with self._lock:
                 self.active -= 1
             self._slots.release()
-            conn.close()
+            try:
+                conn.close()
+            except OSError:
+                pass
             raise
         return True
 

@@ -29,11 +29,13 @@ class ObservationTimestampTests(unittest.TestCase):
 
     def test_telemetry_never_invents_missing_observation_time(self):
         with self.assertRaisesRegex(ValueError, "timestamp"):
-            to_telemetry({"emergency_brake_active": False, "driver_unwell": False})
+            to_telemetry({"emergency_brake_active": False, "driver_unwell": False,
+                          "obstacle_distance": 4.0, "speed": 0.0, "acceleration": 0.0, "gps_lat": 0.0, "gps_lon": 0.0})
 
     def test_telemetry_preserves_valid_observation_time(self):
         result = to_telemetry({"timestamp": "2026-11-15T12:00:01Z",
-                               "emergency_brake_active": False, "driver_unwell": False})
+                               "emergency_brake_active": False, "driver_unwell": False,
+                               "obstacle_distance": 4.0, "speed": 0.0, "acceleration": 0.0, "gps_lat": 0.0, "gps_lon": 0.0})
         self.assertEqual(result.timestamp, "2026-11-15T12:00:01+00:00")
 
 
