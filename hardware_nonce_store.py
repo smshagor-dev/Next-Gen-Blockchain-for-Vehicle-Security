@@ -28,9 +28,12 @@ class SQLiteNonceStore:
         self._max_claims = max_claims
         self._clock = clock or time.time
         self._lock = threading.RLock()
-        self._path = os.path.abspath(os.fspath(path))
+        raw_path = os.fspath(path)
+        if raw_path == ":memory:" or raw_path.startswith("file:"):
+            raise NonceStoreError("persistent nonce database filesystem path required")
+        self._path = os.path.abspath(raw_path)
         path = self._path
-        if os.path.islink(path):
+        if os.path.islink(path) or (os.path.lexists(path) and not os.path.isfile(path)):
             raise NonceStoreError("nonce database must be a non-symlink regular file")
         exists = os.path.exists(path)
         if provision and exists:
