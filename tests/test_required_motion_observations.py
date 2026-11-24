@@ -17,6 +17,7 @@ class RequiredMotionObservationsTests(unittest.TestCase):
             "gps_lon": 0.0,
             "emergency_brake_active": False,
             "driver_unwell": False,
+            "obstacle_distance": 4.0,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 

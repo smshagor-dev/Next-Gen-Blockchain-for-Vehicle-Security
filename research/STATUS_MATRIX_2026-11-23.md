@@ -14,3 +14,6 @@
 Fixture CSVs, three-peer poisoning checks, five-iteration microbenchmarks, and offline communication estimates are **not** main research evidence.
 
 This branch's tests have **not** been executed against an exact checkout. Review potential compatibility effects on legacy telemetry producers before merge.
+
+## Mainline reconciliation (2026-11-24)
+Preserves the existing signed obstacle requirement from #213 and requires explicit motion and GPS fields. Existing direct-conversion fixtures now supply the other required measurements, ensuring each negative control exercises its intended field. No physical validation. Exact-head CI pending.
