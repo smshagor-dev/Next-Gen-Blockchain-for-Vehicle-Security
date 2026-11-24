@@ -185,3 +185,22 @@ would falsely treat deterministic repetitions as independent deployments.
 rows plus 240 sensitivity rows planned. Exact-head CI pending.
 External adjudication, new held-out independent experimental units,
 published comparator and timing sensitivity remain unresolved.
+
+
+## Performance and freshness sensitivity
+
+Compare only predecoded local decision-stage cost on matched observations:
+posture proxy, declared-capability proxy and observed gate. Equal warm-up,
+30 blocks per domain, 10 passes over the same domain trials per method and
+block, fixed randomized trial and method order. Record raw block durations
+and eligibility counts, median of block means, and paired block differences.
+These are local decision microbenchmarks, not V2X RTT, cryptographic
+throughput, evidence-collection cost, or individual-call tail latency.
+For 240 base records, planned timing decisions 216000 across all methods.
+
+Sweep 5 max-age thresholds (1, 10, 100, 1000, 5000 ms) against 8 synthetic
+age offsets (-1, 0, 1, 10, 100, 1000, 5000, 10000 ms), for 9600 replay rows.
+These offsets are not a measured real-delay distribution; no optimized
+freshness SLA is inferred. Keep all results and retain per-class counts.
+See claim-validity-heldout-protocol.md for prospective evaluation design;
+exact schedule and runner must still be implemented before execution.
