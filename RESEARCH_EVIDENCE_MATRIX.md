@@ -1,3 +1,16 @@
+## 2026-11-19 — issuer lock-path substitution negative controls (draft PR #154)
+
+| Workstream | Status | Evidence and next gate |
+| --- | --- | --- |
+| Lock-file symlink, FIFO, hardlink and unsafe mode rejection | IMPLEMENTED, EXACT BRANCH UNVERIFIED | `research_contracts/independent_checkpoint_issuer.py`; POSIX O_NOFOLLOW, descriptor metadata and inode identity checks |
+| Lock replacement during acquisition | DETERMINISTIC NEGATIVE CONTROL AUTHORED | `tests/test_checkpoint_issuer_lock_path.py`; injected replacement after flock, not a concurrency stress test |
+| Normal issue/restart and rewritten history | REGRESSION AUTHORED | Six tests total; run `python -m unittest discover -s tests -p 'test_checkpoint_issuer_lock_path.py' -v` |
+| Trusted directory and lock ownership | PARTIAL | Rejects unsafe lock metadata, but directory must be owned/protected by an independent principal; hostile directory writers remain out of scope |
+| Authenticated verified Go-chain ingestion | PENDING | Issuer still trusts caller-provided hashes |
+| Authentic V2X/CAN incident comparisons | BLOCKED | No publishable original-effectiveness evidence; no hardware actuation |
+
+**Execution limitation:** GitHub connector committed code, but container GitHub DNS resolution failed. The exact branch regression suite was not run. No pass, crash durability, independent finality or physical safety claim. Next: execute tests, validate POSIX race behavior and implement Go-chain verification at issuer ingress.
+
 # Research evidence status (2026-11-14)
 
 | Area | State | Evidence and next step |
