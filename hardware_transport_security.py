@@ -154,6 +154,12 @@ def _validate_secret(secret: str) -> str:
     value = str(secret or "").strip()
     if len(value) < 32:
         raise HardwareTransportError("HW_DEVICE_SECRET_INVALID")
+    # Reject unencodable Unicode at enrollment, not later during HMAC KDF.
+    # Otherwise a malformed secret can crash a live ingress worker.
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise HardwareTransportError("HW_DEVICE_SECRET_INVALID") from exc
     lowered = value.lower()
     if lowered in {"changeme", "change-me", "default", "password", "secret"}:
         raise HardwareTransportError("HW_DEVICE_SECRET_INVALID")
