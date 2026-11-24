@@ -116,6 +116,10 @@ def _strict_json_loads(raw: str):
                           object_pairs_hook=unique_members)
     except HardwareTransportError:
         raise
+    except RecursionError as exc:
+        # Deeply nested untrusted JSON must fail at the authentication boundary,
+        # not escape as an uncaught exception and terminate an ingress worker.
+        raise HardwareTransportError("HW_JSON_NESTING_EXCEEDED") from exc
     except (json.JSONDecodeError, UnicodeDecodeError, TypeError, ValueError) as exc:
         raise HardwareTransportError("HW_JSON_MALFORMED") from exc
 
@@ -129,7 +133,7 @@ def _canonical_bytes(value: Mapping[str, object]) -> bytes:
             ensure_ascii=False,
             allow_nan=False,
         ).encode("utf-8")
-    except (TypeError, ValueError, UnicodeError) as exc:
+    except (TypeError, ValueError, RecursionError, OverflowError) as exc:
         raise HardwareTransportError("HW_CANONICAL_ENCODING_INVALID") from exc
 
 
@@ -280,7 +284,7 @@ def validate_safe_stop_payload(payload: Mapping[str, object]) -> Dict[str, objec
     required = {"cmd", "throttle", "brake_pressure", "ignition_cut", "timestamp", "block_index"}
     if not required.issubset(set(payload)):
         raise HardwareTransportError("HW_COMMAND_REQUIRED_FIELD_MISSING")
-    if str(payload.get("cmd", "")).upper() != "SAFE_MODE_STOP":
+    if type(payload.get("cmd")) is not str or payload["cmd"] != "SAFE_MODE_STOP":
         raise HardwareTransportError("HW_COMMAND_NOT_ALLOWED")
     if type(payload.get("throttle")) is not int or int(payload["throttle"]) != 0:
         raise HardwareTransportError("HW_COMMAND_SEMANTICS_INVALID")
@@ -290,10 +294,12 @@ def validate_safe_stop_payload(payload: Mapping[str, object]) -> Dict[str, objec
         raise HardwareTransportError("HW_COMMAND_SEMANTICS_INVALID")
     if type(payload.get("block_index")) is not int or isinstance(payload.get("block_index"), bool):
         raise HardwareTransportError("HW_COMMAND_SEMANTICS_INVALID")
-    timestamp = str(payload.get("timestamp", ""))
-    if _parse_utc(timestamp) is None:
+    timestamp = payload.get("timestamp")
+    if type(timestamp) is not str or _parse_utc(timestamp) is None:
         raise HardwareTransportError("HW_COMMAND_TIMESTAMP_INVALID")
-    incident_id = str(payload.get("incident_id", ""))
+    incident_id = payload.get("incident_id", "")
+    if type(incident_id) is not str:
+        raise HardwareTransportError("HW_COMMAND_INCIDENT_ID_INVALID")
     if len(incident_id) > 128 or any(ord(ch) < 32 for ch in incident_id):
         raise HardwareTransportError("HW_COMMAND_INCIDENT_ID_INVALID")
     return dict(payload)
@@ -440,6 +446,7 @@ class HardwareEnvelopeVerifier:
             pending = [(raw, 0)]
             visited = set()
             nodes = 0
+            string_units = 0
             while pending:
                 value, depth = pending.pop()
                 nodes += 1
@@ -458,12 +465,15 @@ class HardwareEnvelopeVerifier:
                         raise HardwareTransportError("HW_FRAME_TOO_LARGE")
                     visited.add(identity)
                     if type(value) is dict:
+                        if any(type(k) is not str for k in value):
+                            raise HardwareTransportError("HW_CANONICAL_ENCODING_INVALID")
                         pending.extend((v, depth + 1) for v in value.values())
                         pending.extend((k, depth + 1) for k in value.keys())
                     else:
                         pending.extend((v, depth + 1) for v in value)
                 elif type(value) is str:
-                    if len(value) > self.max_frame_bytes:
+                    string_units += len(value)
+                    if string_units > self.max_frame_bytes:
                         raise HardwareTransportError("HW_FRAME_TOO_LARGE")
                 elif type(value) is int:
                     # Avoid unbounded decimal conversion of attacker-supplied
@@ -485,13 +495,18 @@ class HardwareEnvelopeVerifier:
                 raise HardwareTransportError("HW_FRAME_TOO_LARGE") from exc
             if len(encoded) > self.max_frame_bytes:
                 raise HardwareTransportError("HW_FRAME_TOO_LARGE")
-            parsed = dict(raw)
+            parsed = _strict_json_loads(encoded.decode("utf-8"))
         else:
             raise HardwareTransportError("HW_ENVELOPE_TYPE_INVALID")
         if not isinstance(parsed, dict):
             raise HardwareTransportError("HW_ENVELOPE_TYPE_INVALID")
         if set(parsed) != _REQUIRED_TOP_LEVEL:
             raise HardwareTransportError("HW_ENVELOPE_FIELDS_INVALID")
+        # Never coerce protocol identity, freshness, or authentication fields.
+        # bool/int/list values must not alias enrolled string identifiers.
+        for field in ("version", "kind", "device_id", "timestamp", "nonce", "mac"):
+            if type(parsed[field]) is not str:
+                raise HardwareTransportError("HW_ENVELOPE_FIELD_TYPE_INVALID")
         return parsed
 
     def _prune(self, cache: BoundedReplayCache, now_mono: float) -> None:
@@ -626,32 +641,33 @@ class AuthenticatedLineFramer:
     def feed(self, data: bytes) -> list[bytes]:
         if not isinstance(data, (bytes, bytearray)):
             raise HardwareTransportError("HW_FRAME_TYPE_INVALID")
-        # Reject oversized transport chunks before allocating/copying them.
-        # Production sockets read bounded chunks; this also protects direct
-        # callers of the framing API from one-shot oversized input.
+        # Preserve the mainline preallocation bound for direct callers.
         if len(data) > self.max_frame_bytes:
             self._buffer.clear()
             raise HardwareTransportError("HW_FRAME_TOO_LARGE")
-        self._buffer.extend(data)
         frames: list[bytes] = []
-        while True:
-            try:
-                newline = self._buffer.index(0x0A)
-            except ValueError:
-                break
-            if newline > self.max_frame_bytes:
-                self._buffer.clear()
-                raise HardwareTransportError("HW_FRAME_TOO_LARGE")
-            frame = bytes(self._buffer[:newline]).strip()
-            del self._buffer[: newline + 1]
-            if frame:
-                if len(frame) > self.max_frame_bytes:
-                    self._buffer.clear()
+        offset = 0
+        delimiters = 0
+        try:
+            while offset < len(data):
+                newline = data.find(b"\n", offset)
+                end = len(data) if newline < 0 else newline
+                if len(self._buffer) + end - offset > self.max_frame_bytes:
                     raise HardwareTransportError("HW_FRAME_TOO_LARGE")
-                frames.append(frame)
-        if len(self._buffer) > self.max_frame_bytes:
+                self._buffer.extend(memoryview(data)[offset:end])
+                if newline < 0:
+                    break
+                delimiters += 1
+                if delimiters > 256:
+                    raise HardwareTransportError("HW_FRAME_BATCH_LIMIT_EXCEEDED")
+                frame = bytes(self._buffer).strip()
+                self._buffer.clear()
+                if frame:
+                    frames.append(frame)
+                offset = newline + 1
+        except HardwareTransportError:
             self._buffer.clear()
-            raise HardwareTransportError("HW_FRAME_TOO_LARGE")
+            raise
         return frames
 
     def reset(self) -> None:

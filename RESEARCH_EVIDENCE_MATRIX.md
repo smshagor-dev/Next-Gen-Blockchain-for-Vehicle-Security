@@ -1,3 +1,7 @@
+## 2026-11-24 — #231 mainline reconciliation
+
+Preserves the normalized JSON snapshot and strict top-level field types already on main. Adds bounded in-process traversal before canonical serialization, strict UTF-8 for raw strings, aggregate string-length budget, and exact string keys. Shared container identities are conservatively rejected; this is not a remote DoS guarantee or a guarantee against concurrent in-process mutation. Existing parser recursion/overflow handling remains unchanged. Historical entries below describe earlier branch work; exact-head CI is pending.
+
 ## 2026-11-24 — malformed Unicode hardware ingress negative controls (#231)
 
 | Workstream | Status | Evidence and next gate |
@@ -51,6 +55,18 @@ This is a deliberately narrow in-process input-type restriction. It is not a cla
 | Authentic incident-level original research | BLOCKED | No independently pinned VeReMi NextGen/CAN source or paired multi-seed evidence; no physical actuation claim |
 
 **Threat boundary:** Mapping ingress is in-process, not a claim that arbitrary TCP clients can directly send Python mappings. The size check bounds accepted serialized content but still incurs serialization work; a deeply nested or enormous in-memory object can consume resources before rejection. Consider depth-limited traversal and bounded encoder next. Fixture tests are NON-PUBLISHABLE as effectiveness results. No CI or runtime success claimed.
+
+## 2026-11-23 — nested in-memory ingress objects (draft PR #231)
+
+| Workstream | Status | Evidence / next gate |
+| --- | --- | --- |
+| Executable nested Python objects | IMPLEMENTED ON DRAFT BRANCH | Reject unsupported object types and container subclasses before JSON serialization; commit `ab52374` |
+| Adversarial negative controls | AUTHORED, NOT EXECUTED | `tests/test_nested_hardware_ingress_objects.py`; run `python -m unittest tests.test_nested_hardware_ingress_objects -v` |
+| GitHub CI and main integration | UNVERIFIED | Do not merge before focused tests, security baseline and overlapping #227/#229/#230 reconciliation |
+| Physical safety / authentic incident effectiveness | BLOCKED | No physical interlock proof, independent dataset provenance or publishable efficacy evidence |
+
+**Limitation:** This guards Python in-process mapping admission, not raw socket framing or hostile process memory. The regression tests are synthetic, and no test execution is claimed. Next: execute focused tests and review serializer semantics for repeated shared immutable references, then reconcile transport PRs.
+
 
 ## 2026-11-19 — issuer lock-path substitution negative controls (draft PR #154)
 
@@ -413,14 +429,12 @@ No accuracy, safety efficacy, statistical significance or publishable primary re
 
 Test: `python -m unittest tests.test_matched_can_sham_control -v`. Existing fixture CSVs and short microbenchmarks remain NON-PUBLISHABLE main results.
 
+### 2026-11-23 — Durable admission corruption negative controls (draft #228)
 
-## 2026-11-23 — nested in-memory ingress objects (draft PR #231)
-
-| Workstream | Status | Evidence / next gate |
-| --- | --- | --- |
-| Executable nested Python objects | IMPLEMENTED ON DRAFT BRANCH | Reject unsupported object types and container subclasses before JSON serialization; commit `ab52374` |
-| Adversarial negative controls | AUTHORED, NOT EXECUTED | `tests/test_nested_hardware_ingress_objects.py`; run `python -m unittest tests.test_nested_hardware_ingress_objects -v` |
-| GitHub CI and main integration | UNVERIFIED | Do not merge before focused tests, security baseline and overlapping #227/#229/#230 reconciliation |
-| Physical safety / authentic incident effectiveness | BLOCKED | No physical interlock proof, independent dataset provenance or publishable efficacy evidence |
-
-**Limitation:** This guards Python in-process mapping admission, not raw socket framing or hostile process memory. The regression tests are synthetic, and no test execution is claimed. Next: execute focused tests and review serializer semantics for repeated shared immutable references, then reconcile transport PRs.
+| Area | Status | Evidence and limitation | Next gate |
+| --- | --- | --- | --- |
+| Durable epoch admission snapshot integrity | PARTIAL | Added four synthetic persisted-row corruption negative controls: forged positive without quorum, positive without evidence bucket, duplicate nonce, and future-epoch nonce. They assert fail-closed reopen and state transition. Commit 4ad316b24c4fc04dc986b420cd746321f769c587; execution/CI not yet verified. | Run focused unittest and full security suite; inspect CI before merge. |
+| Hardware actuation | BLOCKED | No physical receiver or independent interlock validation; remote ECU actuation intentionally disabled. | Independent hardware safety review; never infer physical safety from mocked tests. |
+| Crash durability and rollback | PARTIAL | SQLite WAL/FULL is not tamper-proof or rollback-resistant and not blockchain finality. | Fault-injected independent-process crash/restart tests and external trusted anchor. |
+| Publishable original research evidence | BLOCKED | Snapshot mutation fixtures are negative-control tests, not authentic datasets or independent incident-level evidence. | Pinned authentic V2X/CAN data, held-out baselines, paired multi-seed experiments and uncertainty. |
+| PR reconciliation | PARTIAL | #225 merged as b572cb3fd1c85ec9929edc986aa609f67a63cf67; #226/#227 remain draft, #158/#160 closed unmerged. | Reconcile unique changes and validate checks without bypassing safety gates. |
