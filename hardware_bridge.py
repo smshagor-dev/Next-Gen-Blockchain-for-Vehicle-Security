@@ -191,14 +191,20 @@ class AuthenticatedPiTelemetrySession:
         self.framer = AuthenticatedLineFramer(verifier.max_frame_bytes)
         self.device_id = None
 
-    def receive_iter(self, data: bytes):
+    def receive_iter(self, data: bytes, *, remaining_frames=None):
         """Yield verified frames individually so a later bad MAC cannot discard
         an earlier valid frame after its nonce has been claimed.
 
         This is NOT ledger/replay atomicity: a ledger failure after verification
         can still consume the nonce. Framing errors fail the entire read.
         """
-        for frame in self.framer.feed(data):
+        if remaining_frames is not None and (
+            type(remaining_frames) is not int or remaining_frames < 0
+        ):
+            raise HardwareTransportError("HW_INVALID_FRAME_BUDGET")
+        for index, frame in enumerate(self.framer.feed(data)):
+            if remaining_frames is not None and index >= remaining_frames:
+                raise HardwareTransportError("HW_SESSION_FRAME_BUDGET_EXCEEDED")
             item = self.verifier.verify(
                 frame, expected_kind="TELEMETRY", expected_device_id=self.device_id
             )
@@ -305,10 +311,13 @@ def _open_hardware_nonce_store(path_key: str, provision_key: str, transport: str
     return SQLiteNonceStore(path, provision=provision)
 
 
-def _quarantined_serial_frames(session, chunk):
+def _quarantined_serial_frames(session, chunk, *, remaining_frames=None):
     """Catch lazy verifier failures without discarding already yielded frames."""
     try:
-        yield from session.receive_iter(chunk)
+        if remaining_frames is None:
+            yield from session.receive_iter(chunk)
+        else:
+            yield from session.receive_iter(chunk, remaining_frames=remaining_frames)
     except HardwareTransportError as exc:
         print(f"[HW BRIDGE] quarantined Arduino serial input: {exc.reason}")
         raise RuntimeError("Arduino serial authentication/framing failure") from exc
@@ -374,14 +383,17 @@ def run_arduino_mode(bc: SmartCarBlockchain):
                 ingress_monotonic = time.monotonic()
                 ingress_utc = datetime.now(timezone.utc)
                 last_progress = ingress_monotonic
-                for item in _quarantined_serial_frames(session, chunk):
+                for item in _quarantined_serial_frames(
+                    session, chunk,
+                    remaining_frames=serial_budget.max_frames - serial_budget.frames_seen,
+                ):
                     # A single serial read may contain several valid envelopes.
                     # Verification and earlier ledger writes consume time; do not
                     # admit later envelopes after the absolute session deadline.
                     if time.monotonic() >= deadline:
                         raise RuntimeError("Arduino serial session lifetime exceeded; port quarantined")
                     # Limit authenticated frames before any ledger mutation.
-                    # The verifier may already have consumed the nonce.
+                    # The earlier check enforces the remaining session quota.
                     serial_budget.charge_frame()
                     if not serial_global_budget.claim():
                         raise SerialIngressBudgetExceeded("HW_SERIAL_GLOBAL_FRAME_RATE_EXCEEDED")
@@ -511,7 +523,9 @@ def run_pi_mode(bc: SmartCarBlockchain):
                     # connection identity before *any* ledger/actuation side effect.
                     # The verifier owns its replay lock. Do not hold a global
                     # lock across ledger I/O while iterating verified frames.
-                    verified_items = session.receive_iter(data)
+                    verified_items = session.receive_iter(
+                        data, remaining_frames=max_frames - accepted_frames
+                    )
                     for item in verified_items:
                         # A single recv may contain many signed frames. MAC
                         # verification can itself consume the remaining

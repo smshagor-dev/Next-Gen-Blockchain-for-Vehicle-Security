@@ -26,6 +26,7 @@ class ArduinoBudgetContractTests(unittest.TestCase):
         self.assertIn("SMARTCAR_HW_SERIAL_MAX_FRAMES_PER_SESSION", self.src)
         self.assertIn("max_frames=max(1, min(10000,", self.src)
         self.assertIn("serial_budget.charge_frame()", self.src)
+        self.assertIn("remaining_frames=serial_budget.max_frames - serial_budget.frames_seen", self.src)
 
     def test_byte_budget_configured_and_bounded(self):
         self.assertIn("SMARTCAR_HW_SERIAL_MAX_SESSION_BYTES", self.src)
@@ -34,7 +35,7 @@ class ArduinoBudgetContractTests(unittest.TestCase):
 
     def test_bytes_charged_before_frame_verification(self):
         self.assertLess(self.src.index("serial_budget.charge_bytes(len(chunk))"),
-                        self.src.index("_quarantined_serial_frames(session, chunk)"))
+                        self.src.index("_quarantined_serial_frames("))
 
     def test_frames_charged_before_ledger_write(self):
         self.assertLess(self.src.index("serial_budget.charge_frame()"),
