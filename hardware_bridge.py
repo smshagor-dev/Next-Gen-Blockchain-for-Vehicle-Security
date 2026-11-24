@@ -22,6 +22,7 @@ from typing import Optional
 from env_config import load_project_env_once, get_env, get_int, get_bool
 from blockchain import SmartCarBlockchain, TelemetryData
 from hardware_nonce_store import SQLiteNonceStore
+from serial_ingress_budget import SerialIngressBudget, SerialIngressBudgetExceeded
 from bounded_tcp_admission import BoundedTCPAdmission
 from hardware_actuation_safety import BenchActuationGate
 from hardware_transport_deadlines import deadline_check, DeadlineExpired
@@ -330,6 +331,14 @@ def run_arduino_mode(bc: SmartCarBlockchain):
             replay_cache_entries=get_int("SMARTCAR_HW_REPLAY_CACHE_ENTRIES", 2048),
         )
         session = AuthenticatedPiTelemetrySession(verifier)
+        serial_budget = SerialIngressBudget(
+            max_bytes=max(1024, min(8 * 1024 * 1024, get_int("SMARTCAR_HW_SERIAL_MAX_SESSION_BYTES", 262144))),
+            max_frames=max(1, min(10000, get_int("SMARTCAR_HW_SERIAL_MAX_FRAMES_PER_SESSION", 256))),
+        )
+        serial_global_budget = GlobalTelemetryBudget(
+            get_int("SMARTCAR_HW_SERIAL_FRAMES_PER_SEC", 32),
+            get_int("SMARTCAR_HW_SERIAL_FRAME_BURST", 64),
+        )
         print(f"[HW BRIDGE] authenticated Arduino serial mode: {port} @ {baud}")
         try:
             ser = serial.Serial(port=port, baudrate=baud, timeout=1)
@@ -351,6 +360,8 @@ def run_arduino_mode(bc: SmartCarBlockchain):
                 chunk = ser.read(1024)
                 if not chunk:
                     continue
+                # Charge all bytes, including unauthenticated fragments.
+                serial_budget.charge_bytes(len(chunk))
                 ingress_monotonic = time.monotonic()
                 ingress_utc = datetime.now(timezone.utc)
                 last_progress = ingress_monotonic
@@ -365,6 +376,11 @@ def run_arduino_mode(bc: SmartCarBlockchain):
                     # admit later envelopes after the absolute session deadline.
                     if time.monotonic() >= deadline:
                         raise RuntimeError("Arduino serial session lifetime exceeded; port quarantined")
+                    # Limit authenticated frames before any ledger mutation.
+                    # The verifier may already have consumed the nonce.
+                    serial_budget.charge_frame()
+                    if not serial_global_budget.claim():
+                        raise SerialIngressBudgetExceeded("HW_SERIAL_GLOBAL_FRAME_RATE_EXCEEDED")
                     verify_ingress_observation(
                         item.payload.get("timestamp"),
                         received_utc=ingress_utc,
@@ -383,6 +399,8 @@ def run_arduino_mode(bc: SmartCarBlockchain):
                         device_secret=verifier.device_secret(item.device_id),
                     )
             raise RuntimeError("Arduino serial session lifetime exceeded; port quarantined")
+        except SerialIngressBudgetExceeded as exc:
+            raise RuntimeError(f"Arduino serial quota exceeded; port quarantined: {exc}") from exc
         finally:
             ser.close()
     finally:
