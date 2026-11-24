@@ -183,7 +183,13 @@ class GlobalTelemetryBudget:
     def claim(self) -> bool:
         with self._lock:
             now = self.clock()
-            elapsed = max(0.0, now - self.last)
+            # A monotonic clock should not roll backwards, but injected clocks,
+            # host faults, and invalid readings must not mint extra quota.
+            # Keep the previous high-water mark after a rollback.
+            import math
+            if not math.isfinite(now) or now < self.last:
+                return False
+            elapsed = now - self.last
             self.last = now
             self.tokens = min(float(self.burst), self.tokens + elapsed * self.rate)
             if self.tokens < 1.0:
