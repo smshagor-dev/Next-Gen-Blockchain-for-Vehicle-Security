@@ -22,6 +22,7 @@ from consensus_security import consensus_security_metadata
 from runtime_security_strength import evaluate_security_strength
 from experiments.claim_validation.consensus_probe import BASELINE_SHA, ROOT, point, sha256
 from experiments.claim_validation.runtime_evidence import new_scope, observe_handshake
+from experiments.claim_validation.claim_gate import evaluate_claim
 
 CONFIGS = {
     "native_mlkem": (False, False, False, False),
@@ -67,7 +68,9 @@ def trial(config, repeat):
         ack = server.accept_handshake_as_server(hello, session_context=ctx)
         complete = client.complete_handshake_as_client(ack, session_context=ctx)
         elapsed = time.perf_counter_ns() - start
-        evidence = observe_handshake(client, server, complete, new_scope()).export()
+        scope = new_scope()
+        observation = observe_handshake(client, server, complete, scope)
+        evidence = observation.export()
         matched = evidence["facts"]["matched_session"]
         # Never export keys, public key material, transcript context or secret.
         declared = security_capability_output(allow_ecdh)
@@ -75,6 +78,8 @@ def trial(config, repeat):
                     "security_capability": point(declared),
                     "identity_security": point(identity_security_metadata()),
                     "consensus_security": point(consensus_security_metadata())}
+        gate = evaluate_claim("mlkem512_session", evaluate_security_strength(snapshot)["level"],
+                              observation, expected_scope=scope, now_ns=time.monotonic_ns()).export()
         return {"config": config, "repeat": repeat,
                 "provider_unavailability_injected": missing_provider,
                 "malformed_hello_injected": corrupt_hello,
@@ -85,7 +90,7 @@ def trial(config, repeat):
                 "operational_posture": evaluate_security_strength(snapshot)["level"],
                 "observed_mlkem_session": matched and client._hs_mode == "PQC_KEM"
                     and client._negotiated_kem_alg == "ML-KEM-512",
-                "runtime_evidence": evidence, "elapsed_ns": elapsed}
+                "runtime_evidence": evidence, "claim_gate": gate, "elapsed_ns": elapsed}
 
 
 def write_campaign(out: Path):
@@ -102,7 +107,8 @@ def write_campaign(out: Path):
                       "observed_mlkem_sessions": sum(r["observed_mlkem_session"] for r in group),
                       "ecdh_sessions": sum(r["matched_session"] and r["client_mode"] == "ECDH" for r in group),
                       "psk_sessions": sum(r["matched_session"] and r["client_mode"] == "PSK" for r in group),
-                      "strong": sum(r["operational_posture"] == "STRONG" for r in group)})
+                      "strong": sum(r["operational_posture"] == "STRONG" for r in group),
+                      "mlkem_claim_eligible": sum(r["claim_gate"]["eligibility"] == "ELIGIBLE" for r in group)})
     result = {"rows": len(rows), "cells": cells, "exploratory_only": True,
               "statistical_inference": False}
     summary = out / "summary.json"
@@ -111,7 +117,7 @@ def write_campaign(out: Path):
                "consensus_security.py", "runtime_security_strength.py", "env_config.py",
                "v2x_evidence_admission.py", "release_metadata.py", "VERSION",
                "experiments/claim_validation/pqc_probe.py", "experiments/claim_validation/consensus_probe.py",
-               "experiments/claim_validation/runtime_evidence.py")
+               "experiments/claim_validation/runtime_evidence.py", "experiments/claim_validation/claim_gate.py")
     import cryptography
     import importlib.metadata
     manifest = {"schema": "claim-validity-pqc-pilot/1", "baseline_sha": BASELINE_SHA,

@@ -19,6 +19,7 @@ from runtime_security_strength import evaluate_security_strength
 from security_capabilities import security_capability_output
 from identity_security import identity_security_metadata
 from experiments.claim_validation.runtime_evidence import new_scope, observe_consensus
+from experiments.claim_validation.claim_gate import evaluate_claim
 
 BASELINE_SHA = "0e3429a8bf6338ff99779dbc7cc4aa61972932ee"
 SEEDS = tuple(range(12))
@@ -75,9 +76,14 @@ def trial(seed: int, controlled_yes: int, valid: bool):
             break
     elapsed = time.perf_counter_ns() - start
     final = engine.tally(proposal_id)
-    evidence = observe_consensus(engine, proposal_id, new_scope()).export()
+    scope = new_scope()
+    observation = observe_consensus(engine, proposal_id, scope)
+    evidence = observation.export()
     snapshot["consensus_security"] = point(engine.metadata())
     posture_after = evaluate_security_strength(snapshot)["level"]
+    gate = {claim: evaluate_claim(claim, posture_after, observation, expected_scope=scope,
+                                 now_ns=time.monotonic_ns()).export()
+            for claim in ("recorded_quorum_acceptance", "honest_validator_quorum", "external_policy_validity")}
     # The experimental policy label is not fed to the classifier.
     return {"seed": seed, "controlled_voters": controlled_yes,
             "policy_allows_proposal": valid, "quorum_threshold": final["quorum_threshold"],
@@ -85,7 +91,7 @@ def trial(seed: int, controlled_yes: int, valid: bool):
             "final_status": final["status"], "posture_before": posture_before,
             "posture_after": posture_after,
             "unsupported_policy_acceptance": not valid and final["status"] == "ACCEPTED",
-            "runtime_evidence": evidence, "elapsed_ns": elapsed}
+            "runtime_evidence": evidence, "claim_gate": gate, "elapsed_ns": elapsed}
 
 
 def sha256(path):
@@ -116,7 +122,9 @@ def write_campaign(out: Path):
                           "runs": len(group),
                           "accepted": sum(x["final_status"] == "ACCEPTED" for x in group),
                           "strong_after": sum(x["posture_after"] == "STRONG" for x in group),
-                          "unsupported_policy_acceptances": sum(x["unsupported_policy_acceptance"] for x in group)})
+                          "unsupported_policy_acceptances": sum(x["unsupported_policy_acceptance"] for x in group),
+                          "quorum_claim_eligible": sum(x["claim_gate"]["recorded_quorum_acceptance"]["eligibility"] == "ELIGIBLE" for x in group),
+                          "policy_claim_withheld": sum(x["claim_gate"]["external_policy_validity"]["eligibility"] == "WITHHELD" for x in group)})
     summary = out / "summary.json"
     summary.write_text(json.dumps({"rows": len(rows), "cells": cells,
                                     "exploratory_only": True, "statistical_inference": False},
@@ -124,7 +132,7 @@ def write_campaign(out: Path):
     sources = ("permissioned_consensus.py", "runtime_security_strength.py",
                "security_capabilities.py", "identity_security.py", "release_metadata.py",
                "VERSION", "experiments/claim_validation/consensus_probe.py",
-               "experiments/claim_validation/runtime_evidence.py")
+               "experiments/claim_validation/runtime_evidence.py", "experiments/claim_validation/claim_gate.py")
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     manifest = {"schema": "claim-validity-consensus-pilot/1", "baseline_sha": BASELINE_SHA,
                 "executed_sha": revision, "python": sys.version, "platform": platform.platform(),

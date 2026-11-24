@@ -99,3 +99,27 @@ not a signature; the observer is not a separate trusted principal, and
 observations are not remote attestation or durable replay protection. The next
 stage must independently bind trusted evidence to a claim and explicitly
 withhold unverifiable assumptions. Exact-head execution pending.
+
+
+## Claim-specific eligibility prototype (exploratory)
+
+For each claim q, E(q) = O_strong AND G(q, observation). The gate uses
+typed, scope-bound, fresh same-process observations; it never reads fault
+scenario labels or controlled-voter counts. It returns ELIGIBLE,
+NOT_SUPPORTED, or WITHHELD, with an explicit reason. Operational posture
+is retained unchanged. ML-KEM claim requires matched session and both
+peers reporting actual PQC mode and ML-KEM-512; enrolled session requires
+authenticated acknowledgement and registry membership; recorded quorum
+acceptance requires a consistent accepted tally. Validator honesty and
+external policy validity are always withheld under tally-only evidence.
+These latter claims are not incorrectly treated as false just because
+they cannot be observed. No global Sybil, PQ, Byzantine or physical
+safety claim. No external attestation: the local observer is trusted.
+One-second max age is a provisional lab parameter, not a validated SLA.
+Export digest is not proof of origin. All three probes now record both
+legacy posture and scoped eligibility. This is an exploratory comparison
+and does not independently establish effectiveness: the eligibility
+predicates deliberately use the same observed component facts as the
+narrow local claims. Next: independently adjudicated paired evaluation,
+metadata disagreement and evidence faults, coverage/abstention trade-off
+and overhead. Preserve negative and unknown outcomes. CI pending.

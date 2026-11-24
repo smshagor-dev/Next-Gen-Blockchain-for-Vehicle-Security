@@ -21,6 +21,7 @@ from runtime_security_strength import evaluate_security_strength
 from security_capabilities import security_capability_output
 from experiments.claim_validation.consensus_probe import BASELINE_SHA, ROOT, point, sha256
 from experiments.claim_validation.runtime_evidence import new_scope, observe_identity
+from experiments.claim_validation.claim_gate import evaluate_claim
 
 # Configuration factors: registry presence, global compatibility flag, declared policy.
 CONFIGS = {
@@ -75,10 +76,14 @@ def trial(config, challenge, repeat):
             ack = sp.verify_message(response.decode(), derived)
             ack_valid = bool(ack and ack["type"] == sp.MessageType.HANDSHAKE_ACK
                              and ack["payload"]["vehicle_id"] == identity)
-        evidence = observe_identity(server, "lab-session", identity, ack_valid, new_scope()).export()
+        scope = new_scope()
+        observation = observe_identity(server, "lab-session", identity, ack_valid, scope)
+        evidence = observation.export()
         events = monitor.snapshot()["events"]
         # Compare constructed dashboard wrappers with and without observed alert events.
         with_alerts = dict(before, runtime_alerts=events)
+        gate = evaluate_claim("enrolled_session", evaluate_security_strength(with_alerts)["level"],
+                              observation, expected_scope=scope, now_ns=time.monotonic_ns()).export()
         return {
             "config": config, "challenge": challenge, "repeat": repeat,
             "registry_present": registry_present, "global_compatibility": allow_global,
@@ -90,7 +95,7 @@ def trial(config, challenge, repeat):
             "posture_without_alerts": evaluate_security_strength(before)["level"],
             "posture_with_observed_alerts": evaluate_security_strength(with_alerts)["level"],
             "observed_reasons": [event["reason"] for event in events],
-            "runtime_evidence": evidence, "elapsed_ns": elapsed,
+            "runtime_evidence": evidence, "claim_gate": gate, "elapsed_ns": elapsed,
         }
 
 
@@ -101,7 +106,7 @@ def write_campaign(out: Path):
     trace = out / "traces.jsonl"
     trace.write_text("".join(json.dumps(row, sort_keys=True) + "\n" for row in rows), encoding="utf-8")
     decisions = out / "decisions.csv"
-    fields = [key for key in rows[0] if key not in ("observed_reasons", "runtime_evidence")]
+    fields = [key for key in rows[0] if key not in ("observed_reasons", "runtime_evidence", "claim_gate")]
     with decisions.open("w", encoding="utf-8", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=fields, extrasaction="ignore")
         writer.writeheader()
@@ -114,7 +119,8 @@ def write_campaign(out: Path):
                           "authenticated_acks": sum(row["authenticated_ack"] for row in group),
                           "unlisted_acceptances": sum(row["unlisted_identity_accepted"] for row in group),
                           "strong_without_alerts": sum(row["posture_without_alerts"] == "STRONG" for row in group),
-                          "strong_with_alerts": sum(row["posture_with_observed_alerts"] == "STRONG" for row in group)})
+                          "strong_with_alerts": sum(row["posture_with_observed_alerts"] == "STRONG" for row in group),
+                          "enrolled_claim_eligible": sum(row["claim_gate"]["eligibility"] == "ELIGIBLE" for row in group)})
     result = {"rows": len(rows), "cells": cells, "exploratory_only": True, "statistical_inference": False}
     summary = out / "summary.json"
     summary.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
@@ -123,7 +129,7 @@ def write_campaign(out: Path):
                "permissioned_consensus.py", "replay_security.py", "env_config.py",
                "zkp_privacy.py", "release_metadata.py", "VERSION",
                "experiments/claim_validation/identity_probe.py", "experiments/claim_validation/consensus_probe.py",
-               "experiments/claim_validation/runtime_evidence.py")
+               "experiments/claim_validation/runtime_evidence.py", "experiments/claim_validation/claim_gate.py")
     manifest = {"schema": "claim-validity-identity-pilot/1", "baseline_sha": BASELINE_SHA,
                 "executed_sha": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                 "python": sys.version, "platform": platform.platform(),
