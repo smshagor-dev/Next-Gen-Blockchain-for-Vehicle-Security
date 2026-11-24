@@ -108,6 +108,20 @@ jobs:
           path: claim-results/performance-*/
           if-no-files-found: error
 
+      - name: Validate frozen held-out schedule and isolated controls
+        run: python -m unittest tests.test_claim_validation_heldout_runner -v
+      - name: Execute new held-out local component trials
+        run: |
+          python -m experiments.claim_validation.heldout_runner --domain consensus --out claim-results/heldout-consensus
+          python -m experiments.claim_validation.heldout_runner --domain identity --out claim-results/heldout-identity
+      - name: Preserve held-out outcomes including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-heldout-consensus-identity
+          path: claim-results/heldout-*/
+          if-no-files-found: warn
+
   pqc-claim-pilot:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -167,3 +181,13 @@ jobs:
           name: claim-validity-performance-pqc
           path: claim-results/performance-pqc/
           if-no-files-found: error
+
+      - name: Execute new held-out native crypto provider trials
+        run: python -m experiments.claim_validation.heldout_runner --domain pqc --out claim-results/heldout-pqc
+      - name: Preserve held-out PQC outcomes including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-heldout-pqc
+          path: claim-results/heldout-pqc/
+          if-no-files-found: warn

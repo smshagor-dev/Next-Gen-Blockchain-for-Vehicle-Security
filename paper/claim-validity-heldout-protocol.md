@@ -53,3 +53,22 @@ hashes, dependency versions, environment, raw traces, all reference
 disagreements, and failure status. Independent external adjudication and
 published comparator remain separate open requirements. Do not tune the
 candidate on this evaluation and call the same observations held-out.
+
+
+## Schedule freeze and execution implementation
+
+Frozen schedule commit 93c5a6f03cac21076041767efbda58b5dfaf6ccd,
+Git blob 71e8ef83e27463c0940f9e7698b5d522d8622cb5. 41 cells, two replicates
+per cell, 82 scheduled trials (48 consensus, 24 identity, 10 PQC).
+The runner verifies the schedule and both candidate source blobs before
+execution. Expected labels are not transmitted to the worker; the parent
+checks direct outcome against the fixed design. Each trial is a fresh
+subprocess with ephemeral keys; both handshake peers reside in that
+subprocess rather than separate network processes. Context mismatch and
+missing context cover failed session confirmation. No external observation
+principal or actual socket is claimed. Every scheduled result, timeout,
+disagreement and worker failure is recorded; nonzero failure status.
+This finite design is new relative to the pilots, not a random sample of
+deployments. Timing in the worker is illustrative single-call measurement;
+the separate block benchmark is the main overhead measurement.
+No held-out results have yet been verified.

@@ -204,3 +204,12 @@ These offsets are not a measured real-delay distribution; no optimized
 freshness SLA is inferred. Keep all results and retain per-class counts.
 See claim-validity-heldout-protocol.md for prospective evaluation design;
 exact schedule and runner must still be implemented before execution.
+
+
+## Held-out runner implementation
+
+Exact finite schedule committed before execution; see
+claim-validity-heldout-protocol.md. 82 fresh-subprocess trials over 41
+new design cells; the candidate remains unchanged and checked by Git blob.
+Independent parent-side expected labels and direct outcome checks, raw
+JSONL, execution status and provenance retained. Exact-head CI pending.
