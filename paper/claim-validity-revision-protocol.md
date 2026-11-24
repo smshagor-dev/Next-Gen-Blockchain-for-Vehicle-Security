@@ -155,3 +155,33 @@ unsupported rate, and coverage. Undefined class denominators remain null.
 Do not pool across distinct claims or claim statistical significance.
 Independent adjudication, observer compromise sensitivity, exact manuscript
 semantic baseline, related work comparison and overhead remain open.
+
+
+## Separate design reference and observer sensitivity
+
+Freeze a distinct reference implementation from the explicit experimental
+design: recompute consensus transitions from vote order and assigned policy,
+use a table of admitted identity/credential conditions, and preassign the
+expected handshake mode for each provider condition. Compare the design
+expectation to direct component outcomes and preserve disagreements. No
+import from the proposed gate or observation collector in the reference
+module. This separates implementation paths, not trust principals, and is
+not blinded independent adjudication. It follows already observed pilot
+conditions, so it is exploratory and must not be called preregistered.
+
+For the same 240 base trials, replay eight existing evidence faults with
+the design reference, and add one hypothetical schema-consistent contrary
+observation per trial to expose the trusted-observer limitation. Original
+posture stays unchanged. No deployment interface is exercised by this
+sensitivity intervention. Report false eligibility and loss of true
+eligibility separately. A digest is not evidence of trusted origin.
+
+Report gate-minus-comparator eligibility contrasts separately by claim,
+fault and reference class, equal-weighting the authored design cells.
+Repeated seeds, keys and fault interventions are not independent samples.
+Show per-cell deltas and range, not confidence intervals or p-values that
+would falsely treat deterministic repetitions as independent deployments.
+38 design cells (8 consensus, 24 identity, 6 PQC); 1920 paired replay
+rows plus 240 sensitivity rows planned. Exact-head CI pending.
+External adjudication, new held-out independent experimental units,
+published comparator and timing sensitivity remain unresolved.

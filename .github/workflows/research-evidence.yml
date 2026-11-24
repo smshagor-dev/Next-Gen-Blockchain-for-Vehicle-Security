@@ -46,6 +46,8 @@ jobs:
         run: python -m unittest tests.test_claim_validation_runtime_evidence -v
       - name: Validate claim-specific eligibility controls
         run: python -m unittest tests.test_claim_validation_gate -v
+      - name: Validate design adjudication and trust sensitivity
+        run: python -m unittest tests.test_claim_validation_design_reference -v
       - name: Validate paired comparison controls
         run: python -m unittest tests.test_claim_validation_paired_comparison -v
       - name: Execute actual-engine claim validity controls
@@ -80,6 +82,18 @@ jobs:
           name: claim-validity-paired-consensus-identity
           path: claim-results/comparison-*/
           if-no-files-found: error
+
+      - name: Execute design reference and observer sensitivity
+        run: |
+          python -m experiments.claim_validation.design_analysis --domain consensus --source claim-results/consensus --out claim-results/design-consensus
+          python -m experiments.claim_validation.design_analysis --domain identity --source claim-results/identity --out claim-results/design-identity
+      - name: Preserve design analysis including disagreements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-design-consensus-identity
+          path: claim-results/design-*/
+          if-no-files-found: warn
 
   pqc-claim-pilot:
     runs-on: ubuntu-24.04
@@ -121,3 +135,13 @@ jobs:
           name: claim-validity-paired-pqc
           path: claim-results/comparison-pqc/
           if-no-files-found: error
+
+      - name: Execute PQC design reference and observer sensitivity
+        run: python -m experiments.claim_validation.design_analysis --domain pqc --source claim-results/pqc --out claim-results/design-pqc
+      - name: Preserve PQC design analysis including disagreements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-design-pqc
+          path: claim-results/design-pqc/
+          if-no-files-found: warn
