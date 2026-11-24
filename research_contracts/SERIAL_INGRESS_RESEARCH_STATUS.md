@@ -32,3 +32,6 @@ A serial port is closed on quota exhaustion; a local hardwired emergency-stop
 must remain available independently of software and network admission.
 The existing synthetic fixtures and microbenchmarks are non-publishable main
 research results. No vehicle commands were issued.
+
+## Mainline reconciliation (2026-11-24)
+Reapplied byte, frame and rate budgets on top of current main's explicit SQLite serial nonce provisioning, observation freshness and disabled remote actuation. Quota exhaustion closes both the port and nonce store; the authenticated frame quota is evaluated after nonce verification, so quota rejection can consume a nonce. New mocked serial integration tests cover byte and frame exhaustion before ledger mutation. Exact merged-head CI is pending; no physical or publication efficacy claim.
