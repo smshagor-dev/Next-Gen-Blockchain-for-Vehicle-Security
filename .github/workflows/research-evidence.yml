@@ -41,3 +41,14 @@ jobs:
         env:
           PYTHONPATH: .
         run: python -m unittest -v tests.test_experiment_framework
+
+      - name: Execute actual-engine claim validity controls
+        run: python -m unittest tests.test_claim_validation_consensus_probe -v
+      - name: Execute exploratory claim validity campaign
+        run: python -m experiments.claim_validation.consensus_probe --out claim-results/consensus
+      - name: Preserve raw claim validity traces and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-consensus-pilot
+          path: claim-results/consensus/
+          if-no-files-found: error
