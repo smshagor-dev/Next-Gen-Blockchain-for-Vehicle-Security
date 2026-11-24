@@ -16,13 +16,13 @@ class HardwareJsonDepthTests(unittest.TestCase):
         raw = "[" * 1500 + "0" + "]" * 1500
         with self.assertRaises(HardwareTransportError) as caught:
             _strict_json_loads(raw)
-        self.assertEqual(caught.exception.reason, "HW_JSON_MALFORMED")
+        self.assertEqual(caught.exception.reason, "HW_JSON_NESTING_EXCEEDED")
 
     def test_deeply_nested_object_rejected_as_transport_error(self):
         raw = '{"a":' * 1500 + "0" + "}" * 1500
         with self.assertRaises(HardwareTransportError) as caught:
             _strict_json_loads(raw)
-        self.assertEqual(caught.exception.reason, "HW_JSON_MALFORMED")
+        self.assertEqual(caught.exception.reason, "HW_JSON_NESTING_EXCEEDED")
 
     def test_canonicalization_depth_rejected_as_transport_error(self):
         nested = 0
@@ -35,6 +35,11 @@ class HardwareJsonDepthTests(unittest.TestCase):
     def test_shallow_json_still_parses(self):
         self.assertEqual(_strict_json_loads('{"payload":{"x":[1,2]}}'),
                          {"payload": {"x": [1, 2]}})
+
+    def test_malformed_json_keeps_distinct_error(self):
+        with self.assertRaises(HardwareTransportError) as caught:
+            _strict_json_loads('{"a":}')
+        self.assertEqual(caught.exception.reason, "HW_JSON_MALFORMED")
 
     def test_duplicate_members_still_rejected(self):
         with self.assertRaises(HardwareTransportError) as caught:

@@ -116,7 +116,11 @@ def _strict_json_loads(raw: str):
                           object_pairs_hook=unique_members)
     except HardwareTransportError:
         raise
-    except (json.JSONDecodeError, UnicodeDecodeError, TypeError, ValueError, RecursionError) as exc:
+    except RecursionError as exc:
+        # Deeply nested untrusted JSON must fail at the authentication boundary,
+        # not escape as an uncaught exception and terminate an ingress worker.
+        raise HardwareTransportError("HW_JSON_NESTING_EXCEEDED") from exc
+    except (json.JSONDecodeError, UnicodeDecodeError, TypeError, ValueError) as exc:
         raise HardwareTransportError("HW_JSON_MALFORMED") from exc
 
 
@@ -422,7 +426,12 @@ class HardwareEnvelopeVerifier:
                 raise HardwareTransportError("HW_FRAME_TOO_LARGE")
             parsed = _strict_json_loads(raw.strip())
         elif isinstance(raw, Mapping):
-            parsed = dict(raw)
+            # Programmatic callers must obey the same size and nesting boundary
+            # as wire callers. A deep dict must not escape as RecursionError.
+            encoded = _canonical_bytes(raw)
+            if len(encoded) > self.max_frame_bytes:
+                raise HardwareTransportError("HW_FRAME_TOO_LARGE")
+            parsed = _strict_json_loads(encoded.decode("utf-8"))
         else:
             raise HardwareTransportError("HW_ENVELOPE_TYPE_INVALID")
         if not isinstance(parsed, dict):
