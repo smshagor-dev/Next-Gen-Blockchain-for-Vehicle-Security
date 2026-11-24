@@ -358,3 +358,15 @@ No accuracy, safety efficacy, statistical significance or publishable primary re
 | Next code task | Upcoming | Run exact tests and CI; pin independently verified benign donor provenance; add matching/stratification for CAN ID and DLC distributions; execute disjoint-recording trials with incident-level truth and cluster-aware uncertainty |
 
 Test: `python -m unittest tests.test_matched_can_sham_control -v`. Existing fixture CSVs and short microbenchmarks remain NON-PUBLISHABLE main results.
+
+## 2026-11-24 — hardware key Unicode enrollment boundary (draft PR #232)
+
+| Area | State | Evidence / next gate |
+| --- | --- | --- |
+| Malformed enrolled key fail-closed rejection | IMPLEMENTED, UNVERIFIED | `hardware_transport_security.py` validates UTF-8 before HMAC derivation; commit `1939610` |
+| Synthetic regression controls | AUTHORED, NOT EXECUTED | `tests/test_hardware_secret_unicode.py`, three cases; run `python -m unittest discover -s tests -p 'test_hardware_secret_unicode.py' -v` |
+| Integration into main | BLOCKED | #232 draft, mergeable false at creation; reconcile #227/#229/#230/#231 and run focused suite and required CI before review/squash |
+| Authentic incident research | BLOCKED | No independently sourced VeReMi NextGen/CAN data or incident-level baseline evidence in this change |
+| Physical actuation | NOT TESTED | No ECU, emergency control or actuator access; no physical safety claim |
+
+Next code task: execute focused tests, reconcile overlapping hardware security PRs and verify main's protected ingress path before any integration. This is not publishable original research effectiveness evidence.
