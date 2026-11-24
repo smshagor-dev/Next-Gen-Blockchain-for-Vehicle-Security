@@ -293,6 +293,17 @@ class ECUCommandGateway:
         return False
 
 
+def _open_hardware_nonce_store(path_key: str, provision_key: str, transport: str):
+    """Use the mainline persistent nonce store; never silently recreate lost state."""
+    path = get_env(path_key, "").strip()
+    if not path or path == ":memory:" or path.startswith("file:"):
+        raise RuntimeError(f"{path_key} required for {transport} ingress")
+    if os.path.islink(path):
+        raise RuntimeError("hardware nonce database must be a non-symlink file")
+    provision = get_bool(provision_key, False)
+    return SQLiteNonceStore(path, provision=provision)
+
+
 def run_arduino_mode(bc: SmartCarBlockchain):
     """Enrolled-device authenticated serial ingress; no unsigned JSON fallback.
 
@@ -305,68 +316,77 @@ def run_arduino_mode(bc: SmartCarBlockchain):
     port = get_env("SMARTCAR_HW_SERIAL_PORT", "COM3")
     baud = get_int("SMARTCAR_HW_SERIAL_BAUD", 115200)
     device_keys = parse_device_registry(get_env("SMARTCAR_HW_DEVICE_KEYS_JSON", "{}"))
-    verifier = HardwareEnvelopeVerifier(
-        device_keys,
-        max_frame_bytes=get_int("SMARTCAR_HW_MAX_FRAME_BYTES", 4096),
-        replay_window_sec=get_int("SMARTCAR_HW_REPLAY_WINDOW_SEC", 15),
-        replay_cache_entries=get_int("SMARTCAR_HW_REPLAY_CACHE_ENTRIES", 2048),
+    nonce_store = _open_hardware_nonce_store(
+        "SMARTCAR_HW_SERIAL_NONCE_STORE_PATH",
+        "SMARTCAR_HW_SERIAL_NONCE_STORE_PROVISION",
+        "Arduino",
     )
-    session = AuthenticatedPiTelemetrySession(verifier)
-    print(f"[HW BRIDGE] authenticated Arduino serial mode: {port} @ {baud}")
     try:
-        ser = serial.Serial(port=port, baudrate=baud, timeout=1)
-    except Exception as e:
-        raise RuntimeError(f"Could not open serial port '{port}': {e}") from e
+        verifier = HardwareEnvelopeVerifier(
+            device_keys,
+            durable_nonce_store=nonce_store,
+            max_frame_bytes=get_int("SMARTCAR_HW_MAX_FRAME_BYTES", 4096),
+            replay_window_sec=get_int("SMARTCAR_HW_REPLAY_WINDOW_SEC", 15),
+            replay_cache_entries=get_int("SMARTCAR_HW_REPLAY_CACHE_ENTRIES", 2048),
+        )
+        session = AuthenticatedPiTelemetrySession(verifier)
+        print(f"[HW BRIDGE] authenticated Arduino serial mode: {port} @ {baud}")
+        try:
+            ser = serial.Serial(port=port, baudrate=baud, timeout=1)
+        except Exception as e:
+            raise RuntimeError(f"Could not open serial port '{port}': {e}") from e
 
-    # Remote commands remain subject to an independent bench interlock.
-    actuator = SafeModeActuatorDispatcher()
-    # A silent or trickle-fed serial peer must not monopolize the bridge forever.
-    idle_timeout = max(1, min(30, get_int("SMARTCAR_HW_IDLE_TIMEOUT_SEC", 5)))
-    max_session_sec = max(5, min(600, get_int("SMARTCAR_HW_MAX_SESSION_SEC", 120)))
-    deadline = time.monotonic() + max_session_sec
-    last_progress = time.monotonic()
-    try:
-        while time.monotonic() < deadline:
-            if time.monotonic() - last_progress >= idle_timeout:
-                raise RuntimeError("Arduino serial idle timeout; port quarantined")
-            # Bounded read, including for a peer that never sends a newline.
-            chunk = ser.read(1024)
-            if not chunk:
-                continue
-            ingress_monotonic = time.monotonic()
-            ingress_utc = datetime.now(timezone.utc)
-            last_progress = ingress_monotonic
-            try:
-                verified = session.receive_iter(chunk)
-            except HardwareTransportError as exc:
-                print(f"[HW BRIDGE] quarantined Arduino serial input: {exc.reason}")
-                raise RuntimeError("Arduino serial authentication/framing failure") from exc
-            for item in verified:
-                # A single serial read may contain several valid envelopes.
-                # Verification and earlier ledger writes consume time; do not
-                # admit later envelopes after the absolute session deadline.
-                if time.monotonic() >= deadline:
-                    raise RuntimeError("Arduino serial session lifetime exceeded; port quarantined")
-                verify_ingress_observation(
-                    item.payload.get("timestamp"),
-                    received_utc=ingress_utc,
-                    received_monotonic=ingress_monotonic,
-                    commit_monotonic=time.monotonic(),
-                    max_age_seconds=max(1, min(3600, get_int("SMARTCAR_HW_OBSERVATION_MAX_AGE_SEC", 15))),
-                    max_future_skew_seconds=max(0, min(60, get_int("SMARTCAR_HW_OBSERVATION_FUTURE_SKEW_SEC", 2))),
-                )
-                tel = to_telemetry(item.payload)
-                event = _signed_event_label(item.payload.get("event"))
-                block = bc.push_telemetry(tel, event)
-                print(f"[CHAIN] block={block.index} event={event}")
-                actuator.maybe_send_arduino(
-                    ser, bc, block,
-                    device_id=item.device_id,
-                    device_secret=verifier.device_secret(item.device_id),
-                )
-        raise RuntimeError("Arduino serial session lifetime exceeded; port quarantined")
+        # Remote commands remain subject to an independent bench interlock.
+        actuator = SafeModeActuatorDispatcher()
+        # A silent or trickle-fed serial peer must not monopolize the bridge forever.
+        idle_timeout = max(1, min(30, get_int("SMARTCAR_HW_IDLE_TIMEOUT_SEC", 5)))
+        max_session_sec = max(5, min(600, get_int("SMARTCAR_HW_MAX_SESSION_SEC", 120)))
+        deadline = time.monotonic() + max_session_sec
+        last_progress = time.monotonic()
+        try:
+            while time.monotonic() < deadline:
+                if time.monotonic() - last_progress >= idle_timeout:
+                    raise RuntimeError("Arduino serial idle timeout; port quarantined")
+                # Bounded read, including for a peer that never sends a newline.
+                chunk = ser.read(1024)
+                if not chunk:
+                    continue
+                ingress_monotonic = time.monotonic()
+                ingress_utc = datetime.now(timezone.utc)
+                last_progress = ingress_monotonic
+                try:
+                    verified = session.receive_iter(chunk)
+                except HardwareTransportError as exc:
+                    print(f"[HW BRIDGE] quarantined Arduino serial input: {exc.reason}")
+                    raise RuntimeError("Arduino serial authentication/framing failure") from exc
+                for item in verified:
+                    # A single serial read may contain several valid envelopes.
+                    # Verification and earlier ledger writes consume time; do not
+                    # admit later envelopes after the absolute session deadline.
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError("Arduino serial session lifetime exceeded; port quarantined")
+                    verify_ingress_observation(
+                        item.payload.get("timestamp"),
+                        received_utc=ingress_utc,
+                        received_monotonic=ingress_monotonic,
+                        commit_monotonic=time.monotonic(),
+                        max_age_seconds=max(1, min(3600, get_int("SMARTCAR_HW_OBSERVATION_MAX_AGE_SEC", 15))),
+                        max_future_skew_seconds=max(0, min(60, get_int("SMARTCAR_HW_OBSERVATION_FUTURE_SKEW_SEC", 2))),
+                    )
+                    tel = to_telemetry(item.payload)
+                    event = _signed_event_label(item.payload.get("event"))
+                    block = bc.push_telemetry(tel, event)
+                    print(f"[CHAIN] block={block.index} event={event}")
+                    actuator.maybe_send_arduino(
+                        ser, bc, block,
+                        device_id=item.device_id,
+                        device_secret=verifier.device_secret(item.device_id),
+                    )
+            raise RuntimeError("Arduino serial session lifetime exceeded; port quarantined")
+        finally:
+            ser.close()
     finally:
-        ser.close()
+        nonce_store.close()
 
 
 def run_pi_mode(bc: SmartCarBlockchain):
@@ -380,11 +400,10 @@ def run_pi_mode(bc: SmartCarBlockchain):
     device_keys = parse_device_registry(get_env("SMARTCAR_HW_DEVICE_KEYS_JSON", "{}"))
     # No volatile-only replay fallback for production Pi TCP. Provision once
     # with SMARTCAR_HW_NONCE_STORE_PROVISION=true, then restart in recovery mode.
-    nonce_path = get_env("SMARTCAR_HW_NONCE_STORE_PATH", "").strip()
-    if not nonce_path:
-        raise RuntimeError("SMARTCAR_HW_NONCE_STORE_PATH required for Pi ingress")
-    nonce_store = SQLiteNonceStore(
-        nonce_path, provision=get_bool("SMARTCAR_HW_NONCE_STORE_PROVISION", False)
+    nonce_store = _open_hardware_nonce_store(
+        "SMARTCAR_HW_NONCE_STORE_PATH",
+        "SMARTCAR_HW_NONCE_STORE_PROVISION",
+        "Pi",
     )
     verifier = HardwareEnvelopeVerifier(
         device_keys,

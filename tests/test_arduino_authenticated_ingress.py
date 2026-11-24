@@ -1,5 +1,7 @@
 """Synthetic serial ingress security tests; not hardware or research evidence."""
 import unittest
+import tempfile
+import os
 from unittest import mock
 from datetime import datetime, timezone
 
@@ -42,6 +44,16 @@ class FakeSerial:
 
 
 class SerialIngressTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        env = mock.patch.dict("os.environ", {
+            "SMARTCAR_HW_SERIAL_NONCE_STORE_PATH": os.path.join(directory.name, "serial.sqlite"),
+            "SMARTCAR_HW_SERIAL_NONCE_STORE_PROVISION": "true",
+        })
+        env.start()
+        self.addCleanup(env.stop)
+
     def run_bridge(self, frames):
         fake = FakeSerial(frames)
         bc = mock.Mock()
