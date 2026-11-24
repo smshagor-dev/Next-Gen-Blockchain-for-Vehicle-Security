@@ -122,6 +122,15 @@ jobs:
           path: claim-results/heldout-*/
           if-no-files-found: warn
 
+      - name: Record execution environment for archive
+        run: python -m experiments.claim_validation.reproducibility_package --environment environment-local
+      - name: Preserve execution environment
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-environment-local
+          path: environment-local/
+          if-no-files-found: error
+
   pqc-claim-pilot:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -192,6 +201,15 @@ jobs:
           path: claim-results/heldout-pqc/
           if-no-files-found: warn
 
+      - name: Record execution environment for archive
+        run: python -m experiments.claim_validation.reproducibility_package --environment environment-pqc
+      - name: Preserve execution environment
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-environment-pqc
+          path: environment-pqc/
+          if-no-files-found: error
+
   publication-evidence-audit:
     needs: [evidence-integrity, pqc-claim-pilot]
     runs-on: ubuntu-24.04
@@ -220,4 +238,37 @@ jobs:
         with:
           name: claim-validity-publication-evidence
           path: publication-results/
+          if-no-files-found: error
+
+      - name: Record execution environment for archive
+        run: python -m experiments.claim_validation.reproducibility_package --environment environment-audit
+      - name: Preserve execution environment
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-environment-audit
+          path: environment-audit/
+          if-no-files-found: error
+
+  reproducibility-package:
+    needs: [evidence-integrity, pqc-claim-pilot, publication-evidence-audit]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download same-run research evidence
+        uses: actions/download-artifact@v4
+        with:
+          pattern: claim-validity-*
+          path: package-input
+          merge-multiple: false
+      - name: Assemble scoped reproducibility package
+        run: python -m experiments.claim_validation.reproducibility_package --input package-input --out deposition
+      - name: Preserve author-review archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-zenodo-candidate
+          path: deposition/
           if-no-files-found: error
