@@ -63,3 +63,35 @@ jobs:
           name: claim-validity-identity-pilot
           path: claim-results/identity/
           if-no-files-found: error
+
+  pqc-claim-pilot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build repository-pinned native liboqs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone https://github.com/open-quantum-safe/liboqs.git "$RUNNER_TEMP/liboqs-source"
+          git -C "$RUNNER_TEMP/liboqs-source" checkout --detach 5a1a854b0dc9f2141bdc771c555ee60c37950183
+          cmake -S "$RUNNER_TEMP/liboqs-source" -B "$RUNNER_TEMP/liboqs-build" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DOQS_BUILD_ONLY_LIB=ON '-DOQS_MINIMAL_BUILD=KEM_ml_kem_512;SIG_ml_dsa_44' -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/oqs"
+          cmake --build "$RUNNER_TEMP/liboqs-build" --parallel 2
+          cmake --install "$RUNNER_TEMP/liboqs-build"
+          echo "OQS_INSTALL_PATH=$RUNNER_TEMP/oqs" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$RUNNER_TEMP/oqs/lib:$RUNNER_TEMP/oqs/lib64" >> "$GITHUB_ENV"
+      - name: Install pinned provider bindings
+        run: python -m pip install --disable-pip-version-check "liboqs-python==0.16.0.2" "cryptography==46.0.5"
+      - name: Execute actual crypto handshake controls
+        run: python -m unittest tests.test_claim_validation_pqc_probe -v
+      - name: Execute exploratory PQC claim validity campaign
+        run: python -m experiments.claim_validation.pqc_probe --out claim-results/pqc
+      - name: Preserve raw handshake decisions and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-pqc-pilot
+          path: claim-results/pqc/
+          if-no-files-found: error

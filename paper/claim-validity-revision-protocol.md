@@ -63,3 +63,24 @@ Sybil resistance from a successful negative challenge. Repetitions descriptive.
 
 Consensus pilot observed: see claim-validity-consensus-pilot-observed.md.
 Identity pilot execution pending exact-head CI.
+
+## Identity pilot correction and PQC pilot
+
+CI run 45390934835: five identity tests passed, one failed because the
+experiment expected RISK for a HANDSHAKE_REJECTED event. The actual monitor
+classifies that event MEDIUM, and the operational classifier returns GUARDED.
+Correct the expectation without modifying production behaviour; record this
+as a pilot protocol correction. The identity campaign was skipped in that run.
+
+The next pilot runs real DynamicCryptoAgilityLayer client/server methods with
+a pinned liboqs native library and Python bindings. Six configurations (eight
+fresh pairs per condition, 48 runs): ML-KEM-512, forced ECDH, forced PSK,
+injected missing provider with/without ECDH, malformed KEM offer with ECDH
+disabled. Confirm session key agreement internally without recording secrets.
+Record actual negotiated mode vs static capability declaration and operational
+posture. Provider absence is a deliberate module injection. PSK fallback is
+an existing explicit implementation path; ECDH disabled does not imply PQ-only
+or session fail-closed. This is local Python handshake execution with native
+crypto, not the separate C++ ledger, authenticated network capture, or a
+cryptographic security proof. No simulated positive result accepted.
+Repeated fresh keys measure execution variability, not independent deployments.

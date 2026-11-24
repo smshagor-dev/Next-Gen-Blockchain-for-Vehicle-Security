@@ -33,7 +33,7 @@ class IdentityClaimProbeTests(unittest.TestCase):
         row = trial("registry_strict", "enrolled_wrong", 0)
         self.assertFalse(row["authenticated_ack"])
         self.assertEqual(row["posture_without_alerts"], "STRONG")
-        self.assertEqual(row["posture_with_observed_alerts"], "RISK")
+        self.assertEqual(row["posture_with_observed_alerts"], "GUARDED")
 
 
 if __name__ == "__main__":
