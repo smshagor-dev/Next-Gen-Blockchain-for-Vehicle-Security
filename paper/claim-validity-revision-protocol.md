@@ -45,3 +45,21 @@ capture with explicit source/epoch/time binding; independent evidence collector
 and withheld-claim policy; frozen confirmatory protocol with negative controls,
 matched baselines, uncertainty and overhead. Review novelty against primary
 assurance/attestation literature before asserting any contribution.
+
+## RQ1 pilot: identity admission and declared configuration
+
+Six deliberately constructed configurations cross actual registry presence,
+explicit global compatibility flag, and declared identity policy (including
+two inconsistent declarations). Four credential/identity conditions, four
+fresh local engines per cell: 96 scheduled runs. Real SyncServer handshake
+handler, authenticated acknowledgement and session binding are observed
+without opening sockets. Isolated synthetic keys are never exported.
+Record the declared metadata, actual outcome and real runtime monitor events.
+Contrast the alert-free constructed snapshot with one including observed
+alerts. This distinguishes the meaning of configured admission metadata from
+actual per-identity admission; an explicit lab compatibility mode is not a
+production security guarantee. Do not infer physical identity uniqueness or
+Sybil resistance from a successful negative challenge. Repetitions descriptive.
+
+Consensus pilot observed: see claim-validity-consensus-pilot-observed.md.
+Identity pilot execution pending exact-head CI.

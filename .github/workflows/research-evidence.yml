@@ -52,3 +52,14 @@ jobs:
           name: claim-validity-consensus-pilot
           path: claim-results/consensus/
           if-no-files-found: error
+
+      - name: Execute actual sync admission controls
+        run: python -m unittest tests.test_claim_validation_identity_probe -v
+      - name: Execute exploratory identity claim validity campaign
+        run: python -m experiments.claim_validation.identity_probe --out claim-results/identity
+      - name: Preserve raw identity claim validity traces and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-identity-pilot
+          path: claim-results/identity/
+          if-no-files-found: error
