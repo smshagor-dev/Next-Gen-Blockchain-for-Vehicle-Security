@@ -21,7 +21,7 @@ class MappingIngressBoundaryTests(unittest.TestCase):
             value = child
         with self.assertRaises(HardwareTransportError) as ctx:
             self.verifier.verify(root)
-        self.assertEqual(ctx.exception.reason, "HW_CANONICAL_ENCODING_INVALID")
+        self.assertEqual(ctx.exception.reason, "HW_FRAME_TOO_LARGE")
         self.assertFalse(ctx.exception.authenticated)
 
     def test_small_mapping_still_reaches_schema_validation(self):

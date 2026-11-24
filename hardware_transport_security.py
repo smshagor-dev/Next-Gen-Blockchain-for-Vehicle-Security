@@ -424,13 +424,75 @@ class HardwareEnvelopeVerifier:
                 raise HardwareTransportError("HW_FRAME_UTF8_INVALID") from exc
             parsed = _strict_json_loads(text.strip())
         elif isinstance(raw, str):
-            if len(raw.encode("utf-8", errors="replace")) > self.max_frame_bytes:
+            try:
+                frame_bytes = raw.encode("utf-8", errors="strict")
+            except UnicodeEncodeError as exc:
+                raise HardwareTransportError("HW_FRAME_UTF8_INVALID") from exc
+            if len(frame_bytes) > self.max_frame_bytes:
                 raise HardwareTransportError("HW_FRAME_TOO_LARGE")
             parsed = _strict_json_loads(raw.strip())
         elif isinstance(raw, Mapping):
-            # Programmatic callers must obey the same size and nesting boundary
-            # as wire callers. A deep dict must not escape as RecursionError.
-            encoded = _canonical_bytes(raw)
+            # Only built-in dictionaries have predictable iteration and item access.
+            # User-defined Mapping methods can block, mutate or allocate without
+            # respecting any node/byte budget. Never invoke them on ingress.
+            if type(raw) is not dict:
+                raise HardwareTransportError("HW_ENVELOPE_TYPE_INVALID")
+            # In-process callers must obey the same byte budget as TCP callers.
+            # Otherwise a giant mapping bypasses the wire framing limit and
+            # reaches canonical HMAC encoding with unbounded memory/CPU cost.
+            # Bound traversal before canonical JSON allocates a potentially huge
+            # intermediate string. This is a fail-closed admission budget, not
+            # a guarantee against a hostile in-process Mapping implementation.
+            pending = [(raw, 0)]
+            visited = set()
+            nodes = 0
+            string_units = 0
+            while pending:
+                value, depth = pending.pop()
+                nodes += 1
+                if nodes > self.max_frame_bytes or depth > 32:
+                    raise HardwareTransportError("HW_FRAME_TOO_LARGE")
+                if type(value) in (dict, list, tuple):
+                    # Check container fan-out BEFORE extending the worklist.
+                    # Otherwise one wide in-process container can allocate a
+                    # huge pending list even though the later node counter
+                    # would eventually reject the envelope.
+                    children = len(value) * (2 if type(value) is dict else 1)
+                    if children > self.max_frame_bytes - nodes - len(pending):
+                        raise HardwareTransportError("HW_FRAME_TOO_LARGE")
+                    identity = id(value)
+                    if identity in visited:
+                        raise HardwareTransportError("HW_FRAME_TOO_LARGE")
+                    visited.add(identity)
+                    if type(value) is dict:
+                        if any(type(k) is not str for k in value):
+                            raise HardwareTransportError("HW_CANONICAL_ENCODING_INVALID")
+                        pending.extend((v, depth + 1) for v in value.values())
+                        pending.extend((k, depth + 1) for k in value.keys())
+                    else:
+                        pending.extend((v, depth + 1) for v in value)
+                elif type(value) is str:
+                    string_units += len(value)
+                    if string_units > self.max_frame_bytes:
+                        raise HardwareTransportError("HW_FRAME_TOO_LARGE")
+                elif type(value) is int:
+                    # Avoid unbounded decimal conversion of attacker-supplied
+                    # in-process big integers before JSON serialization.
+                    if value.bit_length() > self.max_frame_bytes * 8:
+                        raise HardwareTransportError("HW_FRAME_TOO_LARGE")
+                elif type(value) is float:
+                    if not math.isfinite(value):
+                        raise HardwareTransportError("HW_CANONICAL_ENCODING_INVALID")
+                elif value is None or type(value) is bool:
+                    pass
+                else:
+                    # Do not call user-defined __str__, __iter__, __float__,
+                    # or JSON encoder hooks while processing ingress.
+                    raise HardwareTransportError("HW_CANONICAL_ENCODING_INVALID")
+            try:
+                encoded = _canonical_bytes(raw)
+            except (RecursionError, OverflowError) as exc:
+                raise HardwareTransportError("HW_FRAME_TOO_LARGE") from exc
             if len(encoded) > self.max_frame_bytes:
                 raise HardwareTransportError("HW_FRAME_TOO_LARGE")
             parsed = _strict_json_loads(encoded.decode("utf-8"))
