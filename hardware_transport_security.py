@@ -438,6 +438,11 @@ class HardwareEnvelopeVerifier:
             raise HardwareTransportError("HW_ENVELOPE_TYPE_INVALID")
         if set(parsed) != _REQUIRED_TOP_LEVEL:
             raise HardwareTransportError("HW_ENVELOPE_FIELDS_INVALID")
+        # Never coerce protocol identity, freshness, or authentication fields.
+        # bool/int/list values must not alias enrolled string identifiers.
+        for field in ("version", "kind", "device_id", "timestamp", "nonce", "mac"):
+            if type(parsed[field]) is not str:
+                raise HardwareTransportError("HW_ENVELOPE_FIELD_TYPE_INVALID")
         return parsed
 
     def _prune(self, cache: BoundedReplayCache, now_mono: float) -> None:
