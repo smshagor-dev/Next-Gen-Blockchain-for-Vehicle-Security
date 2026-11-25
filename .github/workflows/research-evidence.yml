@@ -41,3 +41,234 @@ jobs:
         env:
           PYTHONPATH: .
         run: python -m unittest -v tests.test_experiment_framework
+
+      - name: Validate runtime observation boundaries
+        run: python -m unittest tests.test_claim_validation_runtime_evidence -v
+      - name: Validate claim-specific eligibility controls
+        run: python -m unittest tests.test_claim_validation_gate -v
+      - name: Validate design adjudication and trust sensitivity
+        run: python -m unittest tests.test_claim_validation_design_reference -v
+      - name: Validate performance and freshness analysis
+        run: python -m unittest tests.test_claim_validation_performance_probe -v
+      - name: Validate paired comparison controls
+        run: python -m unittest tests.test_claim_validation_paired_comparison -v
+      - name: Execute actual-engine claim validity controls
+        run: python -m unittest tests.test_claim_validation_consensus_probe -v
+      - name: Execute exploratory claim validity campaign
+        run: python -m experiments.claim_validation.consensus_probe --out claim-results/consensus
+      - name: Preserve raw claim validity traces and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-consensus-pilot
+          path: claim-results/consensus/
+          if-no-files-found: error
+
+      - name: Execute actual sync admission controls
+        run: python -m unittest tests.test_claim_validation_identity_probe -v
+      - name: Execute exploratory identity claim validity campaign
+        run: python -m experiments.claim_validation.identity_probe --out claim-results/identity
+      - name: Preserve raw identity claim validity traces and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-identity-pilot
+          path: claim-results/identity/
+          if-no-files-found: error
+
+      - name: Compare consensus and identity methods on matched traces
+        run: |
+          python -m experiments.claim_validation.paired_comparison --domain consensus --source claim-results/consensus --out claim-results/comparison-consensus
+          python -m experiments.claim_validation.paired_comparison --domain identity --source claim-results/identity --out claim-results/comparison-identity
+      - name: Preserve paired comparison results
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-paired-consensus-identity
+          path: claim-results/comparison-*/
+          if-no-files-found: error
+
+      - name: Execute design reference and observer sensitivity
+        run: |
+          python -m experiments.claim_validation.design_analysis --domain consensus --source claim-results/consensus --out claim-results/design-consensus
+          python -m experiments.claim_validation.design_analysis --domain identity --source claim-results/identity --out claim-results/design-identity
+      - name: Preserve design analysis including disagreements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-design-consensus-identity
+          path: claim-results/design-*/
+          if-no-files-found: warn
+
+      - name: Measure local decision overhead and freshness sensitivity
+        run: |
+          python -m experiments.claim_validation.performance_probe --domain consensus --source claim-results/consensus --out claim-results/performance-consensus
+          python -m experiments.claim_validation.performance_probe --domain identity --source claim-results/identity --out claim-results/performance-identity
+      - name: Preserve performance and freshness results
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-performance-consensus-identity
+          path: claim-results/performance-*/
+          if-no-files-found: error
+
+      - name: Validate frozen held-out schedule and isolated controls
+        run: python -m unittest tests.test_claim_validation_heldout_runner -v
+      - name: Execute new held-out local component trials
+        run: |
+          python -m experiments.claim_validation.heldout_runner --domain consensus --out claim-results/heldout-consensus
+          python -m experiments.claim_validation.heldout_runner --domain identity --out claim-results/heldout-identity
+      - name: Preserve held-out outcomes including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-heldout-consensus-identity
+          path: claim-results/heldout-*/
+          if-no-files-found: warn
+
+      - name: Record execution environment for archive
+        run: python -m experiments.claim_validation.reproducibility_package --environment environment-local
+      - name: Preserve execution environment
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-environment-local
+          path: environment-local/
+          if-no-files-found: error
+
+  pqc-claim-pilot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build repository-pinned native liboqs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone https://github.com/open-quantum-safe/liboqs.git "$RUNNER_TEMP/liboqs-source"
+          git -C "$RUNNER_TEMP/liboqs-source" checkout --detach 5a1a854b0dc9f2141bdc771c555ee60c37950183
+          cmake -S "$RUNNER_TEMP/liboqs-source" -B "$RUNNER_TEMP/liboqs-build" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DOQS_BUILD_ONLY_LIB=ON '-DOQS_MINIMAL_BUILD=KEM_ml_kem_512;SIG_ml_dsa_44' -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/oqs"
+          cmake --build "$RUNNER_TEMP/liboqs-build" --parallel 2
+          cmake --install "$RUNNER_TEMP/liboqs-build"
+          echo "OQS_INSTALL_PATH=$RUNNER_TEMP/oqs" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$RUNNER_TEMP/oqs/lib:$RUNNER_TEMP/oqs/lib64" >> "$GITHUB_ENV"
+      - name: Install pinned provider bindings
+        run: python -m pip install --disable-pip-version-check "liboqs-python==0.16.0.2" "cryptography==46.0.5"
+      - name: Execute actual crypto handshake controls
+        run: python -m unittest tests.test_claim_validation_pqc_probe -v
+      - name: Execute exploratory PQC claim validity campaign
+        run: python -m experiments.claim_validation.pqc_probe --out claim-results/pqc
+      - name: Preserve raw handshake decisions and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-pqc-pilot
+          path: claim-results/pqc/
+          if-no-files-found: error
+
+      - name: Compare PQC methods on matched traces
+        run: python -m experiments.claim_validation.paired_comparison --domain pqc --source claim-results/pqc --out claim-results/comparison-pqc
+      - name: Preserve paired PQC comparison results
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-paired-pqc
+          path: claim-results/comparison-pqc/
+          if-no-files-found: error
+
+      - name: Execute PQC design reference and observer sensitivity
+        run: python -m experiments.claim_validation.design_analysis --domain pqc --source claim-results/pqc --out claim-results/design-pqc
+      - name: Preserve PQC design analysis including disagreements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-design-pqc
+          path: claim-results/design-pqc/
+          if-no-files-found: warn
+
+      - name: Measure PQC decision overhead and freshness sensitivity
+        run: python -m experiments.claim_validation.performance_probe --domain pqc --source claim-results/pqc --out claim-results/performance-pqc
+      - name: Preserve PQC performance results
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-performance-pqc
+          path: claim-results/performance-pqc/
+          if-no-files-found: error
+
+      - name: Execute new held-out native crypto provider trials
+        run: python -m experiments.claim_validation.heldout_runner --domain pqc --out claim-results/heldout-pqc
+      - name: Preserve held-out PQC outcomes including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-heldout-pqc
+          path: claim-results/heldout-pqc/
+          if-no-files-found: warn
+
+      - name: Record execution environment for archive
+        run: python -m experiments.claim_validation.reproducibility_package --environment environment-pqc
+      - name: Preserve execution environment
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-environment-pqc
+          path: environment-pqc/
+          if-no-files-found: error
+
+  publication-evidence-audit:
+    needs: [evidence-integrity, pqc-claim-pilot]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install pinned plotting dependencies
+        run: python -m pip install --disable-pip-version-check "numpy==1.26.4" "matplotlib==3.10.0"
+      - name: Download held-out consensus and identity
+        uses: actions/download-artifact@v4
+        with:
+          name: claim-validity-heldout-consensus-identity
+          path: audit-input/local
+      - name: Download held-out PQC
+        uses: actions/download-artifact@v4
+        with:
+          name: claim-validity-heldout-pqc
+          path: audit-input/pqc
+      - name: Verify raw artifacts and regenerate publication figures
+        run: python -m experiments.claim_validation.publication_audit --input audit-input --out publication-results
+      - name: Preserve audited figures and tables
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-publication-evidence
+          path: publication-results/
+          if-no-files-found: error
+
+      - name: Record execution environment for archive
+        run: python -m experiments.claim_validation.reproducibility_package --environment environment-audit
+      - name: Preserve execution environment
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-environment-audit
+          path: environment-audit/
+          if-no-files-found: error
+
+  reproducibility-package:
+    needs: [evidence-integrity, pqc-claim-pilot, publication-evidence-audit]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download same-run research evidence
+        uses: actions/download-artifact@v4
+        with:
+          pattern: claim-validity-*
+          path: package-input
+          merge-multiple: false
+      - name: Assemble scoped reproducibility package
+        run: python -m experiments.claim_validation.reproducibility_package --input package-input --out deposition
+      - name: Preserve author-review archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-validity-zenodo-candidate
+          path: deposition/
+          if-no-files-found: error
